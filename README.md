@@ -16,9 +16,9 @@ Note:
 AOS is a kind of webDav protocol implemented in Alfresco ECM
 
 Important note:
-This a a pre-alpha release, there is still lot of work to be done.
-The software architecture may (and certainly will) change in the future
-Nevertheless, basic operations (open / read/ write / delete / move) are supported
+This a a pre-alpha release, there is still lot of work to be done.<br/>
+The software architecture may (and certainly will) change in the future.<br/>
+Nevertheless, basic operations (open / read/ write / delete / move) are working.<br/>
 
 Based on WinFSP by Bill Zissimopoulos (https://github.com/billziss-gh/winfsp)<br/>
 Based on the WebdavClient library by Itay Sagui (https://github.com/saguiitay/WebDAVClient)
