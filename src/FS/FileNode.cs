@@ -160,17 +160,20 @@ namespace KS2Drive.FS
             this.handle = $"{Interlocked.Increment(ref FileNode._handle).ToString()}";
         }
 
-        public void FillContent(WebDAVClient.Client Proxy)
+        public void FillContent(WebDAVClient.Client Proxy, WebDAVMode davMode, String DocumentLibraryPath)
         {
             if (this.FileData != null) return;
-            this.FileData = GetContent(Proxy);
+            this.FileData = GetContent(Proxy, davMode, DocumentLibraryPath);
         }
 
-        public Byte[] GetContent(WebDAVClient.Client Proxy)
+        public Byte[] GetContent(WebDAVClient.Client Proxy, WebDAVMode davMode, String DocumentLibraryPath)
         {
+            String Path = this.RepositoryPath;
+            if (davMode == WebDAVMode.AOS && this.RepositoryPath.StartsWith(DocumentLibraryPath)) Path = Path.Substring(DocumentLibraryPath.Length);
+
             try
             {
-                System.IO.Stream s = Proxy.Download(this.RepositoryPath).GetAwaiter().GetResult();
+                System.IO.Stream s = Proxy.Download(Path).GetAwaiter().GetResult();
                 using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
                 {
                     s.CopyTo(ms);

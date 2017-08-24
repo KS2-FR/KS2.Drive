@@ -40,6 +40,9 @@ namespace KS2Drive
             DebugTread.Start();
 
             bool IsSync = false;
+            //TEMP
+            //IsSync = true;
+            //TEMP
             if (HostX.Mount($"{DriveName}:", null, IsSync, 0) < 0) throw new IOException("cannot mount file system");
         }
 
