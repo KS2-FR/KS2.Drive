@@ -73,6 +73,10 @@ namespace KS2Drive.FS
 
         public davFS(Boolean CaseInsensitive, UInt32 MaxFileNodes, UInt32 MaxFileSize, String RootSddl, WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
         {
+            //TEMP
+            //System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
+            //TEMP
+
             this.MaxFileNodes = MaxFileNodes;
             this.MaxFileSize = MaxFileSize;
             this.flushMode = flushMode;
@@ -1489,7 +1493,7 @@ namespace KS2Drive.FS
         {
             var Proxy = new WebDAVClient.Client(new NetworkCredential { UserName = this.DAVLogin, Password = this.DAVPassword });
             Proxy.Server = this.DAVServer;
-            Proxy.BasePath = "/";
+            Proxy.BasePath = this._DocumentLibraryPath;
             return Proxy;
         }
 

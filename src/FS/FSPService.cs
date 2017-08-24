@@ -35,7 +35,6 @@ namespace KS2Drive
             HostX.Prefix = null;
             HostX.FileSystemName = "DAVFS";
 
-
             //Start debug window
             DebugTread = new Thread(() => Application.Run(new DebugView(davFs)));
             DebugTread.Start();

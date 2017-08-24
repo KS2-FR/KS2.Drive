@@ -34,7 +34,7 @@
                     <Style.Resources>
                         <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
                             <VisualBrush.Visual>
-                                <Label Content="ex : http://10.10.100.113/alfresco/aos/Sites/swsdp/documentLibrary" Foreground="LightGray" />
+                                <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/Sites/swsdp/documentLibrary" Foreground="LightGray" />
                             </VisualBrush.Visual>
                         </VisualBrush>
                     </Style.Resources>
