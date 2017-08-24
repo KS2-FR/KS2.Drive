@@ -13,7 +13,7 @@ Usage :
 - Hit "Mount"
 
 Note:
-AOS is a kind of webDav protocol implemented in Alfresco ECM
+AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
 
 Important note:
 This a a pre-alpha release, there is still lot of work to be done.<br/>
