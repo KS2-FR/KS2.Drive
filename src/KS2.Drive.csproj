@@ -77,13 +77,13 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Debug\DebugView.cs">
+    <Compile Include="Debugging\DebugMessage.cs" />
+    <Compile Include="Debugging\DebugView.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Debug\DebugView.Designer.cs">
+    <Compile Include="Debugging\DebugView.Designer.cs">
       <DependentUpon>DebugView.cs</DependentUpon>
     </Compile>
-    <Compile Include="Debug\DebugMessage.cs" />
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />
@@ -118,7 +118,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <EmbeddedResource Include="Debug\DebugView.resx">
+    <EmbeddedResource Include="Debugging\DebugView.resx">
       <DependentUpon>DebugView.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
