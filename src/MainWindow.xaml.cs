@@ -79,7 +79,7 @@ namespace KS2Drive
                     return;
                 }
 
-                service.MountX(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password);
+                service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password);
 
                 button1.Content = "Unmount";
                 IsMounted = true;
@@ -89,7 +89,7 @@ namespace KS2Drive
             }
             else
             {
-                service.UnmountX();
+                service.Unmount();
 
                 button1.Content = "Mount";
                 IsMounted = false;

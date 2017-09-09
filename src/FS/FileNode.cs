@@ -160,30 +160,23 @@ namespace KS2Drive.FS
             this.handle = $"{Interlocked.Increment(ref FileNode._handle).ToString()}";
         }
 
-        public void FillContent(WebDAVClient.Client Proxy, WebDAVMode davMode, String DocumentLibraryPath)
+        public void FillContent(WebDavClient2 Proxy)
         {
             if (this.FileData != null) return;
-            this.FileData = GetContent(Proxy, davMode, DocumentLibraryPath);
-        }
-
-        public Byte[] GetContent(WebDAVClient.Client Proxy, WebDAVMode davMode, String DocumentLibraryPath)
-        {
-            String Path = this.RepositoryPath;
-            if (davMode == WebDAVMode.AOS && this.RepositoryPath.StartsWith(DocumentLibraryPath)) Path = Path.Substring(DocumentLibraryPath.Length);
 
             try
             {
-                System.IO.Stream s = Proxy.Download(Path).GetAwaiter().GetResult();
+                System.IO.Stream s = Proxy.Download(this.RepositoryPath).GetAwaiter().GetResult();
                 using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
                 {
                     s.CopyTo(ms);
-                    return ms.ToArray();
+                    this.FileData = ms.ToArray();
                 }
             }
             catch (Exception ex)
             {
                 davFS.LogError($"{this.handle} ***FillContent failed for file {this.RepositoryPath}*** {ex.Message}");
-                return null;
+                this.FileData = null;
             }
         }
     }

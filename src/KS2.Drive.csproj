@@ -83,9 +83,9 @@
     <Compile Include="Debug\DebugView.Designer.cs">
       <DependentUpon>DebugView.cs</DependentUpon>
     </Compile>
-    <Compile Include="FS\DebugMessage.cs" />
+    <Compile Include="Debug\DebugMessage.cs" />
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
-    <Compile Include="FS\enum.cs" />
+    <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />
     <Compile Include="FS\RepositoryElement.cs" />
     <Page Include="MainWindow.xaml">
@@ -98,6 +98,7 @@
     </Compile>
     <Compile Include="FS\davFS.cs" />
     <Compile Include="FS\FileNode.cs" />
+    <Compile Include="FS\WebDavClient2.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

@@ -18,6 +18,7 @@ using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Collections.Concurrent;
 using KS2Drive.Debug;
+using System.Threading.Tasks;
 
 namespace KS2Drive.FS
 {
@@ -31,13 +32,13 @@ namespace KS2Drive.FS
         private UInt32 MaxFileSize;
         private String VolumeLabel;
         private String DAVServer;
-        private FlushMode flushMode;
+        private FlushMode FlushMode;
         private String DAVLogin;
         private String DAVPassword;
-        private WebDAVMode webDAVMode;
-        private String _DocumentLibraryPath;
+        private WebDAVMode WebDAVMode;
+        private String DocumentLibraryPath;
 
-        public const UInt16 MEMFS_SECTOR_SIZE = 512;
+        public const UInt16 MEMFS_SECTOR_SIZE = 4096;
         public const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
         #region Internal Cache management
@@ -71,19 +72,21 @@ namespace KS2Drive.FS
 
         #endregion
 
-        public davFS(Boolean CaseInsensitive, UInt32 MaxFileNodes, UInt32 MaxFileSize, String RootSddl, WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
+        public davFS(WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
         {
             //TEMP
             //System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
             //TEMP
 
-            this.MaxFileNodes = MaxFileNodes;
-            this.MaxFileSize = MaxFileSize;
-            this.flushMode = flushMode;
-            this.webDAVMode = webDAVMode;
+            this.MaxFileNodes = 1024;
+            this.MaxFileSize = 16 * 1024 * 1024;
+            this.FlushMode = flushMode;
+            this.WebDAVMode = webDAVMode;
+
             var ServerURL = new Uri(dAVURL);
             this.DAVServer = ServerURL.GetLeftPart(UriPartial.Authority);
-            this._DocumentLibraryPath = ServerURL.PathAndQuery;
+            this.DocumentLibraryPath = ServerURL.PathAndQuery;
+
             this.DAVLogin = DAVLogin;
             this.DAVPassword = DAVPassword;
         }
@@ -122,13 +125,6 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
-        //Temporary until having a better understanding
-        private String ConvertForAOS(String input)
-        {
-            if (this.webDAVMode == WebDAVMode.AOS && input.StartsWith(this._DocumentLibraryPath)) return input.Substring(this._DocumentLibraryPath.Length);
-            return input;
-        }
-
         /// <summary>
         /// Affecte un nom au volume et retourne un volume info
         /// </summary>
@@ -155,7 +151,7 @@ namespace KS2Drive.FS
                 //We assume the FileName refers to a file
                 try
                 {
-                    RepositoryElement = Proxy.GetFile(ConvertForAOS(RepositoryDocumentName)).GetAwaiter().GetResult();
+                    RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
                     return new RepositoryElement(RepositoryElement, LocalFileName);
                 }
                 catch
@@ -169,7 +165,7 @@ namespace KS2Drive.FS
                 try
                 {
                     //We assume it's a folder
-                    RepositoryElement = Proxy.GetFolder(ConvertForAOS(RepositoryDocumentName)).GetAwaiter().GetResult();
+                    RepositoryElement = Proxy.GetFolder(RepositoryDocumentName).GetAwaiter().GetResult();
                     if (IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
                     return new RepositoryElement(RepositoryElement, LocalFileName);
                 }
@@ -177,7 +173,7 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        RepositoryElement = Proxy.GetFile(ConvertForAOS(RepositoryDocumentName)).GetAwaiter().GetResult();
+                        RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
                         return new RepositoryElement(RepositoryElement, LocalFileName);
                     }
                     catch
@@ -215,9 +211,9 @@ namespace KS2Drive.FS
                     }
                     else
                     {
-                        FileAttributes = FileNode.GetElementAttribute(FoundElement, this.webDAVMode);
+                        FileAttributes = FileNode.GetElementAttribute(FoundElement, this.WebDAVMode);
                         if (null != SecurityDescriptor) SecurityDescriptor = FileNode.GetDefaultSecurity();
-                        var D = FileNode.CreateFromWebDavObject(FoundElement, this.webDAVMode);
+                        var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
                         AddFileToCache(D);
                         DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
                         return STATUS_SUCCESS;
@@ -291,7 +287,7 @@ namespace KS2Drive.FS
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
-                    CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.webDAVMode);
+                    CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
                     AddFileToCache(CFN);
                     Int32 i = Interlocked.Increment(ref CFN.OpenCount);
                     DebugEnd(OperationId, "STATUS_SUCCESS - From Repository - Handle {i}");
@@ -385,19 +381,19 @@ namespace KS2Drive.FS
                                 var ParentElement = GetRepositoryElement(ParentPath);
                                 if (ParentElement != null)
                                 {
-                                    ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.webDAVMode)));
+                                    ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.WebDAVMode)));
                                 }
                             }
                         }
                     }
 
                     var Proxy = GenerateProxy();
-                    IEnumerable<WebDAVClient.Model.Item> ItemsInFolder = Proxy.List(ConvertForAOS(CFN.RepositoryPath)).GetAwaiter().GetResult();
+                    IEnumerable<WebDAVClient.Model.Item> ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
                     bool IsFirst = true;
                     foreach (var Children in ItemsInFolder)
                     {
                         if (IsFirst) { IsFirst = false; continue; }
-                        var Element = FileNode.CreateFromWebDavObject(new RepositoryElement(Children, ConvertRepositoryPathToLocalPath(Children.Href)), this.webDAVMode);
+                        var Element = FileNode.CreateFromWebDavObject(new RepositoryElement(Children, ConvertRepositoryPathToLocalPath(Children.Href)), this.WebDAVMode);
                         ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
                     }
 
@@ -493,9 +489,9 @@ namespace KS2Drive.FS
                 var Proxy = GenerateProxy();
                 if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
                 {
-                    if (Proxy.Upload(ConvertForAOS(RepositoryNewDocumentParentPath), new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
+                    if (Proxy.Upload(RepositoryNewDocumentParentPath, new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
                     {
-                        CFN = FileNode.CreateFromWebDavObject(GetRepositoryElement(FileName), this.webDAVMode);
+                        CFN = FileNode.CreateFromWebDavObject(GetRepositoryElement(FileName), this.WebDAVMode);
                     }
                     else
                     {
@@ -505,9 +501,9 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    if (Proxy.CreateDir(ConvertForAOS(RepositoryNewDocumentParentPath), NewDocumentName).GetAwaiter().GetResult())
+                    if (Proxy.CreateDir(RepositoryNewDocumentParentPath, NewDocumentName).GetAwaiter().GetResult())
                     {
-                        CFN = FileNode.CreateFromWebDavObject(GetRepositoryElement(FileName), this.webDAVMode);
+                        CFN = FileNode.CreateFromWebDavObject(GetRepositoryElement(FileName), this.WebDAVMode);
                     }
                     else
                     {
@@ -588,7 +584,6 @@ namespace KS2Drive.FS
 
             try
             {
-
                 Int32 Result = SetFileSizeInternal(CFN, AllocationSize, true);
                 if (Result < 0)
                 {
@@ -642,7 +637,7 @@ namespace KS2Drive.FS
             catch (Exception ex)
             {
                 DebugEnd(OperationId, $"Exception {ex.Message}");
-                return -1;
+                return STATUS_UNEXPECTED_IO_ERROR;
             }
         }
 
@@ -666,14 +661,14 @@ namespace KS2Drive.FS
                 DebugEnd(OperationId, $"STATUS_SUCCESS - Handle {HandleCount}");
             }
 
-            if (this.flushMode == FlushMode.FlushAtCleanup)
+            if (this.FlushMode == FlushMode.FlushAtCleanup)
             {
                 if (CFN.HasUnflushedData)
                 {
                     try
                     {
                         var Proxy = GenerateProxy();
-                        if (!Proxy.Upload(ConvertForAOS(GetRepositoryParentPath(CFN.RepositoryPath)), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                        if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                         {
                             throw new Exception("Upload failed"); // TODO / ?
                         }
@@ -715,7 +710,7 @@ namespace KS2Drive.FS
                     try
                     {
                         //Fichier
-                        Proxy.DeleteFile(ConvertForAOS(CFN.RepositoryPath)).GetAwaiter().GetResult();
+                        Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
                         DebugEnd(OperationId, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
@@ -727,8 +722,8 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        //Fichier
-                        Proxy.DeleteFolder(ConvertForAOS(CFN.RepositoryPath)).GetAwaiter().GetResult();
+                        //Répertoire
+                        Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
                         DebugEnd(OperationId, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
@@ -739,7 +734,7 @@ namespace KS2Drive.FS
             }
             else
             {
-                if (this.flushMode == FlushMode.FlushAtCleanup)
+                if (this.FlushMode == FlushMode.FlushAtCleanup)
                 {
                     if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
                     {
@@ -748,7 +743,7 @@ namespace KS2Drive.FS
                             var Proxy = GenerateProxy();
                             try
                             {
-                                if (!Proxy.Upload(ConvertForAOS(GetRepositoryParentPath(CFN.RepositoryPath)), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                                if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                                 {
                                     throw new Exception("Upload failed"); //TODO : ?
                                 }
@@ -828,7 +823,7 @@ namespace KS2Drive.FS
             try
             {
                 var Proxy = GenerateProxy();
-                CFN.FillContent(Proxy, webDAVMode, _DocumentLibraryPath);
+                CFN.FillContent(Proxy);
 
                 if (CFN.FileData == null)
                 {
@@ -954,7 +949,7 @@ namespace KS2Drive.FS
                             BytesTransferred = default(UInt32);
                             FileInfo = default(FileInfo);
                             DebugEnd(OperationId, Result.ToString());
-                            return Result;
+                            return STATUS_UNEXPECTED_IO_ERROR;
                         }
                     }
                 }
@@ -970,16 +965,16 @@ namespace KS2Drive.FS
                     BytesTransferred = default(UInt32);
                     FileInfo = default(FileInfo);
                     DebugEnd(OperationId, "-1");
-                    return -1;
+                    return STATUS_UNEXPECTED_IO_ERROR;
                 }
 
-                if (this.flushMode == FlushMode.FlushAtWrite)
+                if (this.FlushMode == FlushMode.FlushAtWrite)
                 {
                     var Proxy = GenerateProxy();
-                    if (!Proxy.Upload(ConvertForAOS(GetRepositoryParentPath(CFN.RepositoryPath)), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                    if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                     {
                         DebugEnd(OperationId, "Upload failed");
-                        return -1;
+                        return STATUS_UNEXPECTED_IO_ERROR;
                     }
                 }
                 else
@@ -996,7 +991,7 @@ namespace KS2Drive.FS
             {
                 LogNotify($"{CFN.handle} Write error {CFN.LocalPath} at {Offset} - {ex.Message}");
                 DebugEnd(OperationId, $"Exception : {ex.Message}");
-                return -1;
+                return STATUS_UNEXPECTED_IO_ERROR;
             }
 
             /*
@@ -1064,7 +1059,7 @@ namespace KS2Drive.FS
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                 {
                     //Fichier
-                    if (!Proxy.MoveFile(ConvertForAOS(RepositoryDocumentName), ConvertForAOS(RepositoryTargetDocumentName)).GetAwaiter().GetResult())
+                    if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
                         DebugEnd(OperationId, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
@@ -1073,7 +1068,7 @@ namespace KS2Drive.FS
                 else
                 {
                     //Répertoire
-                    if (!Proxy.MoveFolder(ConvertForAOS(RepositoryDocumentName), ConvertForAOS(RepositoryTargetDocumentName)).GetAwaiter().GetResult())
+                    if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
                         DebugEnd(OperationId, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
@@ -1295,7 +1290,7 @@ namespace KS2Drive.FS
             FileNode.FileSecurity = ModifySecurityDescriptor(
                 FileNode.FileSecurity, Sections, SecurityDescriptor);
             */
-            return STATUS_SUCCESS;
+            return STATUS_INVALID_DEVICE_REQUEST;
         }
 
         public override Boolean GetStreamEntry(
@@ -1368,7 +1363,7 @@ namespace KS2Drive.FS
 
             ReparseData = FileNode.ReparseData;
             */
-            return STATUS_SUCCESS;
+            return STATUS_INVALID_DEVICE_REQUEST;
         }
 
         public override Int32 GetReparsePoint(
@@ -1390,7 +1385,7 @@ namespace KS2Drive.FS
 
             ReparseData = FileNode.ReparseData;
             */
-            return STATUS_SUCCESS;
+            return STATUS_INVALID_DEVICE_REQUEST;
         }
 
         public override Int32 SetReparsePoint(
@@ -1421,7 +1416,7 @@ namespace KS2Drive.FS
             FileNode.FileInfo.ReparseTag = GetReparseTag(ReparseData);
             FileNode.ReparseData = ReparseData;
             */
-            return STATUS_SUCCESS;
+            return STATUS_INVALID_DEVICE_REQUEST;
         }
 
         public override Int32 DeleteReparsePoint(
@@ -1451,7 +1446,7 @@ namespace KS2Drive.FS
             FileNode.FileInfo.ReparseTag = 0;
             FileNode.ReparseData = null;
             */
-            return STATUS_SUCCESS;
+            return STATUS_INVALID_DEVICE_REQUEST;
         }
 
         #endregion
@@ -1460,7 +1455,7 @@ namespace KS2Drive.FS
 
         public String ConvertLocalPathToRepositoryPath(String LocalPath)
         {
-            String ReworkdPath = _DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            String ReworkdPath = DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
             if (ReworkdPath.EndsWith("/")) ReworkdPath = ReworkdPath.Substring(0, ReworkdPath.Length - 1);
             return ReworkdPath;
         }
@@ -1469,21 +1464,21 @@ namespace KS2Drive.FS
         {
             if (CMISPath.EndsWith("/")) CMISPath = CMISPath.Substring(0, CMISPath.Length - 1);
 
-            String ReworkdPath = CMISPath.Replace(_DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
+            String ReworkdPath = CMISPath.Replace(DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
         }
 
         private bool IsRepositoryRootPath(String RepositoryPath)
         {
-            return RepositoryPath.Equals(_DocumentLibraryPath);
+            return RepositoryPath.Equals(DocumentLibraryPath);
         }
 
         public String GetRepositoryDocumentName(String DocumentPath)
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (DocumentPath.Equals(_DocumentLibraryPath)) return "\\";
+            if (DocumentPath.Equals(DocumentLibraryPath)) return "\\";
             return DocumentPath.Substring(DocumentPath.LastIndexOf('/') + 1);
         }
 
@@ -1491,17 +1486,14 @@ namespace KS2Drive.FS
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (DocumentPath.Equals(_DocumentLibraryPath)) return null;
-            if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
+            if (DocumentPath.Equals(DocumentLibraryPath)) return null;
+            if (DocumentPath.Length < DocumentLibraryPath.Length) return null;
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
         }
 
-        private WebDAVClient.Client GenerateProxy()
+        private WebDavClient2 GenerateProxy()
         {
-            var Proxy = new WebDAVClient.Client(new NetworkCredential { UserName = this.DAVLogin, Password = this.DAVPassword });
-            Proxy.Server = this.DAVServer;
-            Proxy.BasePath = this._DocumentLibraryPath;
-            return Proxy;
+            return new WebDavClient2(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword);
         }
 
         private static object loglock = new object();
