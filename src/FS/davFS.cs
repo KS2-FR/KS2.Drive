@@ -22,7 +22,7 @@ using System.Threading.Tasks;
 
 namespace KS2Drive.FS
 {
-    public class davFS : FileSystemBase
+    public class DavFS : FileSystemBase
     {
         public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
         public EventHandler DebugMessagePosted;
@@ -72,18 +72,20 @@ namespace KS2Drive.FS
 
         #endregion
 
-        public davFS(WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
+        public DavFS(WebDAVMode webDAVMode, String DavServer, FlushMode flushMode, String DAVLogin, String DAVPassword)
         {
             //TEMP
             //System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
             //TEMP
+
+            //TODO : validate parameters
 
             this.MaxFileNodes = 1024;
             this.MaxFileSize = 16 * 1024 * 1024;
             this.FlushMode = flushMode;
             this.WebDAVMode = webDAVMode;
 
-            var ServerURL = new Uri(dAVURL);
+            var ServerURL = new Uri(DavServer);
             this.DAVServer = ServerURL.GetLeftPart(UriPartial.Authority);
             this.DocumentLibraryPath = ServerURL.PathAndQuery;
 
@@ -97,8 +99,8 @@ namespace KS2Drive.FS
         public override Int32 Init(Object Host0)
         {
             FileSystemHost Host = (FileSystemHost)Host0;
-            Host.SectorSize = davFS.MEMFS_SECTOR_SIZE;
-            Host.SectorsPerAllocationUnit = davFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+            Host.SectorSize = DavFS.MEMFS_SECTOR_SIZE;
+            Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
             Host.VolumeSerialNumber = (UInt32)(Host.VolumeCreationTime / (10000 * 1000));
             Host.CaseSensitiveSearch = false;

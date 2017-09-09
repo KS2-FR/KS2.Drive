@@ -96,7 +96,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="FS\davFS.cs" />
+    <Compile Include="FS\DavFS.cs" />
     <Compile Include="FS\FileNode.cs" />
     <Compile Include="FS\WebDavClient2.cs" />
     <Compile Include="MainWindow.xaml.cs">
