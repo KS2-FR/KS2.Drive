@@ -74,18 +74,20 @@ namespace KS2Drive.FS
 
         #endregion
 
-        public DavFS(WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
+        public DavFS(WebDAVMode webDAVMode, String DavServer, FlushMode flushMode, String DAVLogin, String DAVPassword)
         {
             //TEMP
             System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
             //TEMP
+
+            //TODO : validate parameters
 
             this.MaxFileNodes = 1024;
             this.MaxFileSize = 16 * 1024 * 1024;
             this.FlushMode = flushMode;
             this.WebDAVMode = webDAVMode;
 
-            var ServerURL = new Uri(dAVURL);
+            var ServerURL = new Uri(DavServer);
             this.DAVServer = ServerURL.GetLeftPart(UriPartial.Authority);
             this.DocumentLibraryPath = ServerURL.PathAndQuery;
 
