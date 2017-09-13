@@ -152,6 +152,7 @@ namespace KS2Drive.FS
 
             if (RepositoryDocumentName.Contains("."))
             {
+                //TODO : Proper Catching
                 //We assume the FileName refers to a file
                 try
                 {
@@ -166,6 +167,7 @@ namespace KS2Drive.FS
             }
             else
             {
+                //TODO : Proper Catching
                 try
                 {
                     //We assume it's a folder
@@ -175,6 +177,7 @@ namespace KS2Drive.FS
                 }
                 catch (Exception ex)
                 {
+                    //TODO : Proper Catching
                     try
                     {
                         RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
@@ -386,6 +389,7 @@ namespace KS2Drive.FS
 
                 var Proxy = GenerateProxy();
                 IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
+                //TODO : Proper Catching
                 try
                 {
                     ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
@@ -738,6 +742,8 @@ namespace KS2Drive.FS
                 var Proxy = GenerateProxy();
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                 {
+                    //TODO : Proper Catching
+
                     try
                     {
                         //Fichier
@@ -751,6 +757,7 @@ namespace KS2Drive.FS
                 }
                 else
                 {
+                    //TODO : Proper Catching
                     try
                     {
                         //Répertoire
@@ -771,6 +778,7 @@ namespace KS2Drive.FS
                     {
                         if (CFN.HasUnflushedData)
                         {
+                            //TODO : Proper Catching
                             var Proxy = GenerateProxy();
                             try
                             {
@@ -1004,6 +1012,7 @@ namespace KS2Drive.FS
                     var Proxy = GenerateProxy();
                     try
                     {
+                        //TODO : Proper Catching
                         if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                         {
                             //TODO : Remove from cache ?
@@ -1099,6 +1108,7 @@ namespace KS2Drive.FS
                 var Proxy = GenerateProxy();
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                 {
+                    //TODO : Proper Catching
                     //Fichier
                     if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
@@ -1108,6 +1118,7 @@ namespace KS2Drive.FS
                 }
                 else
                 {
+                    //TODO : Proper Catching
                     //Répertoire
                     if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
