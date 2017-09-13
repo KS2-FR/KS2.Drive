@@ -75,7 +75,7 @@ namespace KS2Drive.FS
         public davFS(WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
         {
             //TEMP
-            //System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
+            System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
             //TEMP
 
             this.MaxFileNodes = 1024;
@@ -363,56 +363,29 @@ namespace KS2Drive.FS
                 OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
+                List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
+                if (!IsRepositoryRootPath(CFN.RepositoryPath))
+                {
+                    //if this is not the root directory add the dot entries
+                    if (Marker == null) ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
+
+                    if (null == Marker || "." == Marker)
+                    {
+                        String ParentPath = ConvertRepositoryPathToLocalPath(GetRepositoryParentPath(CFN.RepositoryPath));
+                        if (ParentPath != null)
+                        {
+                            var ParentElement = GetRepositoryElement(ParentPath);
+                            if (ParentElement != null) ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.WebDAVMode)));
+                        }
+                    }
+                }
+
+                var Proxy = GenerateProxy();
+                IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
                 try
                 {
-                    List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
-                    if (!IsRepositoryRootPath(CFN.RepositoryPath))
-                    {
-                        //if this is not the root directory add the dot entries
-                        if (null == Marker)
-                        {
-                            ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
-                        }
-                        if (null == Marker || "." == Marker)
-                        {
-                            String ParentPath = ConvertRepositoryPathToLocalPath(GetRepositoryParentPath(CFN.RepositoryPath));
-                            if (ParentPath != null)
-                            {
-                                var ParentElement = GetRepositoryElement(ParentPath);
-                                if (ParentElement != null)
-                                {
-                                    ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.WebDAVMode)));
-                                }
-                            }
-                        }
-                    }
 
-                    var Proxy = GenerateProxy();
-                    IEnumerable<WebDAVClient.Model.Item> ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
-                    bool IsFirst = true;
-                    foreach (var Children in ItemsInFolder)
-                    {
-                        if (IsFirst) { IsFirst = false; continue; }
-                        var Element = FileNode.CreateFromWebDavObject(new RepositoryElement(Children, ConvertRepositoryPathToLocalPath(Children.Href)), this.WebDAVMode);
-                        ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
-                    }
-
-                    if (!String.IsNullOrEmpty(Marker))
-                    {
-                        var WantedTuple = ChildrenFileNames.FirstOrDefault(x => x.Item1.Equals(Marker));
-                        var WantedTupleIndex = ChildrenFileNames.IndexOf(WantedTuple);
-                        if (WantedTupleIndex + 1 < ChildrenFileNames.Count)
-                        {
-                            ChildrenFileNames = ChildrenFileNames.GetRange(WantedTupleIndex + 1, ChildrenFileNames.Count - 1 - WantedTupleIndex);
-                        }
-                        else
-                        {
-                            ChildrenFileNames.Clear();
-                        }
-                    }
-
-                    Enumerator = ChildrenFileNames.GetEnumerator();
-                    Context = new DirectoryEnumeratorContext() { Enumerator = Enumerator, OperationId = OperationId };
+                    ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -421,6 +394,31 @@ namespace KS2Drive.FS
                     FileInfo = default(FileInfo);
                     return false;
                 }
+
+                bool IsFirst = true;
+                foreach (var Children in ItemsInFolder)
+                {
+                    if (IsFirst) { IsFirst = false; continue; }
+                    var Element = FileNode.CreateFromWebDavObject(new RepositoryElement(Children, ConvertRepositoryPathToLocalPath(Children.Href)), this.WebDAVMode);
+                    ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
+                }
+
+                if (!String.IsNullOrEmpty(Marker))
+                {
+                    var WantedTuple = ChildrenFileNames.FirstOrDefault(x => x.Item1.Equals(Marker));
+                    var WantedTupleIndex = ChildrenFileNames.IndexOf(WantedTuple);
+                    if (WantedTupleIndex + 1 < ChildrenFileNames.Count)
+                    {
+                        ChildrenFileNames = ChildrenFileNames.GetRange(WantedTupleIndex + 1, ChildrenFileNames.Count - 1 - WantedTupleIndex);
+                    }
+                    else
+                    {
+                        ChildrenFileNames.Clear();
+                    }
+                }
+
+                Enumerator = ChildrenFileNames.GetEnumerator();
+                Context = new DirectoryEnumeratorContext() { Enumerator = Enumerator, OperationId = OperationId };
             }
             else
             {
@@ -471,23 +469,22 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             NormalizedName = default(String);
 
-            try
+            FileNode CFN;
+
+            if (GetRepositoryElement(FileName) != null)
             {
-                FileNode CFN;
+                DebugEnd(OperationId, "STATUS_OBJECT_NAME_COLLISION");
+                return STATUS_OBJECT_NAME_COLLISION;
+            }
 
-                if (GetRepositoryElement(FileName) != null)
-                {
-                    DebugEnd(OperationId, "STATUS_OBJECT_NAME_COLLISION");
-                    LogError($"In Create [{FileName}] -> STATUS_OBJECT_NAME_COLLISION");
-                    return STATUS_OBJECT_NAME_COLLISION;
-                }
+            String NewDocumentName = Path.GetFileName(FileName);
+            String NewDocumentParentPath = Path.GetDirectoryName(FileName);
+            String RepositoryNewDocumentParentPath = ConvertLocalPathToRepositoryPath(NewDocumentParentPath);
 
-                String NewDocumentName = Path.GetFileName(FileName);
-                String NewDocumentParentPath = Path.GetDirectoryName(FileName);
-                String RepositoryNewDocumentParentPath = ConvertLocalPathToRepositoryPath(NewDocumentParentPath);
-
-                var Proxy = GenerateProxy();
-                if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
+            var Proxy = GenerateProxy();
+            if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
+            {
+                try
                 {
                     if (Proxy.Upload(RepositoryNewDocumentParentPath, new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
                     {
@@ -499,7 +496,15 @@ namespace KS2Drive.FS
                         return STATUS_CANNOT_MAKE;
                     }
                 }
-                else
+                catch (Exception ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return STATUS_ACCESS_DENIED;
+                }
+            }
+            else
+            {
+                try
                 {
                     if (Proxy.CreateDir(RepositoryNewDocumentParentPath, NewDocumentName).GetAwaiter().GetResult())
                     {
@@ -511,22 +516,22 @@ namespace KS2Drive.FS
                         return STATUS_CANNOT_MAKE;
                     }
                 }
-
-                AddFileToCache(CFN);
-
-                Interlocked.Increment(ref CFN.OpenCount);
-                FileNode0 = CFN;
-                FileInfo = CFN.FileInfo;
-                NormalizedName = FileName;
-
-                DebugEnd(OperationId, $"STATUS_SUCCESS - Handle {CFN.OpenCount}");
-                return STATUS_SUCCESS;
+                catch (Exception ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return STATUS_ACCESS_DENIED;
+                }
             }
-            catch (Exception ex)
-            {
-                DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
-                return STATUS_CANNOT_MAKE;
-            }
+
+            AddFileToCache(CFN);
+
+            Interlocked.Increment(ref CFN.OpenCount);
+            FileNode0 = CFN;
+            FileInfo = CFN.FileInfo;
+            NormalizedName = FileName;
+
+            DebugEnd(OperationId, $"STATUS_SUCCESS - Handle {CFN.OpenCount}");
+            return STATUS_SUCCESS;
 
             /*
             FileNode FileNode;
@@ -651,15 +656,8 @@ namespace KS2Drive.FS
             DebugStart(OperationId, CFN);
 
             Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
-            if (HandleCount == 0)
-            {
-                DeleteFileFromCache(CFN);
-                DebugEnd(OperationId, $"STATUS_SUCCESS - Handle 0");
-            }
-            else
-            {
-                DebugEnd(OperationId, $"STATUS_SUCCESS - Handle {HandleCount}");
-            }
+            if (HandleCount == 0) DeleteFileFromCache(CFN);
+
 
             if (this.FlushMode == FlushMode.FlushAtCleanup)
             {
@@ -670,15 +668,18 @@ namespace KS2Drive.FS
                         var Proxy = GenerateProxy();
                         if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                         {
-                            throw new Exception("Upload failed"); // TODO / ?
+                            throw new Exception("Upload failed");
                         }
                     }
                     catch (Exception ex)
                     {
+                        //TODO : What ?
                     }
                     CFN.HasUnflushedData = false;
                 }
             }
+
+            DebugEnd(OperationId, $"STATUS_SUCCESS - Handle 0");
         }
 
         public override void Cleanup(
@@ -971,10 +972,20 @@ namespace KS2Drive.FS
                 if (this.FlushMode == FlushMode.FlushAtWrite)
                 {
                     var Proxy = GenerateProxy();
-                    if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                    try
                     {
-                        DebugEnd(OperationId, "Upload failed");
-                        return STATUS_UNEXPECTED_IO_ERROR;
+                        if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                        {
+                            //TODO : Remove from cache ?
+                            DebugEnd(OperationId, "STATUS_UNEXPECTED_IO_ERROR - Upload failed");
+                            return STATUS_UNEXPECTED_IO_ERROR;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        //TODO : Remove from cache ?
+                        DebugEnd(OperationId, "STATUS_ACCESS_DENIED - Upload failed");
+                        return STATUS_ACCESS_DENIED;
                     }
                 }
                 else

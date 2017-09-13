@@ -29,7 +29,7 @@ namespace KS2Drive
 
         public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password)
         {
-            Host = new FileSystemHost(davFs = new davFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, Login, Password));
+            Host = new FileSystemHost(davFs = new davFS((WebDAVMode)Mode, URL, FlushMode.FlushAtWrite, Login, Password));
             Host.FileInfoTimeout = unchecked((UInt32)(-1));
             Host.Prefix = null;
             Host.FileSystemName = "davFS";
