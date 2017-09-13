@@ -14,7 +14,7 @@ namespace KS2Drive.Debug
 {
     public partial class DebugView : Form
     {
-        public DebugView(davFS MFS)
+        public DebugView(DavFS MFS)
         {
             Host = MFS;
 
@@ -23,7 +23,7 @@ namespace KS2Drive.Debug
             listView1.DoubleBuffering(true);
         }
 
-        private davFS Host;
+        private DavFS Host;
 
         private bool PauseDequeue = false;
         private object PauseDequeueLock = new object();

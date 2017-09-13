@@ -52,6 +52,7 @@
       <HintPath>..\packages\Microsoft.Net.Http.2.2.29\lib\net45\System.Net.Http.Primitives.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http.WebRequest" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -93,7 +94,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="FS\davFS.cs" />
+    <Compile Include="FS\DavFS.cs" />
     <Compile Include="FS\FileNode.cs" />
     <Compile Include="FS\WebDavClient2.cs" />
     <Compile Include="MainWindow.xaml.cs">

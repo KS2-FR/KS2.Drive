@@ -19,10 +19,12 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using KS2Drive.Debug;
 using System.Threading.Tasks;
+using WebDAVClient.Helpers;
+using System.Net.Http;
 
 namespace KS2Drive.FS
 {
-    public class davFS : FileSystemBase
+    public class DavFS : FileSystemBase
     {
         public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
         public EventHandler DebugMessagePosted;
@@ -72,7 +74,7 @@ namespace KS2Drive.FS
 
         #endregion
 
-        public davFS(WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
+        public DavFS(WebDAVMode webDAVMode, String dAVURL, FlushMode flushMode, String DAVLogin, String DAVPassword)
         {
             //TEMP
             System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
@@ -97,8 +99,8 @@ namespace KS2Drive.FS
         public override Int32 Init(Object Host0)
         {
             FileSystemHost Host = (FileSystemHost)Host0;
-            Host.SectorSize = davFS.MEMFS_SECTOR_SIZE;
-            Host.SectorsPerAllocationUnit = davFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+            Host.SectorSize = DavFS.MEMFS_SECTOR_SIZE;
+            Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
             Host.VolumeSerialNumber = (UInt32)(Host.VolumeCreationTime / (10000 * 1000));
             Host.CaseSensitiveSearch = false;
@@ -384,7 +386,6 @@ namespace KS2Drive.FS
                 IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
                 try
                 {
-
                     ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
@@ -449,6 +450,8 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        //TODO : Apply same try/catch for each Proxy calls
+
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -496,6 +499,16 @@ namespace KS2Drive.FS
                         return STATUS_CANNOT_MAKE;
                     }
                 }
+                catch (WebDAVException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                    return STATUS_CANNOT_MAKE;
+                }
+                catch (HttpRequestException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
                 catch (Exception ex)
                 {
                     DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
@@ -515,6 +528,21 @@ namespace KS2Drive.FS
                         DebugEnd(OperationId, "STATUS_CANNOT_MAKE");
                         return STATUS_CANNOT_MAKE;
                     }
+                }
+                catch (WebDAVConflictException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_COLLISION - {ex.Message}");
+                    return STATUS_OBJECT_NAME_COLLISION;
+                }
+                catch (WebDAVException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                    return STATUS_CANNOT_MAKE;
+                }
+                catch (HttpRequestException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {

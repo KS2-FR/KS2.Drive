@@ -175,7 +175,7 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
-                davFS.LogError($"{this.handle} ***FillContent failed for file {this.RepositoryPath}*** {ex.Message}");
+                DavFS.LogError($"{this.handle} ***FillContent failed for file {this.RepositoryPath}*** {ex.Message}");
                 this.FileData = null;
             }
         }
