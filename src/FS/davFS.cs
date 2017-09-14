@@ -82,7 +82,7 @@ namespace KS2Drive.FS
 
             //TODO : validate parameters
 
-            this.MaxFileNodes = 1024;
+            this.MaxFileNodes = 1024 * 1024;
             this.MaxFileSize = 16 * 1024 * 1024;
             this.FlushMode = flushMode;
             this.WebDAVMode = webDAVMode;
@@ -105,6 +105,10 @@ namespace KS2Drive.FS
             Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
             Host.VolumeSerialNumber = (UInt32)(Host.VolumeCreationTime / (10000 * 1000));
+            Host.FileInfoTimeout = unchecked((UInt32)(-1));
+            Host.Prefix = null;
+            Host.FileSystemName = "davFS";
+            Host.Prefix = $@"\{this.DAVServer}"; //mount as network drive
             Host.CaseSensitiveSearch = false;
             Host.CasePreservedNames = true;
             Host.UnicodeOnDisk = true;

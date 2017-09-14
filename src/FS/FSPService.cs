@@ -24,6 +24,8 @@ namespace KS2Drive
 
         public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password)
         {
+            //TODO : Test parameters
+
             DavFS davFs;
             try
             {
@@ -36,10 +38,6 @@ namespace KS2Drive
             }
 
             Host = new FileSystemHost(davFs);
-            Host.FileInfoTimeout = unchecked((UInt32)(-1));
-            Host.Prefix = null;
-            Host.FileSystemName = "davFS";
-            Host.Prefix = $@"\{new Uri(URL).Authority}"; //mount as network drive
 
 #if DEBUG
             //Start debug window
