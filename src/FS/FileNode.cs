@@ -159,25 +159,5 @@ namespace KS2Drive.FS
         {
             this.handle = $"{Interlocked.Increment(ref FileNode._handle).ToString()}";
         }
-
-        public void FillContent(WebDavClient2 Proxy)
-        {
-            if (this.FileData != null) return;
-
-            try
-            {
-                System.IO.Stream s = Proxy.Download(this.RepositoryPath).GetAwaiter().GetResult();
-                using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
-                {
-                    s.CopyTo(ms);
-                    this.FileData = ms.ToArray();
-                }
-            }
-            catch (Exception ex)
-            {
-                DavFS.LogError($"{this.handle} ***FillContent failed for file {this.RepositoryPath}*** {ex.Message}");
-                this.FileData = null;
-            }
-        }
     }
 }

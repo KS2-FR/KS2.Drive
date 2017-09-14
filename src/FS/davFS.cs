@@ -34,6 +34,9 @@ namespace KS2Drive.FS
         private UInt32 MaxFileSize;
         private String VolumeLabel;
         private String DAVServer;
+
+        public string DAVServeurAuthority { get; }
+
         private FlushMode FlushMode;
         private String DAVLogin;
         private String DAVPassword;
@@ -74,22 +77,25 @@ namespace KS2Drive.FS
 
         #endregion
 
-        public DavFS(WebDAVMode webDAVMode, String DavServer, FlushMode flushMode, String DAVLogin, String DAVPassword)
+        public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, String DAVLogin, String DAVPassword, bool UseProxy = false, String ProxyURL = "", bool UseProxyAuthentication = false, String ProxyLogin = "", String ProxyPassword = "")
         {
-            //TEMP
-            System.Net.GlobalProxySelection.Select = new WebProxy("10.10.100.102", 8888);
-            //TEMP
-
             //TODO : validate parameters
 
-            this.MaxFileNodes = 1024 * 1024;
+            if (UseProxy)
+            {
+                if (UseProxyAuthentication) WebRequest.DefaultWebProxy = new WebProxy(ProxyURL, false, null, new NetworkCredential(ProxyLogin, ProxyPassword));
+                else WebRequest.DefaultWebProxy = new WebProxy(ProxyURL, false);
+            }
+
+            this.MaxFileNodes = 1024;
             this.MaxFileSize = 16 * 1024 * 1024;
             this.FlushMode = flushMode;
             this.WebDAVMode = webDAVMode;
 
-            var ServerURL = new Uri(DavServer);
-            this.DAVServer = ServerURL.GetLeftPart(UriPartial.Authority);
-            this.DocumentLibraryPath = ServerURL.PathAndQuery;
+            var DavServerURI = new Uri(DavServerURL);
+            this.DAVServer = DavServerURI.GetLeftPart(UriPartial.Authority);
+            this.DAVServeurAuthority = DavServerURI.Authority;
+            this.DocumentLibraryPath = DavServerURI.PathAndQuery;
 
             this.DAVLogin = DAVLogin;
             this.DAVPassword = DAVPassword;
@@ -101,14 +107,14 @@ namespace KS2Drive.FS
         public override Int32 Init(Object Host0)
         {
             FileSystemHost Host = (FileSystemHost)Host0;
+
+            Host.FileInfoTimeout = unchecked((UInt32)(-1));
+            Host.FileSystemName = "davFS";
+            Host.Prefix = $@"\{this.DAVServeurAuthority}\dav"; //mount as network drive
             Host.SectorSize = DavFS.MEMFS_SECTOR_SIZE;
             Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
             Host.VolumeSerialNumber = (UInt32)(Host.VolumeCreationTime / (10000 * 1000));
-            Host.FileInfoTimeout = unchecked((UInt32)(-1));
-            Host.Prefix = null;
-            Host.FileSystemName = "davFS";
-            Host.Prefix = $@"\{this.DAVServer}"; //mount as network drive
             Host.CaseSensitiveSearch = false;
             Host.CasePreservedNames = true;
             Host.UnicodeOnDisk = true;
@@ -117,6 +123,7 @@ namespace KS2Drive.FS
             Host.ReparsePointsAccessCheck = false;
             Host.NamedStreams = false;
             Host.PostCleanupWhenModifiedOnly = true; //Decide wheither to fire a cleanup message a every Create / open or only if the file was modified
+
             return STATUS_SUCCESS;
         }
 
@@ -147,6 +154,10 @@ namespace KS2Drive.FS
             return GetVolumeInfo(out VolumeInfo);
         }
 
+        /// <summary>
+        /// Retrieve a file or folder from the remote repo
+        /// Return either a RepositoryElement or a FileSystem Error Message
+        /// </summary>
         private RepositoryElement GetRepositoryElement(String LocalFileName)
         {
             String RepositoryDocumentName = ConvertLocalPathToRepositoryPath(LocalFileName);
@@ -156,42 +167,63 @@ namespace KS2Drive.FS
 
             if (RepositoryDocumentName.Contains("."))
             {
-                //TODO : Proper Catching
                 //We assume the FileName refers to a file
                 try
                 {
                     RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
                     return new RepositoryElement(RepositoryElement, LocalFileName);
                 }
-                catch
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
                 {
-                    LogSuccess($"GetRepositoryElement return null");
                     return null;
+                }
+                catch (WebDAVException ex)
+                {
+                    throw ex;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
                 }
             }
             else
             {
-                //TODO : Proper Catching
+                //We assume it's a folder
                 try
                 {
-                    //We assume it's a folder
+
                     RepositoryElement = Proxy.GetFolder(RepositoryDocumentName).GetAwaiter().GetResult();
                     if (IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
                     return new RepositoryElement(RepositoryElement, LocalFileName);
                 }
-                catch (Exception ex)
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
                 {
-                    //TODO : Proper Catching
+                    //Try as a file
                     try
                     {
                         RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
                         return new RepositoryElement(RepositoryElement, LocalFileName);
                     }
-                    catch
+                    catch (WebDAVException ex1) when (ex1.GetHttpCode() == 404)
                     {
-                        LogSuccess($"GetRepositoryElement return null");
                         return null;
                     }
+                    catch (WebDAVException ex1)
+                    {
+                        throw ex1;
+                    }
+                    catch (Exception ex1)
+                    {
+                        throw ex1;
+                    }
+                }
+                catch (WebDAVException ex)
+                {
+                    throw ex;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
                 }
             }
         }
@@ -208,65 +240,57 @@ namespace KS2Drive.FS
             DebugStart(OperationId, "", FileName);
             FileNode KnownNode = null;
 
-            try
+            KnownNode = FindFileInCache(FileName);
+            if (KnownNode == null)
             {
-                KnownNode = FindFileInCache(FileName);
-                if (KnownNode == null)
+                RepositoryElement FoundElement;
+
+                try
                 {
-                    var FoundElement = GetRepositoryElement(FileName);
-                    if (FoundElement == null)
-                    {
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
-                        return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-                    else
-                    {
-                        FileAttributes = FileNode.GetElementAttribute(FoundElement, this.WebDAVMode);
-                        if (null != SecurityDescriptor) SecurityDescriptor = FileNode.GetDefaultSecurity();
-                        var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
-                        AddFileToCache(D);
-                        DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
-                        return STATUS_SUCCESS;
-                    }
+                    FoundElement = GetRepositoryElement(FileName);
+                }
+                catch (WebDAVException ex)
+                {
+                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                    return STATUS_OBJECT_NAME_NOT_FOUND; //TODO : Webdav operation failed. Find a better return message
+                }
+                catch (HttpRequestException ex)
+                {
+                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
+                catch (Exception ex)
+                {
+                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                    return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
+                }
+
+                if (FoundElement == null)
+                {
+                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                    DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                    return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
                 }
                 else
                 {
-                    FileAttributes = KnownNode.FileInfo.FileAttributes;
-                    if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.FileSecurity;
-                    DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
+                    FileAttributes = FileNode.GetElementAttribute(FoundElement, this.WebDAVMode);
+                    if (null != SecurityDescriptor) SecurityDescriptor = FileNode.GetDefaultSecurity();
+                    var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
+                    AddFileToCache(D);
+                    DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
                     return STATUS_SUCCESS;
                 }
             }
-            catch (Exception ex)
+            else
             {
-                FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
+                FileAttributes = KnownNode.FileInfo.FileAttributes;
+                if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.FileSecurity;
+                DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
+                return STATUS_SUCCESS;
             }
-
-            /*
-            FileNode FileNode = FileNodeMap.Get(FileName);
-            if (null == FileNode)
-            {
-                Int32 Result = STATUS_OBJECT_NAME_NOT_FOUND;
-                if (FindReparsePoint(FileName, out FileAttributes))
-                    Result = STATUS_REPARSE;
-                else
-                    FileNodeMap.GetParent(FileName, ref Result);
-                return Result;
-            }
-
-            UInt32 FileAttributesMask = ~(UInt32)0;
-            if (null != FileNode.MainFileNode)
-            {
-                FileAttributesMask = ~(UInt32)System.IO.FileAttributes.Directory;
-                FileNode = FileNode.MainFileNode;
-            }
-            FileAttributes = FileNode.FileInfo.FileAttributes & FileAttributesMask;
-            if (null != SecurityDescriptor)
-                SecurityDescriptor = FileNode.FileSecurity;
-            */
         }
 
         public override Int32 Open(
@@ -286,38 +310,51 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             NormalizedName = default(String);
 
-            try
+
+            FileNode CFN = FindFileInCache(FileName);
+            if (CFN == null)
             {
-                FileNode CFN = FindFileInCache(FileName);
-                if (CFN == null)
+                RepositoryElement RepositoryObject;
+
+                try
                 {
-                    var RepositoryObject = GetRepositoryElement(FileName);
+                    RepositoryObject = GetRepositoryElement(FileName);
                     if (RepositoryObject == null)
                     {
                         DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
-
-                    CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
-                    AddFileToCache(CFN);
-                    Int32 i = Interlocked.Increment(ref CFN.OpenCount);
-                    DebugEnd(OperationId, "STATUS_SUCCESS - From Repository - Handle {i}");
                 }
-                else
+                catch (WebDAVException ex)
                 {
-                    Int32 i = Interlocked.Increment(ref CFN.OpenCount);
-                    DebugEnd(OperationId, $"STATUS_SUCCESS - From cache - Handle {i}");
+                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                    return STATUS_OBJECT_NAME_NOT_FOUND; //TODO : Webdav operation failed. Find a better return message
+                }
+                catch (HttpRequestException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
+                catch (Exception ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                    return STATUS_OBJECT_NAME_NOT_FOUND;
                 }
 
-                FileNode0 = CFN;
-                FileInfo = CFN.FileInfo;
-                NormalizedName = FileName;
+                CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
+                AddFileToCache(CFN);
+                Int32 i = Interlocked.Increment(ref CFN.OpenCount);
+                DebugEnd(OperationId, "STATUS_SUCCESS - From Repository - Handle {i}");
             }
-            catch (Exception ex)
+            else
             {
-                DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                return STATUS_OBJECT_NAME_NOT_FOUND;
+                Int32 i = Interlocked.Increment(ref CFN.OpenCount);
+                DebugEnd(OperationId, $"STATUS_SUCCESS - From cache - Handle {i}");
             }
+
+            FileNode0 = CFN;
+            FileInfo = CFN.FileInfo;
+            NormalizedName = FileName;
 
             return STATUS_SUCCESS;
         }
@@ -375,25 +412,35 @@ namespace KS2Drive.FS
                 DebugStart(OperationId, CFN);
 
                 List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
+
                 if (!IsRepositoryRootPath(CFN.RepositoryPath))
                 {
                     //if this is not the root directory add the dot entries
                     if (Marker == null) ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
 
+                    //TEMP : Optimization
+                    /*
                     if (null == Marker || "." == Marker)
                     {
                         String ParentPath = ConvertRepositoryPathToLocalPath(GetRepositoryParentPath(CFN.RepositoryPath));
                         if (ParentPath != null)
                         {
-                            var ParentElement = GetRepositoryElement(ParentPath);
-                            if (ParentElement != null) ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.WebDAVMode)));
+                            RepositoryElement ParentElement;
+                            try
+                            {
+                                ParentElement = GetRepositoryElement(ParentPath);
+                                if (ParentElement != null) ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.WebDAVMode)));
+                            }
+                            catch {}
                         }
                     }
+                    */
+                    //TEMP : Optimization
                 }
 
                 var Proxy = GenerateProxy();
                 IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
-                //TODO : Proper Catching
+
                 try
                 {
                     ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
@@ -460,8 +507,6 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
-        //TODO : Apply same try/catch for each Proxy calls
-
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -484,10 +529,26 @@ namespace KS2Drive.FS
 
             FileNode CFN;
 
-            if (GetRepositoryElement(FileName) != null)
+            try
             {
-                DebugEnd(OperationId, "STATUS_OBJECT_NAME_COLLISION");
-                return STATUS_OBJECT_NAME_COLLISION;
+                RepositoryElement KnownRepositoryElement = GetRepositoryElement(FileName);
+                if (KnownRepositoryElement != null)
+                {
+                    DebugEnd(OperationId, "STATUS_OBJECT_NAME_COLLISION");
+                    return STATUS_OBJECT_NAME_COLLISION;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                return STATUS_NETWORK_UNREACHABLE;
+            }
+            catch (Exception ex)
+            {
+                FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                return FileSystemBase.STATUS_CANNOT_MAKE;
             }
 
             String NewDocumentName = Path.GetFileName(FileName);
@@ -509,15 +570,22 @@ namespace KS2Drive.FS
                         return STATUS_CANNOT_MAKE;
                     }
                 }
-                catch (WebDAVException ex)
+                catch (WebDAVConflictException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
-                    return STATUS_CANNOT_MAKE;
+                    //Seems that we get Conflict response when the folder cannot be created
+                    //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return STATUS_ACCESS_DENIED;
                 }
                 catch (HttpRequestException ex)
                 {
                     DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
+                }
+                catch (WebDAVException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                    return STATUS_CANNOT_MAKE;
                 }
                 catch (Exception ex)
                 {
@@ -541,8 +609,10 @@ namespace KS2Drive.FS
                 }
                 catch (WebDAVConflictException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_COLLISION - {ex.Message}");
-                    return STATUS_OBJECT_NAME_COLLISION;
+                    //Seems that we get Conflict response when the folder cannot be created
+                    //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return STATUS_ACCESS_DENIED;
                 }
                 catch (WebDAVException ex)
                 {
@@ -746,8 +816,6 @@ namespace KS2Drive.FS
                 var Proxy = GenerateProxy();
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                 {
-                    //TODO : Proper Catching
-
                     try
                     {
                         //Fichier
@@ -761,7 +829,6 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    //TODO : Proper Catching
                     try
                     {
                         //Répertoire
@@ -782,7 +849,6 @@ namespace KS2Drive.FS
                     {
                         if (CFN.HasUnflushedData)
                         {
-                            //TODO : Proper Catching
                             var Proxy = GenerateProxy();
                             try
                             {
@@ -863,59 +929,74 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, CFN);
 
-            try
+            if (CFN.FileData == null)
             {
                 var Proxy = GenerateProxy();
-                CFN.FillContent(Proxy);
-
-                if (CFN.FileData == null)
+                try
                 {
-                    DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
-                    return STATUS_OBJECT_NAME_NOT_FOUND;
+                    System.IO.Stream s = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                    using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
+                    {
+                        s.CopyTo(ms);
+                        CFN.FileData = ms.ToArray();
+                    }
                 }
-
-                UInt64 FileSize = (UInt64)CFN.FileData.LongLength;
-
-                if (Offset >= FileSize)
+                catch (HttpRequestException ex)
                 {
-                    BytesTransferred = default(UInt32);
-                    DebugEnd(OperationId, "STATUS_END_OF_FILE");
-                    return STATUS_END_OF_FILE;
+                    CFN.FileData = null;
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
                 }
-
-                UInt64 EndOffset = Offset + Length;
-                if (EndOffset > FileSize) EndOffset = FileSize;
-
-                BytesTransferred = (UInt32)(EndOffset - Offset);
-                Marshal.Copy(CFN.FileData, (int)Offset, Buffer, (int)BytesTransferred);
-
-                /*
-                FileNode FileNode = (FileNode)FileNode0;
-                UInt64 EndOffset;
-
-                if (Offset >= FileNode.FileInfo.FileSize)
+                catch (Exception ex)
                 {
-                    BytesTransferred = default(UInt32);
-                    return STATUS_END_OF_FILE;
+                    CFN.FileData = null;
+                    DebugEnd(OperationId, $"STATUS_END_OF_FILE - {ex.Message}");
+                    return STATUS_END_OF_FILE; //TODO : Find a better status
                 }
-
-                EndOffset = Offset + Length;
-                if (EndOffset > FileNode.FileInfo.FileSize)
-                    EndOffset = FileNode.FileInfo.FileSize;
-
-                BytesTransferred = (UInt32)(EndOffset - Offset);
-                Marshal.Copy(FileNode.FileData, (int)Offset, Buffer, (int)BytesTransferred);
-                */
-
-                //LogSuccess($"{CFN.handle} Read {CFN.LocalPath} from {Offset} for {BytesTransferred} bytes | requested {Length} bytes");
-                DebugEnd(OperationId, "STATUS_SUCCESS");
-                return STATUS_SUCCESS;
             }
-            catch (Exception ex)
+
+            if (CFN.FileData == null)
             {
-                DebugEnd(OperationId, $"STATUS_END_OF_FILE - {ex.Message}");
+                DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                return STATUS_OBJECT_NAME_NOT_FOUND;
+            }
+
+            UInt64 FileSize = (UInt64)CFN.FileData.LongLength;
+
+            if (Offset >= FileSize)
+            {
+                BytesTransferred = default(UInt32);
+                DebugEnd(OperationId, "STATUS_END_OF_FILE");
                 return STATUS_END_OF_FILE;
             }
+
+            UInt64 EndOffset = Offset + Length;
+            if (EndOffset > FileSize) EndOffset = FileSize;
+
+            BytesTransferred = (UInt32)(EndOffset - Offset);
+            Marshal.Copy(CFN.FileData, (int)Offset, Buffer, (int)BytesTransferred);
+
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+            UInt64 EndOffset;
+
+            if (Offset >= FileNode.FileInfo.FileSize)
+            {
+                BytesTransferred = default(UInt32);
+                return STATUS_END_OF_FILE;
+            }
+
+            EndOffset = Offset + Length;
+            if (EndOffset > FileNode.FileInfo.FileSize)
+                EndOffset = FileNode.FileInfo.FileSize;
+
+            BytesTransferred = (UInt32)(EndOffset - Offset);
+            Marshal.Copy(FileNode.FileData, (int)Offset, Buffer, (int)BytesTransferred);
+            */
+
+            //LogSuccess($"{CFN.handle} Read {CFN.LocalPath} from {Offset} for {BytesTransferred} bytes | requested {Length} bytes");
+            DebugEnd(OperationId, "STATUS_SUCCESS");
+            return STATUS_SUCCESS;
         }
 
         public override Int32 Write(
@@ -939,114 +1020,113 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, CFN);
 
+            /*
+            CFN.FileData = null;
+            byte[] RepositoryContent = CFN.GetContent(Proxy);
+            CFN.FileData = new byte[(int)CFN.FileInfo.FileSize];
+            if (CFN.FileData == null)
+            {
+                BytesTransferred = default(UInt32);
+                FileInfo = default(FileInfo);
+                return STATUS_SUCCESS;
+            }
             try
             {
-                /*
-                CFN.FileData = null;
-                byte[] RepositoryContent = CFN.GetContent(Proxy);
-                CFN.FileData = new byte[(int)CFN.FileInfo.FileSize];
-                if (CFN.FileData == null)
-                {
-                    BytesTransferred = default(UInt32);
-                    FileInfo = default(FileInfo);
-                    return STATUS_SUCCESS;
-                }
-                try
-                {
-                    Array.Copy(RepositoryContent, CFN.FileData, Math.Min((int)CFN.FileInfo.FileSize, RepositoryContent.Length));
-                }
-                catch (Exception ex)
-                {
-                    LogError($"{CFN.handle} Write Exception {ex.Message}");
-                }
-                */
-
-                if (ConstrainedIo)
-                {
-                    //ContrainedIo - we cannot increase the file size so EndOffset will always be at maximum equal to CFN.FileInfo.FileSize
-                    if (Offset >= CFN.FileInfo.FileSize)
-                    {
-                        LogError($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 1");
-                        BytesTransferred = default(UInt32);
-                        FileInfo = default(FileInfo);
-                        DebugEnd(OperationId, "STATUS_SUCCESS");
-                        return STATUS_SUCCESS;
-                    }
-
-                    EndOffset = Offset + Length;
-                    if (EndOffset > CFN.FileInfo.FileSize) EndOffset = CFN.FileInfo.FileSize;
-                }
-                else
-                {
-                    if (WriteToEndOfFile) Offset = CFN.FileInfo.FileSize; //We write at the end the file so whatever the Offset is, we set it to be equal to the file size
-
-                    EndOffset = Offset + Length;
-
-                    if (EndOffset > CFN.FileInfo.FileSize) //We are not in a ConstrainedIo so we expand the file size if the EndOffset goes beyond the current file size
-                    {
-                        LogError($"{CFN.handle} Write Increase FileSize {CFN.Name}");
-                        Int32 Result = SetFileSizeInternal(CFN, EndOffset, false);
-                        if (Result < 0)
-                        {
-                            LogError($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
-                            BytesTransferred = default(UInt32);
-                            FileInfo = default(FileInfo);
-                            DebugEnd(OperationId, Result.ToString());
-                            return STATUS_UNEXPECTED_IO_ERROR;
-                        }
-                    }
-                }
-
-                BytesTransferred = (UInt32)(EndOffset - Offset);
-                try
-                {
-                    Marshal.Copy(Buffer, CFN.FileData, (int)Offset, (int)BytesTransferred);
-                }
-                catch (Exception ex)
-                {
-                    LogError($"{CFN.handle} Write Exception {ex.Message}");
-                    BytesTransferred = default(UInt32);
-                    FileInfo = default(FileInfo);
-                    DebugEnd(OperationId, "-1");
-                    return STATUS_UNEXPECTED_IO_ERROR;
-                }
-
-                if (this.FlushMode == FlushMode.FlushAtWrite)
-                {
-                    var Proxy = GenerateProxy();
-                    try
-                    {
-                        //TODO : Proper Catching
-                        if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
-                        {
-                            //TODO : Remove from cache ?
-                            DebugEnd(OperationId, "STATUS_UNEXPECTED_IO_ERROR - Upload failed");
-                            return STATUS_UNEXPECTED_IO_ERROR;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        //TODO : Remove from cache ?
-                        DebugEnd(OperationId, "STATUS_ACCESS_DENIED - Upload failed");
-                        return STATUS_ACCESS_DENIED;
-                    }
-                }
-                else
-                {
-                    CFN.HasUnflushedData = true;
-                }
-                FileInfo = CFN.FileInfo;
-
-                LogNotify($"{CFN.handle} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
-                DebugEnd(OperationId, "STATUS_SUCCESS");
-                return STATUS_SUCCESS;
+                Array.Copy(RepositoryContent, CFN.FileData, Math.Min((int)CFN.FileInfo.FileSize, RepositoryContent.Length));
             }
             catch (Exception ex)
             {
-                LogNotify($"{CFN.handle} Write error {CFN.LocalPath} at {Offset} - {ex.Message}");
-                DebugEnd(OperationId, $"Exception : {ex.Message}");
+                LogError($"{CFN.handle} Write Exception {ex.Message}");
+            }
+            */
+
+            if (ConstrainedIo)
+            {
+                //ContrainedIo - we cannot increase the file size so EndOffset will always be at maximum equal to CFN.FileInfo.FileSize
+                if (Offset >= CFN.FileInfo.FileSize)
+                {
+                    LogError($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 1");
+                    BytesTransferred = default(UInt32);
+                    FileInfo = default(FileInfo);
+                    DebugEnd(OperationId, "STATUS_SUCCESS");
+                    return STATUS_SUCCESS;
+                }
+
+                EndOffset = Offset + Length;
+                if (EndOffset > CFN.FileInfo.FileSize) EndOffset = CFN.FileInfo.FileSize;
+            }
+            else
+            {
+                if (WriteToEndOfFile) Offset = CFN.FileInfo.FileSize; //We write at the end the file so whatever the Offset is, we set it to be equal to the file size
+
+                EndOffset = Offset + Length;
+
+                if (EndOffset > CFN.FileInfo.FileSize) //We are not in a ConstrainedIo so we expand the file size if the EndOffset goes beyond the current file size
+                {
+                    LogError($"{CFN.handle} Write Increase FileSize {CFN.Name}");
+                    Int32 Result = SetFileSizeInternal(CFN, EndOffset, false);
+                    if (Result < 0)
+                    {
+                        LogError($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
+                        BytesTransferred = default(UInt32);
+                        FileInfo = default(FileInfo);
+                        DebugEnd(OperationId, Result.ToString());
+                        return STATUS_UNEXPECTED_IO_ERROR;
+                    }
+                }
+            }
+
+            BytesTransferred = (UInt32)(EndOffset - Offset);
+            try
+            {
+                Marshal.Copy(Buffer, CFN.FileData, (int)Offset, (int)BytesTransferred);
+            }
+            catch (Exception ex)
+            {
+                LogError($"{CFN.handle} Write Exception {ex.Message}");
+                BytesTransferred = default(UInt32);
+                FileInfo = default(FileInfo);
+                DebugEnd(OperationId, "-1");
                 return STATUS_UNEXPECTED_IO_ERROR;
             }
+
+            if (this.FlushMode == FlushMode.FlushAtWrite)
+            {
+                var Proxy = GenerateProxy();
+                try
+                {
+                    if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                    {
+                        //TODO : Remove from cache ?
+                        DebugEnd(OperationId, "STATUS_UNEXPECTED_IO_ERROR - Upload failed");
+                        return STATUS_UNEXPECTED_IO_ERROR;
+                    }
+                }
+                catch (WebDAVConflictException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return STATUS_ACCESS_DENIED;
+                }
+                catch (HttpRequestException ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
+                catch (Exception ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_UNEXPECTED_IO_ERROR - {ex.Message}");
+                    return STATUS_UNEXPECTED_IO_ERROR;
+                }
+            }
+            else
+            {
+                CFN.HasUnflushedData = true;
+            }
+            FileInfo = CFN.FileInfo;
+
+            LogNotify($"{CFN.handle} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
+            DebugEnd(OperationId, "STATUS_SUCCESS");
+            return STATUS_SUCCESS;
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1102,75 +1182,109 @@ namespace KS2Drive.FS
 
             if (FileName == NewFileName) return STATUS_SUCCESS;
 
+            String RepositoryDocumentName = ConvertLocalPathToRepositoryPath(FileName);
+            String RepositoryTargetDocumentName = ConvertLocalPathToRepositoryPath(NewFileName);
+
             try
             {
-                String RepositoryDocumentName = ConvertLocalPathToRepositoryPath(FileName);
-                String RepositoryTargetDocumentName = ConvertLocalPathToRepositoryPath(NewFileName);
-
-                if (GetRepositoryElement(NewFileName) != null && !ReplaceIfExists) return STATUS_OBJECT_NAME_COLLISION;
-
-                var Proxy = GenerateProxy();
-                if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
+                RepositoryElement KnownRepositoryElement = GetRepositoryElement(FileName);
+                if (KnownRepositoryElement != null && !ReplaceIfExists)
                 {
-                    //TODO : Proper Catching
-                    //Fichier
+                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_COLLISION");
+                    return STATUS_OBJECT_NAME_COLLISION;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                return STATUS_NETWORK_UNREACHABLE;
+            }
+            catch (Exception ex)
+            {
+                DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                return FileSystemBase.STATUS_CANNOT_MAKE;
+            }
+
+            var Proxy = GenerateProxy();
+            if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
+            {
+                //Fichier
+                try
+                {
                     if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
                         DebugEnd(OperationId, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
                     }
                 }
-                else
+                catch (HttpRequestException ex)
                 {
-                    //TODO : Proper Catching
-                    //Répertoire
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
+                catch (Exception ex)
+                {
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return FileSystemBase.STATUS_ACCESS_DENIED;
+                }
+            }
+            else
+            {
+                //Répertoire
+                try
+                {
                     if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
                         DebugEnd(OperationId, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
                     }
                 }
-
-                CFN.RepositoryPath = RepositoryTargetDocumentName;
-                CFN.Name = GetRepositoryDocumentName(RepositoryTargetDocumentName);
-                CFN.LocalPath = NewFileName;
-
-                /*
-                FileNode FileNode = (FileNode)FileNode0;
-                FileNode NewFileNode;
-
-                NewFileNode = FileNodeMap.Get(NewFileName);
-                if (null != NewFileNode && FileNode != NewFileNode)
+                catch (HttpRequestException ex)
                 {
-                    if (!ReplaceIfExists)
-                        return STATUS_OBJECT_NAME_COLLISION;
-                    if (0 != (NewFileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory))
-                        return STATUS_ACCESS_DENIED;
+                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    return STATUS_NETWORK_UNREACHABLE;
                 }
-
-                if (null != NewFileNode && FileNode != NewFileNode)
-                    FileNodeMap.Remove(NewFileNode);
-
-                List<String> DescendantFileNames = new List<String>(FileNodeMap.GetDescendantFileNames(FileNode));
-                foreach (String DescendantFileName in DescendantFileNames)
+                catch (Exception ex)
                 {
-                    FileNode DescendantFileNode = FileNodeMap.Get(DescendantFileName);
-                    if (null == DescendantFileNode)
-                        continue; // should not happen
-                    FileNodeMap.Remove(DescendantFileNode);
-                    DescendantFileNode.FileName =
-                        NewFileName + DescendantFileNode.FileName.Substring(FileName.Length);
-                    FileNodeMap.Insert(DescendantFileNode);
+                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    return FileSystemBase.STATUS_ACCESS_DENIED;
                 }
-                */
-                DebugEnd(OperationId, $"STATUS_SUCCESS. Renamed to {NewFileName}");
-                return STATUS_SUCCESS;
             }
-            catch (Exception ex)
+
+            CFN.RepositoryPath = RepositoryTargetDocumentName;
+            CFN.Name = GetRepositoryDocumentName(RepositoryTargetDocumentName);
+            CFN.LocalPath = NewFileName;
+
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+            FileNode NewFileNode;
+
+            NewFileNode = FileNodeMap.Get(NewFileName);
+            if (null != NewFileNode && FileNode != NewFileNode)
             {
-                DebugEnd(OperationId, $"Exception : {ex.Message}");
-                return STATUS_ACCESS_DENIED;
+                if (!ReplaceIfExists)
+                    return STATUS_OBJECT_NAME_COLLISION;
+                if (0 != (NewFileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory))
+                    return STATUS_ACCESS_DENIED;
             }
+
+            if (null != NewFileNode && FileNode != NewFileNode)
+                FileNodeMap.Remove(NewFileNode);
+
+            List<String> DescendantFileNames = new List<String>(FileNodeMap.GetDescendantFileNames(FileNode));
+            foreach (String DescendantFileName in DescendantFileNames)
+            {
+                FileNode DescendantFileNode = FileNodeMap.Get(DescendantFileName);
+                if (null == DescendantFileNode)
+                    continue; // should not happen
+                FileNodeMap.Remove(DescendantFileNode);
+                DescendantFileNode.FileName =
+                    NewFileName + DescendantFileNode.FileName.Substring(FileName.Length);
+                FileNodeMap.Insert(DescendantFileNode);
+            }
+            */
+            DebugEnd(OperationId, $"STATUS_SUCCESS. Renamed to {NewFileName}");
+            return STATUS_SUCCESS;
         }
 
         public override Int32 Flush(

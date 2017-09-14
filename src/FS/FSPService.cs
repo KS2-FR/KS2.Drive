@@ -17,6 +17,7 @@ namespace KS2Drive
         private FileSystemHost Host;
         private DavFS davFs;
         private Thread DebugTread;
+        private DebugView DebugWindow;
 
         public FSPService() : base("KS2DriveService")
         {
@@ -24,9 +25,6 @@ namespace KS2Drive
 
         public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password)
         {
-            //TODO : Test parameters
-
-            DavFS davFs;
             try
             {
                 davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, Login, Password);
@@ -39,18 +37,24 @@ namespace KS2Drive
 
             Host = new FileSystemHost(davFs);
 
+            bool IsSync = true;
+            if (Host.Mount($"{DriveName}:", null, IsSync, 0) < 0) throw new IOException("cannot mount file system");
+
 #if DEBUG
             //Start debug window
-            DebugTread = new Thread(() => Application.Run(new DebugView(davFs)));
+            DebugWindow = new DebugView(davFs);
+            DebugTread = new Thread(() => Application.Run(DebugWindow));
             DebugTread.Start();
 #endif
-            bool IsSync = false;
-            if (Host.Mount($"{DriveName}:", null, IsSync, 0) < 0) throw new IOException("cannot mount file system");
         }
 
         public void Unmount()
         {
-            if (DebugTread != null) DebugTread.Abort();
+            if (DebugTread != null && (DebugTread.ThreadState & ThreadState.Running) == ThreadState.Running)
+            {
+                if (DebugWindow.InvokeRequired) DebugWindow.Invoke(new MethodInvoker(() => DebugWindow.Close()));
+                else DebugWindow.Close();
+            }
             Host.Unmount();
             Host = null;
         }
@@ -59,8 +63,7 @@ namespace KS2Drive
         {
             if (Host != null)
             {
-                Host.Unmount();
-                Host = null;
+                Unmount();
             }
         }
     }

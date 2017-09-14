@@ -225,7 +225,6 @@ namespace WebDAVClient
         /// <returns>A list of files (entries without a trailing slash) and directories (entries with a trailing slash)</returns>
         private async Task<Item> Get(Uri listUri, string path)
         {
-
             // Depth header: http://webdav.org/specs/rfc4918.html#rfc.section.9.1.4
             IDictionary<string, string> headers = new Dictionary<string, string>();
             headers.Add("Depth", "0");
@@ -306,6 +305,9 @@ namespace WebDAVClient
             var uploadUri = await GetServerUrl(remoteFilePath.TrimEnd('/') + "/" + name.TrimStart('/'), false).ConfigureAwait(false);
 
             HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content).ConfigureAwait(false);
+
+            if (response.StatusCode == HttpStatusCode.Conflict)
+                throw new WebDAVConflictException((int)response.StatusCode, "Failed uploading file.");
 
             if (response.StatusCode != HttpStatusCode.OK &&
                 response.StatusCode != HttpStatusCode.NoContent &&
