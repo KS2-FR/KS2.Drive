@@ -87,6 +87,10 @@ namespace KS2Drive.FS
                 else WebRequest.DefaultWebProxy = new WebProxy(ProxyURL, false);
             }
 
+            //TEMP
+            WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
+            //TEMP
+
             this.MaxFileNodes = 1024;
             this.MaxFileSize = 16 * 1024 * 1024;
             this.FlushMode = flushMode;
@@ -94,7 +98,7 @@ namespace KS2Drive.FS
 
             var DavServerURI = new Uri(DavServerURL);
             this.DAVServer = DavServerURI.GetLeftPart(UriPartial.Authority);
-            this.DAVServeurAuthority = DavServerURI.Authority;
+            this.DAVServeurAuthority = DavServerURI.DnsSafeHost;
             this.DocumentLibraryPath = DavServerURI.PathAndQuery;
 
             this.DAVLogin = DAVLogin;
@@ -276,9 +280,9 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    FileAttributes = FileNode.GetElementAttribute(FoundElement, this.WebDAVMode);
-                    if (null != SecurityDescriptor) SecurityDescriptor = FileNode.GetDefaultSecurity();
                     var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
+                    if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
+                    FileAttributes = D.FileInfo.FileAttributes;
                     AddFileToCache(D);
                     DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
                     return STATUS_SUCCESS;
@@ -934,12 +938,7 @@ namespace KS2Drive.FS
                 var Proxy = GenerateProxy();
                 try
                 {
-                    System.IO.Stream s = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
-                    using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
-                    {
-                        s.CopyTo(ms);
-                        CFN.FileData = ms.ToArray();
-                    }
+                    CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
                 }
                 catch (HttpRequestException ex)
                 {
@@ -1187,7 +1186,7 @@ namespace KS2Drive.FS
 
             try
             {
-                RepositoryElement KnownRepositoryElement = GetRepositoryElement(FileName);
+                RepositoryElement KnownRepositoryElement = GetRepositoryElement(NewFileName);
                 if (KnownRepositoryElement != null && !ReplaceIfExists)
                 {
                     DebugEnd(OperationId, $"STATUS_OBJECT_NAME_COLLISION");

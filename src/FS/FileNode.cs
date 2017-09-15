@@ -80,14 +80,38 @@ namespace KS2Drive.FS
 
             CFN.Name = WebDavObject.DisplayName;
 
-            if (webDavMode == WebDAVMode.AOS) //AOS
+            if (Uri.TryCreate(WebDavObject.Href, UriKind.Absolute, out Uri ParsedUri))
             {
                 CFN.RepositoryPath = new Uri(WebDavObject.Href).PathAndQuery;
-                if (CFN.RepositoryPath[CFN.RepositoryPath.Length - 1] == '/') CFN.RepositoryPath = CFN.RepositoryPath.Remove(CFN.RepositoryPath.Length - 1);
+            }
+            else
+            {
+                CFN.RepositoryPath = WebDavObject.Href;
+            }
+
+            if (CFN.RepositoryPath[CFN.RepositoryPath.Length - 1] == '/' && CFN.RepositoryPath.Length > 1) CFN.RepositoryPath = CFN.RepositoryPath.Remove(CFN.RepositoryPath.Length - 1);
+
+            if (webDavMode == WebDAVMode.AOS) //AOS
+            {
+                if (WebDavObject.IsCollection)
+                {
+                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
+                }
+                else
+                {
+                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                }
             }
             else //Webdav
             {
-                CFN.RepositoryPath = WebDavObject.Href;
+                if (WebDavObject.Etag == null && WebDavObject.ContentLength == 0)
+                {
+                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
+                }
+                else
+                {
+                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                }
             }
 
             CFN.LocalPath = WebDavObject.LocalFileName;
@@ -95,13 +119,12 @@ namespace KS2Drive.FS
             CFN.FileInfo.LastAccessTime = (UInt64)DateTime.Now.ToFileTimeUtc();
             if (WebDavObject.LastModified.HasValue) CFN.FileInfo.LastWriteTime = (UInt64)WebDavObject.LastModified.Value.ToFileTimeUtc();
             if (WebDavObject.LastModified.HasValue) CFN.FileInfo.ChangeTime = (UInt64)WebDavObject.LastModified.Value.ToFileTimeUtc();
-            CFN.FileInfo.FileAttributes = FileNode.GetElementAttribute(WebDavObject, webDavMode);
             CFN.FileInfo.AllocationSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
             CFN.FileInfo.FileSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
             CFN.FileInfo.IndexNumber = CFN.GetIndex();
             CFN.FileSecurity = GetDefaultSecurity();
 
-            //Memfs.LogSuccess(JsonConvert.SerializeObject(CFN));
+           //Memfs.LogSuccess(JsonConvert.SerializeObject(CFN));
 
             return CFN;
         }
@@ -128,32 +151,6 @@ namespace KS2Drive.FS
             return CFN;
         }
         */
-
-        internal static uint GetElementAttribute(RepositoryElement foundElement, WebDAVMode webDavMode)
-        {
-            if (webDavMode == WebDAVMode.AOS)
-            {
-                if (foundElement.IsCollection)
-                {
-                    return (UInt32)System.IO.FileAttributes.Directory;
-                }
-                else
-                {
-                    return (UInt32)System.IO.FileAttributes.Normal;
-                }
-            }
-            else
-            {
-                if (foundElement.Etag == null && foundElement.ContentLength == 0)
-                {
-                    return (UInt32)System.IO.FileAttributes.Directory;
-                }
-                else
-                {
-                    return (UInt32)System.IO.FileAttributes.Normal;
-                }
-            }
-        }
 
         public FileNode()
         {

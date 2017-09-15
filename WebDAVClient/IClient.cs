@@ -56,7 +56,7 @@ namespace WebDAVClient
         /// Download a file from the server
         /// </summary>
         /// <param name="remoteFilePath">Source path and filename of the file on the server</param>
-        Task<Stream> Download(string remoteFilePath);
+        Task<byte[]> Download(string remoteFilePath);
 
         /// <summary>
         /// Download a file from the server
