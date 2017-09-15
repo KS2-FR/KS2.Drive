@@ -88,7 +88,7 @@ namespace KS2Drive.FS
             }
 
             //TEMP
-            WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
+            //WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
             //TEMP
 
             this.MaxFileNodes = 1024;
@@ -1096,23 +1096,24 @@ namespace KS2Drive.FS
                 {
                     if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                     {
-                        //TODO : Remove from cache ?
-                        DebugEnd(OperationId, "STATUS_UNEXPECTED_IO_ERROR - Upload failed");
-                        return STATUS_UNEXPECTED_IO_ERROR;
+                        throw new Exception();
                     }
                 }
                 catch (WebDAVConflictException ex)
                 {
+                    DeleteFileFromCache(CFN);
                     DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (HttpRequestException ex)
                 {
+                    DeleteFileFromCache(CFN);
                     DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
+                    DeleteFileFromCache(CFN);
                     DebugEnd(OperationId, $"STATUS_UNEXPECTED_IO_ERROR - {ex.Message}");
                     return STATUS_UNEXPECTED_IO_ERROR;
                 }
