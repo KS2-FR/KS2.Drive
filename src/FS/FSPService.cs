@@ -16,8 +16,11 @@ namespace KS2Drive
     {
         private FileSystemHost Host;
         private DavFS davFs;
+
+#if DEBUG
         private Thread DebugTread;
         private DebugView DebugWindow;
+#endif
 
         public FSPService() : base("KS2DriveService")
         {
@@ -50,11 +53,13 @@ namespace KS2Drive
 
         public void Unmount()
         {
+#if DEBUG
             if (DebugTread != null && (DebugTread.ThreadState & ThreadState.Running) == ThreadState.Running)
             {
                 if (DebugWindow.InvokeRequired) DebugWindow.Invoke(new MethodInvoker(() => DebugWindow.Close()));
                 else DebugWindow.Close();
             }
+#endif
             Host.Unmount();
             Host = null;
         }
