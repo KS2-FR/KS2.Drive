@@ -24,7 +24,8 @@ namespace KS2Drive.FS
 
         private String ConvertForAOS(String input)
         {
-            /*if (this.Mode == WebDAVMode.AOS && input.StartsWith(this.RootPath))*/ return input.Substring(this.RootPath.Length);
+            if (input.StartsWith(this.RootPath)) return input.Substring(this.RootPath.Length);
+            else return input;
         }
 
         public new Task<bool> CreateDir(string remotePath, string name)
