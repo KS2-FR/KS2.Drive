@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
-        mc:Ignorable="d" Height="100" Width="930" Closing="Window_Closing" ResizeMode="NoResize" Title="KS² Drive (POC) - Alpha 1">
+        mc:Ignorable="d" Height="100" Width="930" Closing="Window_Closing" ResizeMode="NoResize" Title="KS² Drive (POC) - Alpha 2">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="20"></RowDefinition>

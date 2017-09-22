@@ -75,7 +75,6 @@ namespace KS2Drive.FS
 
         internal static FileNode CreateFromWebDavObject(RepositoryElement WebDavObject, WebDAVMode webDavMode)
         {
-            //TODO : Lock the file ?
             FileNode CFN = new FileNode();
 
             CFN.Name = WebDavObject.DisplayName;
@@ -124,37 +123,7 @@ namespace KS2Drive.FS
             CFN.FileInfo.IndexNumber = CFN.GetIndex();
             CFN.FileSecurity = GetDefaultSecurity();
 
-           //Memfs.LogSuccess(JsonConvert.SerializeObject(CFN));
-
             return CFN;
-        }
-
-        /*
-        internal static FileNode CreateEmptyFileNode(String LocalFilePath, String RemoteFilePath)
-        {
-            FileNode CFN = new FileNode();
-            CFN.IsCreationPending = true;
-            CFN.Name = Path.GetFileName(LocalFilePath);
-            CFN.RepositoryPath = RemoteFilePath;
-            CFN.LocalPath = LocalFilePath;
-            CFN.FileInfo.FileAttributes = (UInt32)FileAttributes.Normal;
-            CFN.FileInfo.CreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
-            CFN.FileInfo.LastAccessTime = (UInt64)DateTime.Now.ToFileTimeUtc();
-            CFN.FileInfo.LastWriteTime = (UInt64)DateTime.Now.ToFileTimeUtc();
-            CFN.FileInfo.ChangeTime = (UInt64)DateTime.Now.ToFileTimeUtc();
-            CFN.FileInfo.CreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
-            CFN.FileInfo.AllocationSize = 0;
-            CFN.FileInfo.FileSize = 0;
-            CFN.FileInfo.IndexNumber = CFN.GetIndex();
-            CFN.FileSecurity = GetDefaultSecurity();
-
-            return CFN;
-        }
-        */
-
-        public FileNode()
-        {
-            this.handle = $"{Interlocked.Increment(ref FileNode._handle).ToString()}";
         }
     }
 }

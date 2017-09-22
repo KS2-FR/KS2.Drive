@@ -36,6 +36,7 @@
             this.Start = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.End = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.Status = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.OperationTime = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.panel1 = new System.Windows.Forms.Panel();
             this.button2 = new System.Windows.Forms.Button();
@@ -57,7 +58,8 @@
             this.Path,
             this.Start,
             this.End,
-            this.Status});
+            this.Status,
+            this.OperationTime});
             this.listView1.Font = new System.Drawing.Font("Microsoft Sans Serif", 6.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.listView1.FullRowSelect = true;
             this.listView1.GridLines = true;
@@ -102,6 +104,11 @@
             // 
             this.Status.Text = "Status";
             this.Status.Width = 250;
+            // 
+            // OperationTime
+            // 
+            this.OperationTime.Text = "OperationTime";
+            this.OperationTime.Width = 120;
             // 
             // tableLayoutPanel1
             // 
@@ -176,5 +183,6 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.ColumnHeader OperationTime;
     }
 }

@@ -27,14 +27,13 @@ namespace KS2Drive
         private FSPService service = new FSPService();
         private bool IsMounted = false;
         private Thread T;
-        private ArrayList FreeDrives = new ArrayList();
 
         public MainWindow()
         {
             InitializeComponent();
 
             //Get Free drives
-            FreeDrives = new ArrayList(26); // Allocate space for alphabet
+            ArrayList FreeDrives = new ArrayList(26); // Allocate space for alphabet
             for (int i = 65; i < 91; i++) // increment from ASCII values for A-Z
             {
                 FreeDrives.Add(Convert.ToChar(i)); // Add uppercase letters to possible drive letters

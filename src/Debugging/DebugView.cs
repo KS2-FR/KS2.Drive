@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -67,12 +68,14 @@ namespace KS2Drive.Debug
                 {
                     bool Found = false;
 
-                    for (int i = listView1.Items.Count - 1; i >= Math.Max(0, listView1.Items.Count - 50); i--)
+                    for (int i = listView1.Items.Count - 1; i >= Math.Max(0, listView1.Items.Count - 25); i--)
                     {
                         if (listView1.Items[i].SubItems[0].Text.Equals(DM.OperationId))
                         {
                             listView1.Items[i].SubItems[5].Text = DM.date.ToString("HH:MM:ss:ffff");
                             listView1.Items[i].SubItems[6].Text = DM.Result;
+                            listView1.Items[i].SubItems[7].Text = Convert.ToInt32((DM.date - (DateTime)listView1.Items[i].SubItems[4].Tag).TotalMilliseconds).ToString();
+
                             if (!DM.Result.StartsWith("STATUS_SUCCESS")) listView1.Items[i].ForeColor = Color.Red;
                             Found = true;
                             break;
@@ -81,7 +84,8 @@ namespace KS2Drive.Debug
                 }
                 else
                 {
-                    listView1.Items.Add(new ListViewItem(new String[] { DM.OperationId, DM.Handle, DM.Caller, DM.Path, DM.date.ToString("HH:mm:ss:ffff"), "", "" }));
+                    listView1.Items.Add(new ListViewItem(new String[] { DM.OperationId, DM.Handle, DM.Caller, DM.Path, DM.date.ToString("HH:mm:ss:ffff"), "", "", "" }));
+                    listView1.Items[listView1.Items.Count - 1].SubItems[4].Tag = DM.date;
                     listView1.Items[listView1.Items.Count - 1].EnsureVisible();
                 }
             }

@@ -240,6 +240,14 @@ namespace KS2Drive.FS
             out UInt32 FileAttributes/* or ReparsePointIndex */,
             ref Byte[] SecurityDescriptor)
         {
+            //TEMP
+            if (FileName.ToLower().Contains("desktop.ini") || (FileName.ToLower().Contains("autorun.inf")))
+            {
+                FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                return STATUS_OBJECT_NAME_NOT_FOUND;
+            }
+            //TEMP
+
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, "", FileName);
             FileNode KnownNode = null;
@@ -363,7 +371,6 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
-
         public override Int32 GetFileInfo(
             Object FileNode0,
             Object FileDesc,
@@ -411,6 +418,8 @@ namespace KS2Drive.FS
 
             if (Context == null)
             {
+                LogTrace("Read directory start");
+
                 Enumerator = null;
                 OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
@@ -422,8 +431,6 @@ namespace KS2Drive.FS
                     //if this is not the root directory add the dot entries
                     if (Marker == null) ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
 
-                    //TEMP : Optimization
-                    /*
                     if (null == Marker || "." == Marker)
                     {
                         String ParentPath = ConvertRepositoryPathToLocalPath(GetRepositoryParentPath(CFN.RepositoryPath));
@@ -438,8 +445,6 @@ namespace KS2Drive.FS
                             catch {}
                         }
                     }
-                    */
-                    //TEMP : Optimization
                 }
 
                 var Proxy = GenerateProxy();
@@ -447,6 +452,7 @@ namespace KS2Drive.FS
 
                 try
                 {
+                    LogTrace("Read directory list start");
                     ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
@@ -457,6 +463,8 @@ namespace KS2Drive.FS
                     return false;
                 }
 
+                LogTrace("Read directory list end");
+
                 bool IsFirst = true;
                 foreach (var Children in ItemsInFolder)
                 {
@@ -465,7 +473,9 @@ namespace KS2Drive.FS
                     ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
                 }
 
-                if (!String.IsNullOrEmpty(Marker))
+                LogTrace("Read directory list transformed to FileNode");
+
+                if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
                 {
                     var WantedTuple = ChildrenFileNames.FirstOrDefault(x => x.Item1.Equals(Marker));
                     var WantedTupleIndex = ChildrenFileNames.IndexOf(WantedTuple);
@@ -490,6 +500,7 @@ namespace KS2Drive.FS
 
             if (Enumerator.MoveNext())
             {
+                LogTrace("Read directory enumerate");
                 Tuple<String, FileNode> CurrentCFN = Enumerator.Current;
                 FileName = CurrentCFN.Item1;
                 FileInfo = CurrentCFN.Item2.FileInfo;
@@ -497,6 +508,7 @@ namespace KS2Drive.FS
             }
 
             DebugEnd(OperationId, "STATUS_SUCCESS");
+            LogTrace("Read directory end");
 
             FileName = default(String);
             FileInfo = default(FileInfo);
@@ -770,7 +782,6 @@ namespace KS2Drive.FS
             Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
             if (HandleCount == 0) DeleteFileFromCache(CFN);
 
-
             if (this.FlushMode == FlushMode.FlushAtCleanup)
             {
                 if (CFN.HasUnflushedData)
@@ -1035,7 +1046,7 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
-                LogError($"{CFN.handle} Write Exception {ex.Message}");
+                LogTrace($"{CFN.handle} Write Exception {ex.Message}");
             }
             */
 
@@ -1044,7 +1055,7 @@ namespace KS2Drive.FS
                 //ContrainedIo - we cannot increase the file size so EndOffset will always be at maximum equal to CFN.FileInfo.FileSize
                 if (Offset >= CFN.FileInfo.FileSize)
                 {
-                    LogError($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 1");
+                    LogTrace($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 1");
                     BytesTransferred = default(UInt32);
                     FileInfo = default(FileInfo);
                     DebugEnd(OperationId, "STATUS_SUCCESS");
@@ -1062,11 +1073,11 @@ namespace KS2Drive.FS
 
                 if (EndOffset > CFN.FileInfo.FileSize) //We are not in a ConstrainedIo so we expand the file size if the EndOffset goes beyond the current file size
                 {
-                    LogError($"{CFN.handle} Write Increase FileSize {CFN.Name}");
+                    LogTrace($"{CFN.handle} Write Increase FileSize {CFN.Name}");
                     Int32 Result = SetFileSizeInternal(CFN, EndOffset, false);
                     if (Result < 0)
                     {
-                        LogError($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
+                        LogTrace($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
                         BytesTransferred = default(UInt32);
                         FileInfo = default(FileInfo);
                         DebugEnd(OperationId, Result.ToString());
@@ -1082,7 +1093,7 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
-                LogError($"{CFN.handle} Write Exception {ex.Message}");
+                LogTrace($"{CFN.handle} Write Exception {ex.Message}");
                 BytesTransferred = default(UInt32);
                 FileInfo = default(FileInfo);
                 DebugEnd(OperationId, "-1");
@@ -1124,7 +1135,7 @@ namespace KS2Drive.FS
             }
             FileInfo = CFN.FileInfo;
 
-            LogNotify($"{CFN.handle} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
+            LogTrace($"{CFN.handle} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
             DebugEnd(OperationId, "STATUS_SUCCESS");
             return STATUS_SUCCESS;
 
@@ -1368,7 +1379,7 @@ namespace KS2Drive.FS
             Int32 Result = SetFileSizeInternal(CFN, NewSize, SetAllocationSize);
             FileInfo = Result >= 0 ? CFN.FileInfo : default(FileInfo);
 
-            LogSuccess($"{CFN.handle} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}");
+            LogTrace($"{CFN.handle} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1438,7 +1449,7 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
-                LogError($"{FileNode.handle} SetFileSizeInternal {ex.Message} {ex.StackTrace}");
+                LogTrace($"{FileNode.handle} SetFileSizeInternal {ex.Message} {ex.StackTrace}");
             }
 
             return STATUS_SUCCESS;
@@ -1471,7 +1482,7 @@ namespace KS2Drive.FS
             out UInt64 StreamSize,
             out UInt64 StreamAllocationSize)
         {
-            LogError("Not implemented : GetStreamEntry");
+            LogTrace("Not implemented : GetStreamEntry");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1519,7 +1530,7 @@ namespace KS2Drive.FS
             Boolean IsDirectory,
             ref Byte[] ReparseData)
         {
-            LogError("Not implemented : GetReparsePointByName");
+            LogTrace("Not implemented : GetReparsePointByName");
 
             /*
             FileNode FileNode;
@@ -1542,7 +1553,7 @@ namespace KS2Drive.FS
             String FileName,
             ref Byte[] ReparseData)
         {
-            LogError("Not implemented : GetReparsePoint");
+            LogTrace("Not implemented : GetReparsePoint");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1564,7 +1575,7 @@ namespace KS2Drive.FS
             String FileName,
             Byte[] ReparseData)
         {
-            LogError("Not implemented : SetReparsePoint");
+            LogTrace("Not implemented : SetReparsePoint");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1595,7 +1606,7 @@ namespace KS2Drive.FS
             String FileName,
             Byte[] ReparseData)
         {
-            LogError("Not implemented : DeleteReparsePoint");
+            LogTrace("Not implemented : DeleteReparsePoint");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1668,38 +1679,12 @@ namespace KS2Drive.FS
 
         private static object loglock = new object();
 
-        public static void LogSuccess(String Message)
+        public static void LogTrace(String Message)
         {
             lock (loglock)
             {
-                logger.Debug(Message);
+                logger.Trace(Message);
             }
-        }
-
-        public static void LogNotify(String Message)
-        {
-            /*
-            lock (loglock)
-            {
-                logger.Debug(Message);
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine(Message);
-                Console.ResetColor();
-            }
-            */
-        }
-
-        public static void LogError(String Message)
-        {
-            /*
-            lock (loglock)
-            {
-                logger.Debug(Message);
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(Message);
-                Console.ResetColor();
-            }
-            */
         }
 
         #endregion
