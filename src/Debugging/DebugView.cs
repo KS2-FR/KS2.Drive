@@ -43,9 +43,8 @@ namespace KS2Drive.Debug
 
         public DebugView(DavFS MFS)
         {
-            Host = MFS;
-
             InitializeComponent();
+            Host = MFS;
             Host.DebugMessagePosted += (sender, e) => { DisplayEvent(); };
             listView1.DoubleBuffering(true);
         }
@@ -83,8 +82,6 @@ namespace KS2Drive.Debug
 
                     if (DM.MessageType == 1)
                     {
-                        bool Found = false;
-
                         for (int i = listView1.Items.Count - 1; i >= Math.Max(0, listView1.Items.Count - 25); i--)
                         {
                             if (listView1.Items[i].SubItems[0].Text.Equals(DM.OperationId))
@@ -94,7 +91,6 @@ namespace KS2Drive.Debug
                                 listView1.Items[i].SubItems[7].Text = Convert.ToInt32((DM.date - (DateTime)listView1.Items[i].SubItems[4].Tag).TotalMilliseconds).ToString();
 
                                 if (!DM.Result.StartsWith("STATUS_SUCCESS")) listView1.Items[i].ForeColor = Color.Red;
-                                Found = true;
                                 break;
                             }
                         }
@@ -106,23 +102,15 @@ namespace KS2Drive.Debug
                         listView1.Items[listView1.Items.Count - 1].EnsureVisible();
                     }
                 }
-                catch
+                catch (OperationCanceledException)
                 {
-
+                    //Catch cancellation
+                }
+                catch( Exception ex)
+                {
+                    //This could be a real error
                 }
             }
-
-            /*
-            lock (IsDequeueingLock)
-            {
-                IsDequeueing = false;
-            }
-            */
-        }
-
-        private void button1_Click(object sender, EventArgs e)
-        {
-            listView1.Items.Clear();
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
@@ -134,6 +122,11 @@ namespace KS2Drive.Debug
             }
 
             Host.DebugMessagePosted -= (ps, pe) => { DisplayEvent(); };
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            listView1.Items.Clear();
         }
 
         private void button2_Click(object sender, EventArgs e)
