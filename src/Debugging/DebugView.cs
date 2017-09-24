@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -15,6 +16,31 @@ namespace KS2Drive.Debug
 {
     public partial class DebugView : Form
     {
+        private DavFS Host;
+        private bool _PauseDequeue;
+        private bool PauseDequeue
+        {
+            get
+            {
+                lock (PauseDequeueLock)
+                {
+                    return _PauseDequeue;
+                }
+            }
+            set
+            {
+                lock (PauseDequeueLock)
+                {
+                    _PauseDequeue = value;
+                }
+            }
+        }
+        private object PauseDequeueLock = new object();
+
+        private CancellationTokenSource TokenSource;
+        private CancellationToken Token;
+        private Task EventDisplayTask;
+
         public DebugView(DavFS MFS)
         {
             Host = MFS;
@@ -24,76 +50,74 @@ namespace KS2Drive.Debug
             listView1.DoubleBuffering(true);
         }
 
-        private DavFS Host;
-
-        private bool PauseDequeue = false;
-        private object PauseDequeueLock = new object();
-
-        private bool IsDequeueing = false;
-        private object IsDequeueingLock = new object();
-
         private void DisplayEvent()
         {
-            lock (PauseDequeueLock)
-            {
-                if (PauseDequeue) return;
-            }
+            if (PauseDequeue) return;
 
-            lock (IsDequeueingLock)
-            {
-                if (IsDequeueing) return;
-                IsDequeueing = true;
-            }
+            //https://stackoverflow.com/questions/19197376/check-if-task-is-already-running-before-starting-new
+            if (EventDisplayTask != null && !EventDisplayTask.IsCompleted) return;
 
-            if (listView1.InvokeRequired)
+            TokenSource = new CancellationTokenSource();
+            Token = TokenSource.Token;
+
+            EventDisplayTask = Task.Factory.StartNew(() =>
             {
-                listView1.Invoke(new MethodInvoker(delegate { DisplayEventSafe(); }));
-            }
-            else
-            {
-                DisplayEventSafe();
-            }
+                if (listView1.InvokeRequired)
+                {
+                    listView1.Invoke(new MethodInvoker(delegate { DisplayEventSafe(); }));
+                }
+                else
+                {
+                    DisplayEventSafe();
+                };
+            });
         }
 
         private void DisplayEventSafe()
         {
             while (Host.DebugMessageQueue.TryDequeue(out DebugMessage DM))
             {
-                lock (PauseDequeueLock)
+                try
                 {
-                    if (PauseDequeue) break;
-                }
+                    Token.ThrowIfCancellationRequested();
 
-                if (DM.MessageType == 1)
-                {
-                    bool Found = false;
-
-                    for (int i = listView1.Items.Count - 1; i >= Math.Max(0, listView1.Items.Count - 25); i--)
+                    if (DM.MessageType == 1)
                     {
-                        if (listView1.Items[i].SubItems[0].Text.Equals(DM.OperationId))
-                        {
-                            listView1.Items[i].SubItems[5].Text = DM.date.ToString("HH:MM:ss:ffff");
-                            listView1.Items[i].SubItems[6].Text = DM.Result;
-                            listView1.Items[i].SubItems[7].Text = Convert.ToInt32((DM.date - (DateTime)listView1.Items[i].SubItems[4].Tag).TotalMilliseconds).ToString();
+                        bool Found = false;
 
-                            if (!DM.Result.StartsWith("STATUS_SUCCESS")) listView1.Items[i].ForeColor = Color.Red;
-                            Found = true;
-                            break;
+                        for (int i = listView1.Items.Count - 1; i >= Math.Max(0, listView1.Items.Count - 25); i--)
+                        {
+                            if (listView1.Items[i].SubItems[0].Text.Equals(DM.OperationId))
+                            {
+                                listView1.Items[i].SubItems[5].Text = DM.date.ToString("HH:MM:ss:ffff");
+                                listView1.Items[i].SubItems[6].Text = DM.Result;
+                                listView1.Items[i].SubItems[7].Text = Convert.ToInt32((DM.date - (DateTime)listView1.Items[i].SubItems[4].Tag).TotalMilliseconds).ToString();
+
+                                if (!DM.Result.StartsWith("STATUS_SUCCESS")) listView1.Items[i].ForeColor = Color.Red;
+                                Found = true;
+                                break;
+                            }
                         }
                     }
+                    else
+                    {
+                        listView1.Items.Add(new ListViewItem(new String[] { DM.OperationId, DM.Handle, DM.Caller, DM.Path, DM.date.ToString("HH:mm:ss:ffff"), "", "", "" }));
+                        listView1.Items[listView1.Items.Count - 1].SubItems[4].Tag = DM.date;
+                        listView1.Items[listView1.Items.Count - 1].EnsureVisible();
+                    }
                 }
-                else
+                catch
                 {
-                    listView1.Items.Add(new ListViewItem(new String[] { DM.OperationId, DM.Handle, DM.Caller, DM.Path, DM.date.ToString("HH:mm:ss:ffff"), "", "", "" }));
-                    listView1.Items[listView1.Items.Count - 1].SubItems[4].Tag = DM.date;
-                    listView1.Items[listView1.Items.Count - 1].EnsureVisible();
+
                 }
             }
 
+            /*
             lock (IsDequeueingLock)
             {
                 IsDequeueing = false;
             }
+            */
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -103,26 +127,30 @@ namespace KS2Drive.Debug
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (EventDisplayTask != null && !EventDisplayTask.IsCompleted)
+            {
+                TokenSource.Cancel();
+                EventDisplayTask.Wait();
+            }
+
             Host.DebugMessagePosted -= (ps, pe) => { DisplayEvent(); };
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-            lock (PauseDequeueLock)
+            if (PauseDequeue)
             {
-                if (PauseDequeue)
-                {
-                    button2.Text = "Pause";
-                    PauseDequeue = false;
-                }
-                else
-                {
-                    button2.Text = "Continue";
-                    PauseDequeue = true;
-                }
+                button2.Text = "Pause";
+                PauseDequeue = false;
+                DisplayEvent();
             }
-
-            DisplayEvent();
+            else
+            {
+                button2.Text = "Continue";
+                PauseDequeue = true;
+                TokenSource.Cancel();
+                EventDisplayTask.Wait();
+            }
         }
     }
 

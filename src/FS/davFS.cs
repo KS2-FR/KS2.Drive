@@ -1692,33 +1692,36 @@ namespace KS2Drive.FS
         private void DebugStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, Handle = CFN.handle, OperationId = OperationId, Path = CFN.LocalPath, Caller = Caller });
-            DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            DebugMessagePosted?.Invoke(null, null);
+            //DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
         }
 
         private void DebugStart(String OperationId, String Handle, String FileName, [CallerMemberName]string Caller = "")
         {
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, Handle = Handle, OperationId = OperationId, Path = FileName, Caller = Caller });
-            DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            //DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            DebugMessagePosted?.Invoke(null, null);
         }
 
         private void DebugEnd(String OperationId, String Result)
         {
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 1, date = DateTime.Now, OperationId = OperationId, Result = Result });
-            DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            //DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            DebugMessagePosted?.Invoke(null, null);
         }
 
-        private void DebugMessagePostedEndAsync(IAsyncResult iar)
-        {
-            var ar = (System.Runtime.Remoting.Messaging.AsyncResult)iar;
-            var invokedMethod = (EventHandler)ar.AsyncDelegate;
+        //private void DebugMessagePostedEndAsync(IAsyncResult iar)
+        //{
+        //    var ar = (System.Runtime.Remoting.Messaging.AsyncResult)iar;
+        //    var invokedMethod = (EventHandler)ar.AsyncDelegate;
 
-            try
-            {
-                invokedMethod.EndInvoke(iar);
-            }
-            catch
-            {
-            }
-        }
+        //    try
+        //    {
+        //        invokedMethod.EndInvoke(iar);
+        //    }
+        //    catch
+        //    {
+        //    }
+        //}
     }
 }
