@@ -17,4 +17,15 @@ namespace KS2Drive.FS
         WebDAV = 0,
         AOS = 1
     }
+
+    //Windows Kernel Cache management
+    //An infinite FileInfoTimeout, which enables caching of metadata and data.
+    //A FileInfoTimeout of 1s(second), which enables caching of metadata but disables caching of data.
+    //A FileInfoTimeout of 0, which completely disables caching.
+    public enum KernelCacheMode
+    {
+        DataAndMetaData = -1,            
+        Disabled = 0,
+        MetaDataOnly = 1000
+    }
 }

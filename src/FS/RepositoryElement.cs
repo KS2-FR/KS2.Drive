@@ -17,9 +17,8 @@ namespace KS2Drive
         public DateTime? LastModified { get; set; }
         public string DisplayName { get; set; }
         public long? ContentLength { get; set; }
-        public String LocalFileName { get; set; }
 
-        public RepositoryElement(WebDAVClient.Model.Item Item, String LocalFileName)
+        public RepositoryElement(WebDAVClient.Model.Item Item)
         {
             this.Href = Item.Href;
             this.CreationDate = Item.CreationDate;
@@ -30,7 +29,6 @@ namespace KS2Drive
             this.LastModified = Item.LastModified;
             this.DisplayName = Item.DisplayName;
             this.ContentLength = Item.ContentLength;
-            this.LocalFileName = LocalFileName;
         }
     }
 }

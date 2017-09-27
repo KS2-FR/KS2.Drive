@@ -85,6 +85,7 @@ namespace KS2Drive
                 catch ( Exception ex)
                 {
                     MessageBox.Show(ex.Message);
+                    return;
                 }
 
                 button1.Content = "Unmount";

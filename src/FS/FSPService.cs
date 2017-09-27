@@ -2,12 +2,8 @@
 using KS2Drive.Debug;
 using KS2Drive.FS;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace KS2Drive
@@ -28,23 +24,10 @@ namespace KS2Drive
 
         public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password)
         {
-            try
-            {
-                davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, Login, Password);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-                return;
-            }
-
+            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, KernelCacheMode.Disabled, Login, Password);
             Host = new FileSystemHost(davFs);
 
             bool IsSync = false;
-#if DEBUG
-            IsSync = true;
-#endif
-
             if (Host.Mount($"{DriveName}:", null, IsSync, 0) < 0) throw new IOException("cannot mount file system");
 
 #if DEBUG

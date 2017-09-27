@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using WebDAVClient.Helpers;
 using WebDAVClient.Model;
 
@@ -385,7 +386,7 @@ namespace WebDAVClient
         {
             // Should have a trailing slash.
             var srcUri = await GetServerUrl(srcFolderPath, true).ConfigureAwait(false);
-            var dstUri = await GetServerUrl(dstFolderPath, true).ConfigureAwait(false);
+            var dstUri = await GetServerUrl(dstFolderPath, false).ConfigureAwait(false);
 
             return await Move(srcUri.Uri, dstUri.Uri).ConfigureAwait(false);
         }
@@ -405,7 +406,7 @@ namespace WebDAVClient
             const string requestContent = "MOVE";
 
             IDictionary<string, string> headers = new Dictionary<string, string>();
-            headers.Add("Destination", dstUri.ToString());
+            headers.Add("Destination", HttpUtility.UrlPathEncode(dstUri.ToString()));
 
             var response = await HttpRequest(srcUri, MoveMethod, headers, Encoding.UTF8.GetBytes(requestContent)).ConfigureAwait(false);
 

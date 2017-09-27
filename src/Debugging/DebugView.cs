@@ -145,6 +145,32 @@ namespace KS2Drive.Debug
                 EventDisplayTask.Wait();
             }
         }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            RefreshView();
+        }
+
+        private void RefreshView()
+        {
+            if (listView1.InvokeRequired)
+            {
+                listView2.Invoke(new MethodInvoker(delegate { RefreshViewSafe(); }));
+            }
+            else
+            {
+                RefreshViewSafe();
+            };
+        }
+
+        private void RefreshViewSafe()
+        {
+            listView2.Items.Clear();
+            foreach (var E in Host.FileNodeCache.OrderBy(x=>x.LocalPath))
+            {
+                listView2.Items.Add(E.LocalPath);
+            }
+        }
     }
 
     public static class ControlExtensions
