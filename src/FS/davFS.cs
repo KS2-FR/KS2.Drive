@@ -60,7 +60,7 @@ namespace KS2Drive.FS
                 return ReturnList;
             }
         }
-
+        /*
         private void UpdateReservedFileNodeInCache(FileNode node)
         {
             lock (CacheLock)
@@ -69,7 +69,8 @@ namespace KS2Drive.FS
                 FileNodeCache.Add(node);
             }
         }
-
+        */
+        /*
         private void RemoveReservedFileNodeFromCache(String FileOrFolderLocalPath)
         {
             lock (CacheLock)
@@ -77,7 +78,16 @@ namespace KS2Drive.FS
                 FileNodeCache.RemoveAll(x => x.LocalPath.Equals(FileOrFolderLocalPath));
             }
         }
+        */
+        private FileNode GetFileNodeFromCache(String FileOrFolderLocalPath)
+        {
+            lock (CacheLock)
+            {
+                return FileNodeCache.FirstOrDefault(x => x.LocalPath.Equals(FileOrFolderLocalPath));
+            }
+        }
 
+        /*
         private FileNode GetFileNodeFromCache(String FileOrFolderLocalPath, bool ReserveIfNull = false)
         {
             lock (CacheLock)
@@ -96,7 +106,7 @@ namespace KS2Drive.FS
                 }
             }
         }
-
+        */
         private void AddFileNodeToCache(FileNode node)
         {
             lock (CacheLock)
@@ -328,60 +338,59 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, "", FileName);
 
-            var KnownNode = GetFileNodeFromCache(FileName, true); //If no object in cache, reserve it (to avoid concurrency issues)
-            if (KnownNode == null)
+            lock (CacheLock)
             {
-                WebDAVClient.Model.Item FoundElement;
+                var KnownNode = GetFileNodeFromCache(FileName);
+                if (KnownNode == null)
+                {
+                    WebDAVClient.Model.Item FoundElement;
 
-                try
-                {
-                    FoundElement = GetRepositoryElement(FileName);
-                }
-                catch (WebDAVException ex)
-                {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                    return STATUS_OBJECT_NAME_NOT_FOUND;
-                }
-                catch (HttpRequestException ex)
-                {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                    return STATUS_NETWORK_UNREACHABLE;
-                }
-                catch (Exception ex)
-                {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                    return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
-                }
+                    try
+                    {
+                        FoundElement = GetRepositoryElement(FileName);
+                    }
+                    catch (WebDAVException ex)
+                    {
+                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                        DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                        return STATUS_NETWORK_UNREACHABLE;
+                    }
+                    catch (Exception ex)
+                    {
+                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
 
-                if (FoundElement == null)
-                {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                    DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
-                    return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
+                    if (FoundElement == null)
+                    {
+                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                        DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                        return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
+                    else
+                    {
+                        var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
+                        if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
+                        FileAttributes = D.FileInfo.FileAttributes;
+                        AddFileNodeToCache(D);
+                        DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
+                        return STATUS_SUCCESS;
+                    }
                 }
                 else
                 {
-                    var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
-                    if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
-                    FileAttributes = D.FileInfo.FileAttributes;
-                    UpdateReservedFileNodeInCache(D);
-                    DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
+                    FileAttributes = KnownNode.FileInfo.FileAttributes;
+                    if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.FileSecurity;
+                    DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
                     return STATUS_SUCCESS;
                 }
-            }
-            else
-            {
-                FileAttributes = KnownNode.FileInfo.FileAttributes;
-                if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.FileSecurity;
-                DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
-                return STATUS_SUCCESS;
             }
         }
 
@@ -402,54 +411,53 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             NormalizedName = default(String);
 
-            FileNode CFN = GetFileNodeFromCache(FileName, true);
-            if (CFN == null)
+            lock (CacheLock)
             {
-                WebDAVClient.Model.Item RepositoryObject;
-
-                try
+                FileNode CFN = GetFileNodeFromCache(FileName);
+                if (CFN == null)
                 {
-                    RepositoryObject = GetRepositoryElement(FileName);
-                    if (RepositoryObject == null)
+                    WebDAVClient.Model.Item RepositoryObject;
+
+                    try
                     {
-                        RemoveReservedFileNodeFromCache(FileName);
-                        DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                        RepositoryObject = GetRepositoryElement(FileName);
+                        if (RepositoryObject == null)
+                        {
+                            DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                            return STATUS_OBJECT_NAME_NOT_FOUND;
+                        }
+                    }
+                    catch (WebDAVException ex)
+                    {
+                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
+                    catch (HttpRequestException ex)
+                    {
+                        DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                        return STATUS_NETWORK_UNREACHABLE;
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
+
+                    CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
+                    AddFileNodeToCache(CFN);
+                    Int32 i = Interlocked.Increment(ref CFN.OpenCount);
+                    DebugEnd(OperationId, $"STATUS_SUCCESS - From Repository - Handle {i}");
                 }
-                catch (WebDAVException ex)
+                else
                 {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                    return STATUS_OBJECT_NAME_NOT_FOUND;
-                }
-                catch (HttpRequestException ex)
-                {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                    return STATUS_NETWORK_UNREACHABLE;
-                }
-                catch (Exception ex)
-                {
-                    RemoveReservedFileNodeFromCache(FileName);
-                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                    return STATUS_OBJECT_NAME_NOT_FOUND;
+                    Int32 i = Interlocked.Increment(ref CFN.OpenCount);
+                    DebugEnd(OperationId, $"STATUS_SUCCESS - From cache - Handle {i}");
                 }
 
-                CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
-                UpdateReservedFileNodeInCache(CFN);
-                Int32 i = Interlocked.Increment(ref CFN.OpenCount);
-                DebugEnd(OperationId, $"STATUS_SUCCESS - From Repository - Handle {i}");
+                FileNode0 = CFN;
+                FileInfo = CFN.FileInfo;
+                NormalizedName = FileName;
             }
-            else
-            {
-                Int32 i = Interlocked.Increment(ref CFN.OpenCount);
-                DebugEnd(OperationId, $"STATUS_SUCCESS - From cache - Handle {i}");
-            }
-
-            FileNode0 = CFN;
-            FileInfo = CFN.FileInfo;
-            NormalizedName = FileName;
 
             return STATUS_SUCCESS;
         }
