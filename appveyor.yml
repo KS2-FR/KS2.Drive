@@ -1,0 +1,5 @@
+version: 1.0.{build}
+image: Visual Studio 2017
+platform: Any CPU
+build:
+  verbosity: normal
