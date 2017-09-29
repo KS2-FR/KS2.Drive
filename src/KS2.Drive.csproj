@@ -62,8 +62,9 @@
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
-    <Reference Include="winfsp-msil">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\WinFsp\bin\winfsp-msil.dll</HintPath>
+    <Reference Include="winfsp-msil, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b099876d8fa9b1f3, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Reference\winfsp-msil.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
