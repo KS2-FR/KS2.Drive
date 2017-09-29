@@ -44,19 +44,18 @@ namespace KS2Drive.FS
         #region Internal Cache management
 
         private object CacheLock = new object();
-        public List<FileNode> FileNodeCache = new List<FileNode>();
+        public Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
 
         private List<FileNode> GetFolderContentFromCache(String FolderName)
         {
             lock (CacheLock)
             {
-                var KnownFolder = FileNodeCache.FirstOrDefault(x => x.LocalPath.Equals(FolderName));
-                if (KnownFolder == null || !KnownFolder.IsParsed) return null;
+                if (!FileNodeCache.ContainsKey(FolderName) || !FileNodeCache[FolderName].IsParsed) return null;
 
                 if (FolderName != "\\") FolderName += "\\";
 
                 List<FileNode> ReturnList = new List<FileNode>();
-                ReturnList.AddRange(FileNodeCache.Where(x => x.LocalPath != FolderName && x.LocalPath.StartsWith($"{FolderName}") && x.LocalPath.LastIndexOf('\\') == FolderName.Length - 1));
+                ReturnList.AddRange(FileNodeCache.Where(x => x.Key != FolderName && x.Key.StartsWith($"{FolderName}") && x.Key.LastIndexOf('\\').Equals(FolderName.Length - 1)).Select(x => x.Value));
                 return ReturnList;
             }
         }
@@ -83,7 +82,8 @@ namespace KS2Drive.FS
         {
             lock (CacheLock)
             {
-                return FileNodeCache.FirstOrDefault(x => x.LocalPath.Equals(FileOrFolderLocalPath));
+                if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return null;
+                else return FileNodeCache[FileOrFolderLocalPath];
             }
         }
 
@@ -111,7 +111,16 @@ namespace KS2Drive.FS
         {
             lock (CacheLock)
             {
-                FileNodeCache.Add(node);
+                FileNodeCache.Add(node.LocalPath, node);
+                CacheRefreshed?.Invoke(this, null);
+            }
+        }
+
+        private void UpdateFileNodeKeyInCache(String PreviousKey, String NewKey)
+        {
+            lock (CacheLock)
+            {
+                FileNodeCache.RenameKey(PreviousKey, NewKey);
                 CacheRefreshed?.Invoke(this, null);
             }
         }
@@ -120,10 +129,15 @@ namespace KS2Drive.FS
         {
             lock (CacheLock)
             {
-                foreach (var FolderSubElement in FileNodeCache.Where(x => x.LocalPath.StartsWith(OldFolderName + "\\")))
+                foreach (var FolderSubElement in FileNodeCache.Where(x => x.Key.StartsWith(OldFolderName + "\\")).ToList())
                 {
-                    FolderSubElement.LocalPath = NewFolderName + FolderSubElement.LocalPath.Substring(OldFolderName.Length);
-                    FolderSubElement.RepositoryPath = ConvertLocalPathToRepositoryPath(FolderSubElement.LocalPath);
+                    String OldKeyName = FolderSubElement.Key;
+                    FolderSubElement.Value.LocalPath = NewFolderName + FolderSubElement.Value.LocalPath.Substring(OldFolderName.Length);
+                    FolderSubElement.Value.RepositoryPath = ConvertLocalPathToRepositoryPath(FolderSubElement.Value.LocalPath);
+                    String NewKeyName = FolderSubElement.Value.LocalPath;
+
+                    FileNodeCache.RenameKey(OldKeyName, NewKeyName);
+
                 }
                 CacheRefreshed?.Invoke(this, null);
             }
@@ -133,10 +147,13 @@ namespace KS2Drive.FS
         {
             lock (CacheLock)
             {
-                FileNodeCache.Remove(node);
+                FileNodeCache.Remove(node.LocalPath);
                 if ((node.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
                 {
-                    FileNodeCache.RemoveAll(x => x.LocalPath.StartsWith(node.LocalPath + "\\"));
+                    foreach (var s in FileNodeCache.Where(x => x.Key.StartsWith(node.LocalPath + "\\")).ToList())
+                    {
+                        FileNodeCache.Remove(s.Key);
+                    }
                 }
                 CacheRefreshed?.Invoke(this, null);
             }
@@ -144,12 +161,11 @@ namespace KS2Drive.FS
 
         private void InvalidateFileNodeInCache(FileNode node)
         {
-            lock(CacheLock)
+            lock (CacheLock)
             {
-                FileNodeCache.Remove(node);
+                FileNodeCache.Remove(node.LocalPath);
                 String ParentFolderPath = node.LocalPath.Substring(0, node.LocalPath.LastIndexOf(@"\"));
-                var ParentFromCache = FileNodeCache.FirstOrDefault(x => x.LocalPath.Equals(ParentFolderPath));
-                if (ParentFromCache != null) ParentFromCache.IsParsed = false;
+                FileNodeCache[ParentFolderPath].IsParsed = false;
             }
         }
 
@@ -204,7 +220,7 @@ namespace KS2Drive.FS
 
             Host.FileInfoTimeout = unchecked((UInt32)(Int32)(this.kernelCacheMode));
             Host.FileSystemName = "davFS";
-            Host.Prefix = $@"\{this.DAVServeurAuthority}\dav"; //mount as network drive
+            //Host.Prefix = $@"\{this.DAVServeurAuthority}\dav"; //mount as network drive
             Host.SectorSize = DavFS.MEMFS_SECTOR_SIZE;
             Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
@@ -329,11 +345,12 @@ namespace KS2Drive.FS
             out UInt32 FileAttributes/* or ReparsePointIndex */,
             ref Byte[] SecurityDescriptor)
         {
-            //if (FileName.ToLower().Contains("desktop.ini") || (FileName.ToLower().Contains("autorun.inf")))
-            //{
-            //    FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-            //    return STATUS_OBJECT_NAME_NOT_FOUND;
-            //}
+
+            if (FileName.ToLower().Contains("desktop.ini") || (FileName.ToLower().Contains("autorun.inf")))
+            {
+                FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                return STATUS_OBJECT_NAME_NOT_FOUND;
+            }
 
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, "", FileName);
@@ -900,7 +917,7 @@ namespace KS2Drive.FS
                     {
                         DebugEnd(OperationId, ex.Message);
                         DeleteFileNodeFromCache(CFN);
-                        
+
                         return;
                     }
                     CFN.HasUnflushedData = false;
@@ -1375,6 +1392,7 @@ namespace KS2Drive.FS
             CFN.RepositoryPath = RepositoryTargetDocumentName;
             CFN.Name = GetRepositoryDocumentName(RepositoryTargetDocumentName);
             CFN.LocalPath = NewFileName;
+            UpdateFileNodeKeyInCache(FileName, NewFileName);
 
             if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
             {
@@ -1835,5 +1853,16 @@ namespace KS2Drive.FS
         //    {
         //    }
         //}
+    }
+
+    public static class Extension
+    {
+        public static void RenameKey<TKey, TValue>(this IDictionary<TKey, TValue> dic,
+                                      TKey fromKey, TKey toKey)
+        {
+            TValue value = dic[fromKey];
+            dic.Remove(fromKey);
+            dic[toKey] = value;
+        }
     }
 }
