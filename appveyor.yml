@@ -12,5 +12,4 @@ build:
   verbosity: minimal
 
 artifacts:
-- path: src\bin\$(configuration)
-  name: $(configuration)
+  name: KS2Drive.zip
