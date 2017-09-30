@@ -12,4 +12,4 @@ build:
   verbosity: minimal
 
 artifacts:
-  name: KS2Drive.zip
+  -path: KS2Drive.zip
