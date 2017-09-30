@@ -57,6 +57,13 @@ namespace KS2Drive.FS
             return ReworkdPath;
         }
 
+        public static String ConvertLocalPathToRepositoryPath(String LocalPath)
+        {
+            String ReworkdPath = DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            if (ReworkdPath.EndsWith("/")) ReworkdPath = ReworkdPath.Substring(0, ReworkdPath.Length - 1);
+            return ReworkdPath;
+        }
+
         public static Byte[] GetDefaultSecurity()
         {
             //https://blogs.technet.microsoft.com/askds/2008/04/18/the-security-descriptor-definition-language-of-love-part-1/

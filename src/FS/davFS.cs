@@ -21,7 +21,6 @@ namespace KS2Drive.FS
     {
         public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
         public EventHandler DebugMessagePosted;
-        public EventHandler CacheRefreshed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private UInt32 MaxFileNodes;
@@ -38,138 +37,10 @@ namespace KS2Drive.FS
         private WebDAVMode WebDAVMode;
         private String DocumentLibraryPath;
 
+        public CacheManager Cache;
+
         public const UInt16 MEMFS_SECTOR_SIZE = 4096;
         public const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
-
-        #region Internal Cache management
-
-        private object CacheLock = new object();
-        public Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
-
-        private List<FileNode> GetFolderContentFromCache(String FolderName)
-        {
-            lock (CacheLock)
-            {
-                if (!FileNodeCache.ContainsKey(FolderName) || !FileNodeCache[FolderName].IsParsed) return null;
-
-                if (FolderName != "\\") FolderName += "\\";
-
-                List<FileNode> ReturnList = new List<FileNode>();
-                ReturnList.AddRange(FileNodeCache.Where(x => x.Key != FolderName && x.Key.StartsWith($"{FolderName}") && x.Key.LastIndexOf('\\').Equals(FolderName.Length - 1)).Select(x => x.Value));
-                return ReturnList;
-            }
-        }
-        /*
-        private void UpdateReservedFileNodeInCache(FileNode node)
-        {
-            lock (CacheLock)
-            {
-                FileNodeCache.RemoveAll(x => x.LocalPath.Equals(node.LocalPath));
-                FileNodeCache.Add(node);
-            }
-        }
-        */
-        /*
-        private void RemoveReservedFileNodeFromCache(String FileOrFolderLocalPath)
-        {
-            lock (CacheLock)
-            {
-                FileNodeCache.RemoveAll(x => x.LocalPath.Equals(FileOrFolderLocalPath));
-            }
-        }
-        */
-        private FileNode GetFileNodeFromCache(String FileOrFolderLocalPath)
-        {
-            lock (CacheLock)
-            {
-                if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return null;
-                else return FileNodeCache[FileOrFolderLocalPath];
-            }
-        }
-
-        /*
-        private FileNode GetFileNodeFromCache(String FileOrFolderLocalPath, bool ReserveIfNull = false)
-        {
-            lock (CacheLock)
-            {
-                var KnownNode = FileNodeCache.FirstOrDefault(x => x.LocalPath.Equals(FileOrFolderLocalPath));
-                if (!ReserveIfNull) return KnownNode;
-
-                if (KnownNode == null)
-                {
-                    FileNodeCache.Add(new FileNode() { LocalPath = FileOrFolderLocalPath });
-                    return null;
-                }
-                else
-                {
-                    return KnownNode;
-                }
-            }
-        }
-        */
-        private void AddFileNodeToCache(FileNode node)
-        {
-            lock (CacheLock)
-            {
-                FileNodeCache.Add(node.LocalPath, node);
-                CacheRefreshed?.Invoke(this, null);
-            }
-        }
-
-        private void UpdateFileNodeKeyInCache(String PreviousKey, String NewKey)
-        {
-            lock (CacheLock)
-            {
-                FileNodeCache.RenameKey(PreviousKey, NewKey);
-                CacheRefreshed?.Invoke(this, null);
-            }
-        }
-
-        private void RenameFolderSubElementsInCache(String OldFolderName, String NewFolderName)
-        {
-            lock (CacheLock)
-            {
-                foreach (var FolderSubElement in FileNodeCache.Where(x => x.Key.StartsWith(OldFolderName + "\\")).ToList())
-                {
-                    String OldKeyName = FolderSubElement.Key;
-                    FolderSubElement.Value.LocalPath = NewFolderName + FolderSubElement.Value.LocalPath.Substring(OldFolderName.Length);
-                    FolderSubElement.Value.RepositoryPath = ConvertLocalPathToRepositoryPath(FolderSubElement.Value.LocalPath);
-                    String NewKeyName = FolderSubElement.Value.LocalPath;
-
-                    FileNodeCache.RenameKey(OldKeyName, NewKeyName);
-
-                }
-                CacheRefreshed?.Invoke(this, null);
-            }
-        }
-
-        private void DeleteFileNodeFromCache(FileNode node)
-        {
-            lock (CacheLock)
-            {
-                FileNodeCache.Remove(node.LocalPath);
-                if ((node.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
-                {
-                    foreach (var s in FileNodeCache.Where(x => x.Key.StartsWith(node.LocalPath + "\\")).ToList())
-                    {
-                        FileNodeCache.Remove(s.Key);
-                    }
-                }
-                CacheRefreshed?.Invoke(this, null);
-            }
-        }
-
-        private void InvalidateFileNodeInCache(FileNode node)
-        {
-            lock (CacheLock)
-            {
-                FileNodeCache.Remove(node.LocalPath);
-                String ParentFolderPath = node.LocalPath.Substring(0, node.LocalPath.LastIndexOf(@"\"));
-                FileNodeCache[ParentFolderPath].IsParsed = false;
-            }
-        }
-
-        #endregion
 
         public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, KernelCacheMode kernelCacheMode, String DAVLogin, String DAVPassword, bool UseProxy = false, String ProxyURL = "", bool UseProxyAuthentication = false, String ProxyLogin = "", String ProxyPassword = "")
         {
@@ -199,6 +70,8 @@ namespace KS2Drive.FS
             this.DAVLogin = DAVLogin;
             this.DAVPassword = DAVPassword;
 
+            Cache = new CacheManager();
+
             //Test Connection
             var Proxy = GenerateProxy();
             try
@@ -209,6 +82,7 @@ namespace KS2Drive.FS
             {
                 throw new Exception($"Impossible de se connecter au serveur : {ex.Message}");
             }
+
         }
 
         /// <summary>
@@ -270,7 +144,7 @@ namespace KS2Drive.FS
         /// </summary>
         private WebDAVClient.Model.Item GetRepositoryElement(String LocalFileName)
         {
-            String RepositoryDocumentName = ConvertLocalPathToRepositoryPath(LocalFileName);
+            String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
             WebDAVClient.Model.Item RepositoryElement = null;
 
             var Proxy = GenerateProxy();
@@ -355,9 +229,11 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, "", FileName);
 
-            lock (CacheLock)
+            try
             {
-                var KnownNode = GetFileNodeFromCache(FileName);
+                Cache.Lock();
+
+                var KnownNode = Cache.GetFileNodeNoLock(FileName);
                 if (KnownNode == null)
                 {
                     WebDAVClient.Model.Item FoundElement;
@@ -396,7 +272,7 @@ namespace KS2Drive.FS
                         var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
                         if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
                         FileAttributes = D.FileInfo.FileAttributes;
-                        AddFileNodeToCache(D);
+                        Cache.AddFileNodeNoLock(D);
                         DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
                         return STATUS_SUCCESS;
                     }
@@ -408,6 +284,10 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
                     return STATUS_SUCCESS;
                 }
+            }
+            finally
+            {
+                Cache.Unlock();
             }
         }
 
@@ -428,9 +308,11 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             NormalizedName = default(String);
 
-            lock (CacheLock)
+            try
             {
-                FileNode CFN = GetFileNodeFromCache(FileName);
+                Cache.Lock();
+
+                FileNode CFN = Cache.GetFileNodeNoLock(FileName);
                 if (CFN == null)
                 {
                     WebDAVClient.Model.Item RepositoryObject;
@@ -461,7 +343,7 @@ namespace KS2Drive.FS
                     }
 
                     CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
-                    AddFileNodeToCache(CFN);
+                    Cache.AddFileNodeNoLock(CFN);
                     Int32 i = Interlocked.Increment(ref CFN.OpenCount);
                     DebugEnd(OperationId, $"STATUS_SUCCESS - From Repository - Handle {i}");
                 }
@@ -474,6 +356,10 @@ namespace KS2Drive.FS
                 FileNode0 = CFN;
                 FileInfo = CFN.FileInfo;
                 NormalizedName = FileName;
+            }
+            finally
+            {
+                Cache.Unlock();
             }
 
             return STATUS_SUCCESS;
@@ -533,7 +419,7 @@ namespace KS2Drive.FS
                 DebugStart(OperationId, CFN);
 
                 List<Tuple<String, FileNode>> ChildrenFileNames = null;
-                var CachedFolder = GetFileNodeFromCache(CFN.LocalPath);
+                var CachedFolder = Cache.GetFileNode(CFN.LocalPath);
 
                 if (CachedFolder == null || !CachedFolder.IsParsed)
                 {
@@ -582,7 +468,7 @@ namespace KS2Drive.FS
                     {
                         var Element = FileNode.CreateFromWebDavObject(Children, this.WebDAVMode);
                         if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue;
-                        AddFileNodeToCache(Element);
+                        Cache.AddFileNode(Element);
                         ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
                     }
 
@@ -590,7 +476,7 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    ChildrenFileNames = GetFolderContentFromCache(CFN.LocalPath).Select(x => new Tuple<String, FileNode>(x.Name, x)).ToList();
+                    ChildrenFileNames = Cache.CacheGetFolderContent(CFN.LocalPath).Select(x => new Tuple<String, FileNode>(x.Name, x)).ToList();
                 }
 
                 LogTrace("Read directory list transformed to FileNode");
@@ -689,7 +575,7 @@ namespace KS2Drive.FS
 
             String NewDocumentName = Path.GetFileName(FileName);
             String NewDocumentParentPath = Path.GetDirectoryName(FileName);
-            String RepositoryNewDocumentParentPath = ConvertLocalPathToRepositoryPath(NewDocumentParentPath);
+            String RepositoryNewDocumentParentPath = FileNode.ConvertLocalPathToRepositoryPath(NewDocumentParentPath);
 
             var Proxy = GenerateProxy();
             if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
@@ -767,7 +653,7 @@ namespace KS2Drive.FS
                 }
             }
 
-            AddFileNodeToCache(CFN);
+            Cache.AddFileNode(CFN);
 
             Interlocked.Increment(ref CFN.OpenCount);
             FileNode0 = CFN;
@@ -916,7 +802,7 @@ namespace KS2Drive.FS
                     catch (Exception ex)
                     {
                         DebugEnd(OperationId, ex.Message);
-                        DeleteFileNodeFromCache(CFN);
+                        Cache.DeleteFileNode(CFN);
 
                         return;
                     }
@@ -957,7 +843,7 @@ namespace KS2Drive.FS
                     {
                         //Fichier
                         Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
-                        DeleteFileNodeFromCache(CFN);
+                        Cache.DeleteFileNode(CFN);
                         DebugEnd(OperationId, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
@@ -971,7 +857,7 @@ namespace KS2Drive.FS
                     {
                         //Répertoire
                         Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
-                        DeleteFileNodeFromCache(CFN);
+                        Cache.DeleteFileNode(CFN);
                         DebugEnd(OperationId, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
@@ -1238,19 +1124,19 @@ namespace KS2Drive.FS
                 }
                 catch (WebDAVConflictException ex)
                 {
-                    InvalidateFileNodeInCache(CFN);
+                    Cache.InvalidateFileNode(CFN);
                     DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (HttpRequestException ex)
                 {
-                    InvalidateFileNodeInCache(CFN);
+                    Cache.InvalidateFileNode(CFN);
                     DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
-                    InvalidateFileNodeInCache(CFN);
+                    Cache.InvalidateFileNode(CFN);
                     DebugEnd(OperationId, $"STATUS_UNEXPECTED_IO_ERROR - {ex.Message}");
                     return STATUS_UNEXPECTED_IO_ERROR;
                 }
@@ -1319,8 +1205,8 @@ namespace KS2Drive.FS
 
             if (FileName == NewFileName) return STATUS_SUCCESS;
 
-            String RepositoryDocumentName = ConvertLocalPathToRepositoryPath(FileName);
-            String RepositoryTargetDocumentName = ConvertLocalPathToRepositoryPath(NewFileName);
+            String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(FileName);
+            String RepositoryTargetDocumentName = FileNode.ConvertLocalPathToRepositoryPath(NewFileName);
 
             try
             {
@@ -1392,11 +1278,11 @@ namespace KS2Drive.FS
             CFN.RepositoryPath = RepositoryTargetDocumentName;
             CFN.Name = GetRepositoryDocumentName(RepositoryTargetDocumentName);
             CFN.LocalPath = NewFileName;
-            UpdateFileNodeKeyInCache(FileName, NewFileName);
+            Cache.UpdateFileNodeKey(FileName, NewFileName);
 
             if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
             {
-                RenameFolderSubElementsInCache(FileName, NewFileName);
+                Cache.RenameFolderSubElements(FileName, NewFileName);
             }
 
             /*
@@ -1766,13 +1652,6 @@ namespace KS2Drive.FS
 
         #region Tools
 
-        public String ConvertLocalPathToRepositoryPath(String LocalPath)
-        {
-            String ReworkdPath = DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
-            if (ReworkdPath.EndsWith("/")) ReworkdPath = ReworkdPath.Substring(0, ReworkdPath.Length - 1);
-            return ReworkdPath;
-        }
-
         private bool IsRepositoryRootPath(String RepositoryPath)
         {
             return RepositoryPath.Equals(DocumentLibraryPath);
@@ -1814,8 +1693,7 @@ namespace KS2Drive.FS
 
         public override void Unmounted(object Host)
         {
-            FileNodeCache.Clear();
-            FileNodeCache = null;
+            Cache.Clear();
             base.Unmounted(Host);
         }
 

@@ -79,6 +79,7 @@
     <Compile Include="Debugging\DebugView.Designer.cs">
       <DependentUpon>DebugView.cs</DependentUpon>
     </Compile>
+    <Compile Include="FS\CacheManager.cs" />
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />

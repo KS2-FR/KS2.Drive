@@ -166,7 +166,7 @@ namespace KS2Drive.Debug
         private void RefreshViewSafe()
         {
             listView2.Items.Clear();
-            foreach (var E in Host.FileNodeCache.OrderBy(x=>x.Key))
+            foreach (var E in Host.Cache.FileNodeCache.OrderBy(x=>x.Key))
             {
                 listView2.Items.Add(E.Key);
             }
