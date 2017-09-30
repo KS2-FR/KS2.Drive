@@ -4,14 +4,13 @@ image: Visual Studio 2017
 
 configuration: Debug
 
-before_build:
-- nuget restore
-
-build:
-  verbosity: minimal
-  
 platform: Any CPU
 
+before_build:
+- cmd: nuget restore
+build:
+  verbosity: minimal
+
 artifacts:
-  - path: src\bin\$(configuration)
-    name: $(configuration).zip
+- path: src\bin\$(configuration)
+  name: $(configuration).zip
