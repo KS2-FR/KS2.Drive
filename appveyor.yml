@@ -2,6 +2,13 @@ version: 1.0.{build}
 image: Visual Studio 2017
 platform: Any CPU
 before_build:
-- cmd: nuget restore
+- nuget restore
+
 build:
   verbosity: minimal
+  
+platform: Any CPU
+
+artifacts:
+  - path: src\bin\$(configuration)\*.*
+    name: $(configuration).zip
