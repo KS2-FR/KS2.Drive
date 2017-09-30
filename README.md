@@ -22,3 +22,5 @@ Nevertheless, basic operations (open / read/ write / delete / move) are working.
 
 Based on WinFSP by Bill Zissimopoulos (https://github.com/billziss-gh/winfsp)<br/>
 Based on the WebdavClient library by Itay Sagui (https://github.com/saguiitay/WebDAVClient)
+
+Latest Build : https://ci.appveyor.com/api/projects/FrKaram/ks2-drive/artifacts/src\bin\KS2Drive.zip
