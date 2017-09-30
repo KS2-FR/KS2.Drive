@@ -12,5 +12,5 @@ build:
 platform: Any CPU
 
 artifacts:
-  - path: %APPVEYOR_BUILD_FOLDER%\src\bin\$(configuration)\*.*
+  - path: ks2-drive\src\bin\$(configuration)\*.*
     name: $(configuration).zip
