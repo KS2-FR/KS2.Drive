@@ -12,5 +12,5 @@ build:
 platform: Any CPU
 
 artifacts:
-  - path: ks2-drive\src\bin\$(configuration)\*.*
+  - path: C:\projects\ks2-drive\src\$(configuration)\*.*
     name: $(configuration).zip
