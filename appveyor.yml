@@ -2,6 +2,7 @@ version: 1.0.{build}
 
 image: Visual Studio 2017
 
+configuration: Debug
 
 before_build:
 - nuget restore
@@ -12,5 +13,5 @@ build:
 platform: Any CPU
 
 artifacts:
-  - path: src\bin\debug
+  - path: src\bin\$(configuration)
     name: $(configuration).zip
