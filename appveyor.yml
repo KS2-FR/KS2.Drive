@@ -12,5 +12,5 @@ build:
 platform: Any CPU
 
 artifacts:
-  - path: src\bin\$(configuration)\*.*
+  - path: src\bin\$(configuration)
     name: $(configuration).zip
