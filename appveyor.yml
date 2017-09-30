@@ -13,4 +13,4 @@ build:
 
 artifacts: 
  - path: src\bin\$(configuration)
- name: KS2Drive.zip
+ name: KS2Drive
