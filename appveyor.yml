@@ -11,5 +11,5 @@ before_build:
 build:
   verbosity: minimal
 
-artifacts:
-  -path: KS2Drive.zip
+artifacts: 
+ - path: KS2Drive.zip
