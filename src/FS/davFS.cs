@@ -51,7 +51,7 @@ namespace KS2Drive.FS
             }
 
             //TEMP
-            WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
+            //WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
             //TEMP
 
             this.MaxFileNodes = 500000;
