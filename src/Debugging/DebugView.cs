@@ -106,7 +106,7 @@ namespace KS2Drive.Debug
                 {
                     //Catch cancellation
                 }
-                catch( Exception ex)
+                catch( Exception)
                 {
                     //This could be a real error
                 }

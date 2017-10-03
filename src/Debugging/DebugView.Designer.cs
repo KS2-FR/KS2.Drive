@@ -30,7 +30,7 @@
         {
             this.listView1 = new System.Windows.Forms.ListView();
             this.ActionId = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.Handle = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.Handle_ = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.Type = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.Path = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.Start = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -56,7 +56,7 @@
             this.listView1.AutoArrange = false;
             this.listView1.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.ActionId,
-            this.Handle,
+            this.Handle_,
             this.Type,
             this.Path,
             this.Start,
@@ -79,9 +79,9 @@
             this.ActionId.Text = "ActionId";
             this.ActionId.Width = 0;
             // 
-            // Handle
+            // Handle_
             // 
-            this.Handle.Text = "Handle";
+            this.Handle_.Text = "Handle";
             // 
             // Type
             // 
@@ -214,7 +214,7 @@
         #endregion
         private System.Windows.Forms.ListView listView1;
         private System.Windows.Forms.ColumnHeader ActionId;
-        private System.Windows.Forms.ColumnHeader Handle;
+        private System.Windows.Forms.ColumnHeader Handle_;
         private System.Windows.Forms.ColumnHeader Type;
         private System.Windows.Forms.ColumnHeader Path;
         private System.Windows.Forms.ColumnHeader Start;

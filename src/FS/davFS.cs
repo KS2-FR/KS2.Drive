@@ -51,7 +51,7 @@ namespace KS2Drive.FS
             }
 
             //TEMP
-            //WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
+            WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
             //TEMP
 
             this.MaxFileNodes = 500000;
@@ -65,15 +65,15 @@ namespace KS2Drive.FS
             this.DAVServeurAuthority = DavServerURI.DnsSafeHost;
             this.DocumentLibraryPath = DavServerURI.PathAndQuery;
 
-            FileNode.DocumentLibraryPath = this.DocumentLibraryPath;
-
             this.DAVLogin = DAVLogin;
             this.DAVPassword = DAVPassword;
 
+            FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
+            WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword);
             Cache = new CacheManager();
 
             //Test Connection
-            var Proxy = GenerateProxy();
+            var Proxy = new WebDavClient2();
             try
             {
                 var LisTest = Proxy.List("/").GetAwaiter().GetResult();
@@ -82,7 +82,6 @@ namespace KS2Drive.FS
             {
                 throw new Exception($"Impossible de se connecter au serveur : {ex.Message}");
             }
-
         }
 
         /// <summary>
@@ -139,79 +138,6 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Retrieve a file or folder from the remote repo
-        /// Return either a RepositoryElement or a FileSystem Error Message
-        /// </summary>
-        private WebDAVClient.Model.Item GetRepositoryElement(String LocalFileName)
-        {
-            String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
-            WebDAVClient.Model.Item RepositoryElement = null;
-
-            var Proxy = GenerateProxy();
-
-            if (RepositoryDocumentName.Contains("."))
-            {
-                //We assume the FileName refers to a file
-                try
-                {
-                    RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
-                    return RepositoryElement;
-                }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
-                {
-                    return null;
-                }
-                catch (WebDAVException ex)
-                {
-                    throw ex;
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
-            }
-            else
-            {
-                //We assume it's a folder
-                try
-                {
-                    RepositoryElement = Proxy.GetFolder(RepositoryDocumentName).GetAwaiter().GetResult();
-                    if (IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
-                    return RepositoryElement;
-                }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
-                {
-                    //Try as a file
-                    try
-                    {
-                        RepositoryElement = Proxy.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
-                        return RepositoryElement;
-                    }
-                    catch (WebDAVException ex1) when (ex1.GetHttpCode() == 404)
-                    {
-                        return null;
-                    }
-                    catch (WebDAVException ex1)
-                    {
-                        throw ex1;
-                    }
-                    catch (Exception ex1)
-                    {
-                        throw ex1;
-                    }
-                }
-                catch (WebDAVException ex)
-                {
-                    throw ex;
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
-            }
-        }
-
-        /// <summary>
         /// GetSecurityByName is used by WinFsp to retrieve essential metadata about a file to be opened, such as its attributes and security descriptor.
         /// </summary>
         public override Int32 GetSecurityByName(
@@ -219,7 +145,6 @@ namespace KS2Drive.FS
             out UInt32 FileAttributes/* or ReparsePointIndex */,
             ref Byte[] SecurityDescriptor)
         {
-
             if (FileName.ToLower().Contains("desktop.ini") || (FileName.ToLower().Contains("autorun.inf")))
             {
                 FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
@@ -240,7 +165,8 @@ namespace KS2Drive.FS
 
                     try
                     {
-                        FoundElement = GetRepositoryElement(FileName);
+                        var Proxy = new WebDavClient2();
+                        FoundElement = Proxy.GetRepositoryElement(FileName);
                     }
                     catch (WebDAVException ex)
                     {
@@ -269,7 +195,7 @@ namespace KS2Drive.FS
                     }
                     else
                     {
-                        var D = FileNode.CreateFromWebDavObject(FoundElement, this.WebDAVMode);
+                        var D = new FileNode(FoundElement);
                         if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
                         FileAttributes = D.FileInfo.FileAttributes;
                         Cache.AddFileNodeNoLock(D);
@@ -319,7 +245,8 @@ namespace KS2Drive.FS
 
                     try
                     {
-                        RepositoryObject = GetRepositoryElement(FileName);
+                        var Proxy = new WebDavClient2();
+                        RepositoryObject = Proxy.GetRepositoryElement(FileName);
                         if (RepositoryObject == null)
                         {
                             DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
@@ -342,7 +269,7 @@ namespace KS2Drive.FS
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
-                    CFN = FileNode.CreateFromWebDavObject(RepositoryObject, this.WebDAVMode);
+                    CFN = new FileNode(RepositoryObject);
                     Cache.AddFileNodeNoLock(CFN);
                     Int32 i = Interlocked.Increment(ref CFN.OpenCount);
                     DebugEnd(OperationId, $"STATUS_SUCCESS - From Repository - Handle {i}");
@@ -419,64 +346,20 @@ namespace KS2Drive.FS
                 DebugStart(OperationId, CFN);
 
                 List<Tuple<String, FileNode>> ChildrenFileNames = null;
-                var CachedFolder = Cache.GetFileNode(CFN.LocalPath);
 
-                if (CachedFolder == null || !CachedFolder.IsParsed)
+                LogTrace("Read directory list start");
+                var Result = Cache.GetFolderContent(CFN.LocalPath, Marker);
+                LogTrace("Read directory list End");
+                if (!Result.Success)
                 {
-                    ChildrenFileNames = new List<Tuple<String, FileNode>>();
-
-                    if (!IsRepositoryRootPath(CFN.RepositoryPath))
-                    {
-                        //if this is not the root directory add the dot entries
-                        if (Marker == null) ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
-
-                        if (null == Marker || "." == Marker)
-                        {
-                            String ParentPath = FileNode.ConvertRepositoryPathToLocalPath(GetRepositoryParentPath(CFN.RepositoryPath));
-                            if (ParentPath != null)
-                            {
-                                //RepositoryElement ParentElement;
-                                try
-                                {
-                                    var ParentElement = GetRepositoryElement(ParentPath);
-                                    if (ParentElement != null) ChildrenFileNames.Add(new Tuple<String, FileNode>("..", FileNode.CreateFromWebDavObject(ParentElement, this.WebDAVMode)));
-                                }
-                                catch { }
-                            }
-                        }
-                    }
-
-                    var Proxy = GenerateProxy();
-                    IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
-
-                    try
-                    {
-                        LogTrace("Read directory list start");
-                        ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugEnd(OperationId, $"Exception : {ex.Message}");
-                        FileName = default(String);
-                        FileInfo = default(FileInfo);
-                        return false;
-                    }
-
-                    LogTrace("Read directory list end");
-
-                    foreach (var Children in ItemsInFolder)
-                    {
-                        var Element = FileNode.CreateFromWebDavObject(Children, this.WebDAVMode);
-                        if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue;
-                        Cache.AddFileNode(Element);
-                        ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
-                    }
-
-                    CFN.IsParsed = true;
+                    DebugEnd(OperationId, $"Exception : {Result.ErrorMessage}");
+                    FileName = default(String);
+                    FileInfo = default(FileInfo);
+                    return false;
                 }
                 else
                 {
-                    ChildrenFileNames = Cache.CacheGetFolderContent(CFN.LocalPath).Select(x => new Tuple<String, FileNode>(x.Name, x)).ToList();
+                    ChildrenFileNames = Result.Content;
                 }
 
                 LogTrace("Read directory list transformed to FileNode");
@@ -550,10 +433,11 @@ namespace KS2Drive.FS
             NormalizedName = default(String);
 
             FileNode CFN;
+            var Proxy = new WebDavClient2();
 
             try
             {
-                WebDAVClient.Model.Item KnownRepositoryElement = GetRepositoryElement(FileName);
+                WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(FileName);
                 if (KnownRepositoryElement != null)
                 {
                     DebugEnd(OperationId, "STATUS_OBJECT_NAME_COLLISION");
@@ -577,14 +461,13 @@ namespace KS2Drive.FS
             String NewDocumentParentPath = Path.GetDirectoryName(FileName);
             String RepositoryNewDocumentParentPath = FileNode.ConvertLocalPathToRepositoryPath(NewDocumentParentPath);
 
-            var Proxy = GenerateProxy();
             if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
             {
                 try
                 {
                     if (Proxy.Upload(RepositoryNewDocumentParentPath, new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
                     {
-                        CFN = FileNode.CreateFromWebDavObject(GetRepositoryElement(FileName), this.WebDAVMode);
+                        CFN = new FileNode(Proxy.GetRepositoryElement(FileName));
                     }
                     else
                     {
@@ -621,7 +504,7 @@ namespace KS2Drive.FS
                 {
                     if (Proxy.CreateDir(RepositoryNewDocumentParentPath, NewDocumentName).GetAwaiter().GetResult())
                     {
-                        CFN = FileNode.CreateFromWebDavObject(GetRepositoryElement(FileName), this.WebDAVMode);
+                        CFN = new FileNode(Proxy.GetRepositoryElement(FileName));
                     }
                     else
                     {
@@ -793,8 +676,8 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        var Proxy = GenerateProxy();
-                        if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
+                        var Proxy = new WebDavClient2();
+                        if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                         {
                             throw new Exception("Upload failed");
                         }
@@ -825,7 +708,7 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, CFN);
 
-            if (IsRepositoryRootPath(CFN.RepositoryPath)) return;
+            if (FileNode.IsRepositoryRootPath(CFN.RepositoryPath)) return;
 
             if ((Flags & CleanupSetAllocationSize) != 0)
             {
@@ -836,7 +719,7 @@ namespace KS2Drive.FS
 
             if ((Flags & CleanupDelete) != 0)
             {
-                var Proxy = GenerateProxy();
+                var Proxy = new WebDavClient2();
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                 {
                     try
@@ -874,10 +757,10 @@ namespace KS2Drive.FS
                     {
                         if (CFN.HasUnflushedData)
                         {
-                            var Proxy = GenerateProxy();
+                            var Proxy = new WebDavClient2();
                             try
                             {
-                                if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
+                                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                                 {
                                     throw new Exception("Upload failed");
                                 }
@@ -958,7 +841,7 @@ namespace KS2Drive.FS
 
             if (CFN.FileData == null)
             {
-                var Proxy = GenerateProxy();
+                var Proxy = new WebDavClient2();
                 try
                 {
                     CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
@@ -1114,10 +997,10 @@ namespace KS2Drive.FS
 
             if (this.FlushMode == FlushMode.FlushAtWrite)
             {
-                var Proxy = GenerateProxy();
+                var Proxy = new WebDavClient2();
                 try
                 {
-                    if (!Proxy.Upload(GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                    if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
                     {
                         throw new Exception();
                     }
@@ -1208,9 +1091,11 @@ namespace KS2Drive.FS
             String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(FileName);
             String RepositoryTargetDocumentName = FileNode.ConvertLocalPathToRepositoryPath(NewFileName);
 
+            var Proxy = new WebDavClient2();
+
             try
             {
-                WebDAVClient.Model.Item KnownRepositoryElement = GetRepositoryElement(NewFileName);
+                WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(NewFileName);
                 if (KnownRepositoryElement != null && !ReplaceIfExists)
                 {
                     DebugEnd(OperationId, $"STATUS_OBJECT_NAME_COLLISION");
@@ -1228,7 +1113,6 @@ namespace KS2Drive.FS
                 return FileSystemBase.STATUS_CANNOT_MAKE;
             }
 
-            var Proxy = GenerateProxy();
             if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
             {
                 //Fichier
@@ -1276,9 +1160,9 @@ namespace KS2Drive.FS
             }
 
             CFN.RepositoryPath = RepositoryTargetDocumentName;
-            CFN.Name = GetRepositoryDocumentName(RepositoryTargetDocumentName);
+            CFN.Name = FileNode.GetRepositoryDocumentName(RepositoryTargetDocumentName);
             CFN.LocalPath = NewFileName;
-            Cache.UpdateFileNodeKey(FileName, NewFileName);
+            Cache.RenameFileNodeKey(FileName, NewFileName);
 
             if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
             {
@@ -1651,33 +1535,6 @@ namespace KS2Drive.FS
         #endregion
 
         #region Tools
-
-        private bool IsRepositoryRootPath(String RepositoryPath)
-        {
-            return RepositoryPath.Equals(DocumentLibraryPath);
-        }
-
-        public String GetRepositoryDocumentName(String DocumentPath)
-        {
-            if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
-
-            if (DocumentPath.Equals(DocumentLibraryPath)) return "\\";
-            return DocumentPath.Substring(DocumentPath.LastIndexOf('/') + 1);
-        }
-
-        public String GetRepositoryParentPath(String DocumentPath)
-        {
-            if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
-
-            if (DocumentPath.Equals(DocumentLibraryPath)) return null;
-            if (DocumentPath.Length < DocumentLibraryPath.Length) return null;
-            return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
-        }
-
-        private WebDavClient2 GenerateProxy()
-        {
-            return new WebDavClient2(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword);
-        }
 
         private static object loglock = new object();
 

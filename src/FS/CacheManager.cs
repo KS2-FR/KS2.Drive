@@ -15,26 +15,6 @@ namespace KS2Drive.FS
         private object CacheLock = new object();
         public Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
 
-        public List<FileNode> CacheGetFolderContent(String FolderName)
-        {
-            lock (CacheLock)
-            {
-                if (!FileNodeCache.ContainsKey(FolderName) || !FileNodeCache[FolderName].IsParsed) return null;
-
-                if (FolderName != "\\") FolderName += "\\";
-
-                List<FileNode> ReturnList = new List<FileNode>();
-                ReturnList.AddRange(FileNodeCache.Where(x => x.Key != FolderName && x.Key.StartsWith($"{FolderName}") && x.Key.LastIndexOf('\\').Equals(FolderName.Length - 1)).Select(x => x.Value));
-                return ReturnList;
-            }
-        }
-
-        internal FileNode GetFileNodeNoLock(String FileOrFolderLocalPath)
-        {
-            if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return null;
-            else return FileNodeCache[FileOrFolderLocalPath];
-        }
-
         public FileNode GetFileNode(String FileOrFolderLocalPath)
         {
             lock (CacheLock)
@@ -43,10 +23,10 @@ namespace KS2Drive.FS
             }
         }
 
-        internal void AddFileNodeNoLock(FileNode node)
+        public FileNode GetFileNodeNoLock(String FileOrFolderLocalPath)
         {
-            FileNodeCache.Add(node.LocalPath, node);
-            CacheRefreshed?.Invoke(this, null);
+            if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return null;
+            else return FileNodeCache[FileOrFolderLocalPath];
         }
 
         public void AddFileNode(FileNode node)
@@ -57,7 +37,16 @@ namespace KS2Drive.FS
             }
         }
 
-        public void UpdateFileNodeKey(String PreviousKey, String NewKey)
+        public void AddFileNodeNoLock(FileNode node)
+        {
+            FileNodeCache.Add(node.LocalPath, node);
+            CacheRefreshed?.Invoke(this, null);
+        }
+
+        /// <summary>
+        /// Renomme une clé du dictionnaire
+        /// </summary>
+        public void RenameFileNodeKey(String PreviousKey, String NewKey)
         {
             lock (CacheLock)
             {
@@ -110,20 +99,140 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Return folder content in the form of a list fo FileNodes
+        /// If the folder as not already been parsed, we parse it from the server
+        /// If the folder has been parsed, we serve content from the cache and update the cache from the server in a background task. So that we have a refreshed view for next call
+        /// </summary>
+        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(String FolderName, String Marker)
+        {
+            bool RunRefreshTask = false;
+            List<Tuple<String, FileNode>> ReturnList = null;
+
+            lock (CacheLock)
+            {
+                if (!FileNodeCache.ContainsKey(FolderName)) return (false, null, "Unknown folder");
+
+                var CFN = FileNodeCache[FolderName];
+
+                if (!CFN.IsParsed)
+                {
+                    var Result = InternalGetFolderContent(CFN, Marker);
+                    if (!Result.Success) return Result;
+
+                    //Mise en cache du contenu du répertoire
+                    foreach (var Node in Result.Content)
+                    {
+                        if (Node.Item1 == "." || Node.Item1 == "..") continue;
+                        this.AddFileNodeNoLock(Node.Item2);
+                    }
+
+                    ReturnList = Result.Content;
+                }
+                else
+                {
+                    String FolderNameForSearch = FolderName;
+                    if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
+                    ReturnList = new List<Tuple<String, FileNode>>();
+                    //TODO : Add . && .. from cache
+                    ReturnList.AddRange(FileNodeCache.Where(x => x.Key != FolderName && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
+                    if ((DateTime.Now - FileNodeCache[FolderName].LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
+                }
+            }
+
+            if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(FileNodeCache[FolderName]));
+            return (true, ReturnList, null);
+        }
+
         public void Clear()
         {
             FileNodeCache.Clear();
             FileNodeCache = null;
         }
 
-        internal void Lock()
+        public void Lock()
         {
             Monitor.Enter(CacheLock);
         }
 
-        internal void Unlock()
+        public void Unlock()
         {
             Monitor.Exit(CacheLock);
         }
-     }
+
+        private void InternalRefreshFolderCacheContent(FileNode CFN)
+        {
+            var Result = InternalGetFolderContent(CFN, null);
+            if (!Result.Success) return;
+
+            lock (CacheLock)
+            {
+                //Remove folder content
+                foreach (var s in FileNodeCache.Where(x => x.Key.StartsWith(CFN.LocalPath + "\\")).ToList())
+                {
+                    FileNodeCache.Remove(s.Key);
+                }
+
+                //Refresh from server result
+                foreach (var Node in Result.Content)
+                {
+                    if (Node.Item1 == "." || Node.Item1 == "..") continue;
+                    this.AddFileNodeNoLock(Node.Item2);
+                }
+
+                CFN.LastRefresh = DateTime.Now;
+            }
+        }
+
+        private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) InternalGetFolderContent(FileNode CFN, String Marker)
+        {
+            var Proxy = new WebDavClient2();
+            List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
+
+            if (!FileNode.IsRepositoryRootPath(CFN.RepositoryPath))
+            {
+                //if this is not the root directory add the dot entries
+                if (Marker == null) ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
+
+                if (null == Marker || "." == Marker)
+                {
+                    String ParentPath = FileNode.ConvertRepositoryPathToLocalPath(FileNode.GetRepositoryParentPath(CFN.RepositoryPath));
+                    if (ParentPath != null)
+                    {
+                        //RepositoryElement ParentElement;
+                        try
+                        {
+                            var ParentElement = Proxy.GetRepositoryElement(ParentPath);
+                            if (ParentElement != null) ChildrenFileNames.Add(new Tuple<String, FileNode>("..", new FileNode(ParentElement)));
+                        }
+                        catch { }
+                    }
+                }
+            }
+
+            IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
+
+            try
+            {
+                //LogTrace("Read directory list start");
+                ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                return (false, null, ex.Message);
+            }
+
+            foreach (var Child in ItemsInFolder)
+            {
+                var Element = new FileNode(Child);
+                if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue; //Bypass l'entrée correspondant à l'élément appelant
+                ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
+            }
+
+            CFN.IsParsed = true;
+            CFN.LastRefresh = DateTime.Now;
+
+            return (true, ChildrenFileNames, null);
+        }
+    }
 }

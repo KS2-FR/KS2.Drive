@@ -13,7 +13,7 @@ namespace KS2Drive.FS
     public class FileNode
     {
         public Int32 OpenCount;
-        static int _handle;
+        //static int _handle;
         public string handle;
         public string Name;
         public String RepositoryPath;
@@ -23,13 +23,15 @@ namespace KS2Drive.FS
         public Byte[] FileData;
         public bool IsCreationPending { get; set; } = false;
         public bool HasUnflushedData { get; set; } = false;
-        private static object IsParsedLock = new object();
-        private bool _IsParsed;
-        public bool IsParsed
+        public DateTime LastRefresh { get; set; }
+
+        //private object IsParsedLock = new object();
+        public bool IsParsed;
+        /*public bool IsParsed
         {
             get
             {
-                lock(IsParsedLock)
+                lock (IsParsedLock)
                 {
                     return _IsParsed;
                 }
@@ -42,24 +44,88 @@ namespace KS2Drive.FS
                 }
             }
         }
-        public static String DocumentLibraryPath;
+        */
+        private static String _DocumentLibraryPath;
+        private static WebDAVMode _WebDAVMode;
 
-        private static ulong FileIndex = 0;
-        private static object DictionnaryLock = new object();
-        private static Dictionary<String, ulong> MappingNodeRef_FileId = new Dictionary<string, ulong>();
+        //private static ulong FileIndex = 0;
+        //private static object DictionnaryLock = new object();
+        //private static Dictionary<String, ulong> MappingNodeRef_FileId = new Dictionary<string, ulong>();
+
+        private static bool _IsInited = false;
+
+        public static void Init(String DocumentLibraryPath, WebDAVMode webDavMode)
+        {
+            FileNode._DocumentLibraryPath = DocumentLibraryPath;
+            FileNode._WebDAVMode = webDavMode;
+            FileNode._IsInited = true;
+        }
+
+        public FileNode(WebDAVClient.Model.Item WebDavObject)
+        {
+            if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
+
+            this.LastRefresh = DateTime.Now;
+            this.Name = WebDavObject.DisplayName;
+
+            if (Uri.TryCreate(WebDavObject.Href, UriKind.Absolute, out Uri ParsedUri))
+            {
+                this.RepositoryPath = new Uri(WebDavObject.Href).PathAndQuery;
+            }
+            else
+            {
+                this.RepositoryPath = WebDavObject.Href;
+            }
+
+            this.LocalPath = HttpUtility.UrlDecode(ConvertRepositoryPathToLocalPath(this.RepositoryPath));
+
+            if (this.RepositoryPath[this.RepositoryPath.Length - 1] == '/' && this.RepositoryPath.Length > 1) this.RepositoryPath = this.RepositoryPath.Remove(this.RepositoryPath.Length - 1);
+
+            if (FileNode._WebDAVMode == WebDAVMode.AOS) //AOS
+            {
+                if (WebDavObject.IsCollection)
+                {
+                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
+                }
+                else
+                {
+                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                }
+            }
+            else //Webdav
+            {
+                if (WebDavObject.Etag == null && WebDavObject.ContentLength == 0)
+                {
+                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
+                }
+                else
+                {
+                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                }
+            }
+
+            if (WebDavObject.CreationDate.HasValue) this.FileInfo.CreationTime = (UInt64)WebDavObject.CreationDate.Value.ToFileTimeUtc();
+            this.FileInfo.LastAccessTime = (UInt64)DateTime.Now.ToFileTimeUtc();
+            if (WebDavObject.LastModified.HasValue) this.FileInfo.LastWriteTime = (UInt64)WebDavObject.LastModified.Value.ToFileTimeUtc();
+            if (WebDavObject.LastModified.HasValue) this.FileInfo.ChangeTime = (UInt64)WebDavObject.LastModified.Value.ToFileTimeUtc();
+            this.FileInfo.AllocationSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
+            this.FileInfo.FileSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
+            //CFN.FileInfo.IndexNumber = CFN.GetIndex(); //TEMP
+            this.FileSecurity = GetDefaultSecurity();
+        }
 
         public static String ConvertRepositoryPathToLocalPath(String CMISPath)
         {
             if (CMISPath.EndsWith("/")) CMISPath = CMISPath.Substring(0, CMISPath.Length - 1);
 
-            String ReworkdPath = CMISPath.Replace(DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
+            String ReworkdPath = CMISPath.Replace(_DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
         }
 
         public static String ConvertLocalPathToRepositoryPath(String LocalPath)
         {
-            String ReworkdPath = DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            String ReworkdPath = _DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
             if (ReworkdPath.EndsWith("/")) ReworkdPath = ReworkdPath.Substring(0, ReworkdPath.Length - 1);
             return ReworkdPath;
         }
@@ -87,81 +153,48 @@ namespace KS2Drive.FS
             return FileSecurity;
         }
 
-        /// <summary>
-        /// Gets an ulong id for a Repository file.
-        /// Register the file if it now known yet
-        /// </summary>
-        private ulong GetIndex()
+        ///// <summary>
+        ///// Gets an ulong id for a Repository file.
+        ///// Register the file if it now known yet
+        ///// </summary>
+        //private ulong GetIndex()
+        //{
+        //    lock (DictionnaryLock)
+        //    {
+        //        var KnownDictionnayFile = MappingNodeRef_FileId.FirstOrDefault(x => x.Key.Equals(this.RepositoryPath));
+        //        if (KnownDictionnayFile.Key == null)
+        //        {
+        //            ulong FileId = ++FileIndex;
+        //            MappingNodeRef_FileId.Add(this.RepositoryPath, FileId);
+        //            return FileId;
+        //        }
+        //        else
+        //        {
+        //            return KnownDictionnayFile.Value;
+        //        }
+        //    }
+        //}
+
+        internal static bool IsRepositoryRootPath(String RepositoryPath)
         {
-            lock (DictionnaryLock)
-            {
-                var KnownDictionnayFile = MappingNodeRef_FileId.FirstOrDefault(x => x.Key.Equals(this.RepositoryPath));
-                if (KnownDictionnayFile.Key == null)
-                {
-                    ulong FileId = ++FileIndex;
-                    MappingNodeRef_FileId.Add(this.RepositoryPath, FileId);
-                    return FileId;
-                }
-                else
-                {
-                    return KnownDictionnayFile.Value;
-                }
-            }
+            return RepositoryPath.Equals(_DocumentLibraryPath);
         }
 
-        internal static FileNode CreateFromWebDavObject(WebDAVClient.Model.Item WebDavObject, WebDAVMode webDavMode)
+        internal static String GetRepositoryDocumentName(String DocumentPath)
         {
-            FileNode CFN = new FileNode();
+            if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            CFN.Name = WebDavObject.DisplayName;
+            if (DocumentPath.Equals(_DocumentLibraryPath)) return "\\";
+            return DocumentPath.Substring(DocumentPath.LastIndexOf('/') + 1);
+        }
 
+        internal static String GetRepositoryParentPath(String DocumentPath)
+        {
+            if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (Uri.TryCreate(WebDavObject.Href, UriKind.Absolute, out Uri ParsedUri))
-            {
-                CFN.RepositoryPath = new Uri(WebDavObject.Href).PathAndQuery;
-            }
-            else
-            {
-                CFN.RepositoryPath = WebDavObject.Href;
-            }
-
-            CFN.LocalPath = HttpUtility.UrlDecode(ConvertRepositoryPathToLocalPath(CFN.RepositoryPath));
-
-            if (CFN.RepositoryPath[CFN.RepositoryPath.Length - 1] == '/' && CFN.RepositoryPath.Length > 1) CFN.RepositoryPath = CFN.RepositoryPath.Remove(CFN.RepositoryPath.Length - 1);
-
-            if (webDavMode == WebDAVMode.AOS) //AOS
-            {
-                if (WebDavObject.IsCollection)
-                {
-                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
-                }
-                else
-                {
-                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                }
-            }
-            else //Webdav
-            {
-                if (WebDavObject.Etag == null && WebDavObject.ContentLength == 0)
-                {
-                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
-                }
-                else
-                {
-                    CFN.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                }
-            }
-
-            if (WebDavObject.CreationDate.HasValue) CFN.FileInfo.CreationTime = (UInt64)WebDavObject.CreationDate.Value.ToFileTimeUtc();
-            CFN.FileInfo.LastAccessTime = (UInt64)DateTime.Now.ToFileTimeUtc();
-            if (WebDavObject.LastModified.HasValue) CFN.FileInfo.LastWriteTime = (UInt64)WebDavObject.LastModified.Value.ToFileTimeUtc();
-            if (WebDavObject.LastModified.HasValue) CFN.FileInfo.ChangeTime = (UInt64)WebDavObject.LastModified.Value.ToFileTimeUtc();
-            CFN.FileInfo.AllocationSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
-            CFN.FileInfo.FileSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
-            //CFN.FileInfo.IndexNumber = CFN.GetIndex(); //TEMP
-            CFN.FileSecurity = GetDefaultSecurity();
-
-            return CFN;
+            if (DocumentPath.Equals(_DocumentLibraryPath)) return null;
+            if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
+            return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
         }
     }
 }

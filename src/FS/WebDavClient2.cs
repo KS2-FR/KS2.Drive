@@ -6,26 +6,40 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using WebDAVClient.Helpers;
 
 namespace KS2Drive.FS
 {
     public class WebDavClient2 : WebDAVClient.Client
     {
-        private WebDAVMode Mode;
-        private String RootPath;
+        private static WebDAVMode _Mode;
+        private static String _RootPath;
+        private static String _Server;
+        private static String _Login;
+        private static String _Password;
+        private static bool _IsInited = false;
 
-        public WebDavClient2(WebDAVMode mode, String Server, String BasePath, String Login, String Password, TimeSpan? uploadTimeout = null, IWebProxy proxy = null) :
-            base(new NetworkCredential { UserName = Login, Password = Password }, uploadTimeout, proxy)
+        public static void Init(WebDAVMode mode, String Server, String BasePath, String Login, String Password)
         {
-            this.Mode = mode;
-            base.Server = Server;
-            base.BasePath = BasePath;
-            this.RootPath = BasePath;
+            WebDavClient2._Mode = mode;
+            WebDavClient2._RootPath = BasePath;
+            WebDavClient2._Server = Server;
+            WebDavClient2._Login = Login;
+            WebDavClient2._Password = Password;
+            WebDavClient2._IsInited = true;
+        }
+
+        public WebDavClient2(TimeSpan? uploadTimeout = null) :
+            base(new NetworkCredential { UserName = WebDavClient2._Login, Password = WebDavClient2._Password }, uploadTimeout, null)
+        {
+            if (!WebDavClient2._IsInited) throw new InvalidOperationException("Please Call Init First");
+            base.Server = WebDavClient2._Server;
+            base.BasePath = WebDavClient2._RootPath;
         }
 
         private String ParameterConvert(String input)
         {
-            if (input.StartsWith(this.RootPath)) return input.Substring(this.RootPath.Length);
+            if (input.StartsWith(WebDavClient2._RootPath)) return input.Substring(WebDavClient2._RootPath.Length);
             else return input;
         }
 
@@ -89,6 +103,77 @@ namespace KS2Drive.FS
         {
             remoteFilePath = ParameterConvert(remoteFilePath);
             return base.Upload(remoteFilePath, content, name);
+        }
+
+        /// <summary>
+        /// Retrieve a file or folder from the remote repo
+        /// Return either a RepositoryElement or a FileSystem Error Message
+        /// </summary>
+        public WebDAVClient.Model.Item GetRepositoryElement(String LocalFileName)
+        {
+            String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
+            WebDAVClient.Model.Item RepositoryElement = null;
+
+            if (RepositoryDocumentName.Contains("."))
+            {
+                //We assume the FileName refers to a file
+                try
+                {
+                    RepositoryElement = this.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
+                    return RepositoryElement;
+                }
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
+                {
+                    return null;
+                }
+                catch (WebDAVException ex)
+                {
+                    throw ex;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
+            }
+            else
+            {
+                //We assume it's a folder
+                try
+                {
+                    RepositoryElement = this.GetFolder(RepositoryDocumentName).GetAwaiter().GetResult();
+                    if (FileNode.IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
+                    return RepositoryElement;
+                }
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
+                {
+                    //Try as a file
+                    try
+                    {
+                        RepositoryElement = this.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
+                        return RepositoryElement;
+                    }
+                    catch (WebDAVException ex1) when (ex1.GetHttpCode() == 404)
+                    {
+                        return null;
+                    }
+                    catch (WebDAVException ex1)
+                    {
+                        throw ex1;
+                    }
+                    catch (Exception ex1)
+                    {
+                        throw ex1;
+                    }
+                }
+                catch (WebDAVException ex)
+                {
+                    throw ex;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
+            }
         }
     }
 }
