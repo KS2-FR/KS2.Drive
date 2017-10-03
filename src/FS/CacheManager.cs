@@ -12,7 +12,7 @@ namespace KS2Drive.FS
     {
         public EventHandler CacheRefreshed;
 
-        private object CacheLock = new object();
+        private static object CacheLock = new object();
         public Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
 
         public FileNode GetFileNode(String FileOrFolderLocalPath)
@@ -138,6 +138,24 @@ namespace KS2Drive.FS
                     ReturnList.AddRange(FileNodeCache.Where(x => x.Key != FolderName && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
                     if ((DateTime.Now - FileNodeCache[FolderName].LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
                 }
+
+
+                if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
+                {
+                    ReturnList.RemoveAll(x => String.Compare(x.Item1,Marker, StringComparison.OrdinalIgnoreCase) < 1);
+                    /*
+                    var WantedTuple = ChildrenFileNames.FirstOrDefault(x => x.Item1.Equals(Marker));
+                    var WantedTupleIndex = ChildrenFileNames.IndexOf(WantedTuple);
+                    if (WantedTupleIndex + 1 < ChildrenFileNames.Count)
+                    {
+                        ChildrenFileNames = ChildrenFileNames.GetRange(WantedTupleIndex + 1, ChildrenFileNames.Count - 1 - WantedTupleIndex);
+                    }
+                    else
+                    {
+                        ChildrenFileNames.Clear();
+                    }*/
+                }
+
             }
 
             if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(FileNodeCache[FolderName]));

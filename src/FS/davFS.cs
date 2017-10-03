@@ -364,20 +364,6 @@ namespace KS2Drive.FS
 
                 LogTrace("Read directory list transformed to FileNode");
 
-                if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
-                {
-                    var WantedTuple = ChildrenFileNames.FirstOrDefault(x => x.Item1.Equals(Marker));
-                    var WantedTupleIndex = ChildrenFileNames.IndexOf(WantedTuple);
-                    if (WantedTupleIndex + 1 < ChildrenFileNames.Count)
-                    {
-                        ChildrenFileNames = ChildrenFileNames.GetRange(WantedTupleIndex + 1, ChildrenFileNames.Count - 1 - WantedTupleIndex);
-                    }
-                    else
-                    {
-                        ChildrenFileNames.Clear();
-                    }
-                }
-
                 Enumerator = ChildrenFileNames.GetEnumerator();
                 Context = new DirectoryEnumeratorContext() { Enumerator = Enumerator, OperationId = OperationId };
             }
