@@ -24,7 +24,7 @@ namespace KS2Drive
 
         public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password)
         {
-            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, KernelCacheMode.Disabled, Login, Password);
+            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, KernelCacheMode.MetaDataOnly, Login, Password);
             Host = new FileSystemHost(davFs);
 
             bool IsSync = false;

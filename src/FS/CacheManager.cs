@@ -124,7 +124,7 @@ namespace KS2Drive.FS
                     foreach (var Node in Result.Content)
                     {
                         if (Node.Item1 == "." || Node.Item1 == "..") continue;
-                        this.AddFileNodeNoLock(Node.Item2);
+                        if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath)) this.AddFileNodeNoLock(Node.Item2);
                     }
 
                     ReturnList = Result.Content;
@@ -139,23 +139,21 @@ namespace KS2Drive.FS
                     if ((DateTime.Now - FileNodeCache[FolderName].LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
                 }
 
+                ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
 
                 if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
                 {
-                    ReturnList.RemoveAll(x => String.Compare(x.Item1,Marker, StringComparison.OrdinalIgnoreCase) < 1);
-                    /*
-                    var WantedTuple = ChildrenFileNames.FirstOrDefault(x => x.Item1.Equals(Marker));
-                    var WantedTupleIndex = ChildrenFileNames.IndexOf(WantedTuple);
-                    if (WantedTupleIndex + 1 < ChildrenFileNames.Count)
+                    var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
+                    var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
+                    if (WantedTupleIndex + 1 < ReturnList.Count)
                     {
-                        ChildrenFileNames = ChildrenFileNames.GetRange(WantedTupleIndex + 1, ChildrenFileNames.Count - 1 - WantedTupleIndex);
+                        ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
                     }
                     else
                     {
-                        ChildrenFileNames.Clear();
-                    }*/
+                        ReturnList.Clear();
+                    }
                 }
-
             }
 
             if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(FileNodeCache[FolderName]));

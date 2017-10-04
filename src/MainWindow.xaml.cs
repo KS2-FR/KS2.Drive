@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -93,6 +94,8 @@ namespace KS2Drive
                 txtURL.IsEnabled = false;
                 txtLogin.IsEnabled = false;
                 txtPassword.IsEnabled = false;
+
+                Process.Start($@"{CBFreeDrives.SelectedValue.ToString()}:\");
             }
             else
             {
