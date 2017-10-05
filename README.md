@@ -5,7 +5,7 @@ It is similar to what webdrive© or netdrive© do.
 
 Usage :
 - Install the latest release of WinFSP (https://github.com/billziss-gh/winfsp/releases)
-- Download the lastest build of KS² Drive (https://ci.appveyor.com/api/projects/FrKaram/ks2-drive/artifacts/src\bin\KS2Drive.zip)
+- Download the lastest build of KS² Drive (https://ci.appveyor.com/api/projects/FrKaram/ks2-drive/artifacts/src/bin/KS2Drive.zip)
 - Run KS2Drive.exe
 - Select the drive letter you want your server to been mounted as
 - Enter the Webdav/AOS URL of the server
