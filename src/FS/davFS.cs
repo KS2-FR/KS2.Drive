@@ -70,7 +70,7 @@ namespace KS2Drive.FS
 
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
             WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword);
-            Cache = new CacheManager();
+            Cache = new CacheManager(CacheMode.Enabled);
 
             //Test Connection
             var Proxy = new WebDavClient2();
@@ -348,7 +348,7 @@ namespace KS2Drive.FS
                 List<Tuple<String, FileNode>> ChildrenFileNames = null;
 
                 LogTrace("Read directory list start");
-                var Result = Cache.GetFolderContent(CFN.LocalPath, Marker);
+                var Result = Cache.GetFolderContent(CFN, Marker);
                 LogTrace("Read directory list End");
                 if (!Result.Success)
                 {

@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
-        mc:Ignorable="d" Height="100" Width="930" Closing="Window_Closing" ResizeMode="NoResize" Title="KS² Drive (POC) - Alpha 2">
+        mc:Ignorable="d" Height="100" Width="1150" Closing="Window_Closing" ResizeMode="NoResize" Title="KS² Drive (POC) - Alpha 3">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="20"></RowDefinition>
@@ -19,13 +19,18 @@
             <ColumnDefinition Width="100"/>
             <ColumnDefinition Width="10"/>
             <ColumnDefinition Width="100"/>
+            <ColumnDefinition Width="10"/>
+            <ColumnDefinition Width="100"/>
+            <ColumnDefinition Width="10"/>
+            <ColumnDefinition Width="100"/>
         </Grid.ColumnDefinitions>
         <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">Letter</TextBlock>
         <TextBlock Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">URL</TextBlock>
         <TextBlock Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">Type</TextBlock>
         <TextBlock Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center">Login</TextBlock>
         <TextBlock Grid.Row="0" Grid.Column="5" HorizontalAlignment="Center" VerticalAlignment="Center">Password</TextBlock>
-
+        <TextBlock Grid.Row="0" Grid.Column="7" HorizontalAlignment="Center" VerticalAlignment="Center">Kernel Cache</TextBlock>
+        <TextBlock Grid.Row="0" Grid.Column="9" HorizontalAlignment="Center" VerticalAlignment="Center">Sync ops</TextBlock>
 
         <ComboBox Grid.Column="0" Grid.Row="1" x:Name="CBFreeDrives" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
         <TextBox Grid.Column="1"  Grid.Row="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL">
@@ -55,6 +60,8 @@
         <ComboBox Grid.Column="2" Grid.Row="1" x:Name="CBMode"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
         <TextBox Grid.Column="3" Grid.Row="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
         <PasswordBox Grid.Column="5" Grid.Row="1" Height="20" VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
-        <Button x:Name="button1" Content="Mount" Click="button1_Click" Grid.Column="7" Grid.RowSpan="2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Height="50"/>
+        <ComboBox Grid.Column="7" Grid.Row="1" x:Name="CBKernelCache"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+        <ComboBox Grid.Column="9" Grid.Row="1" x:Name="CBSyncOps"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+        <Button x:Name="button1" Content="Mount" Click="button1_Click" Grid.Column="11" Grid.RowSpan="2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Height="50"/>
     </Grid>
 </Window>

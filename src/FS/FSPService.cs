@@ -22,13 +22,12 @@ namespace KS2Drive
         {
         }
 
-        public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password)
+        public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password, KernelCacheMode KernelMode, bool SyncOps)
         {
-            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, KernelCacheMode.MetaDataOnly, Login, Password);
+            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, KernelMode, Login, Password);
             Host = new FileSystemHost(davFs);
 
-            bool IsSync = false;
-            if (Host.Mount($"{DriveName}:", null, IsSync, 0) < 0) throw new IOException("cannot mount file system");
+            if (Host.Mount($"{DriveName}:", null, SyncOps, 0) < 0) throw new IOException("cannot mount file system");
 
 #if DEBUG
             //Start debug window

@@ -1,4 +1,5 @@
 ﻿using Fsp;
+using KS2Drive.FS;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -57,6 +58,19 @@ namespace KS2Drive
             CBMode.Items.Add(new KeyValuePair<int, string>(1, "AOS"));
             CBMode.SelectedIndex = 0;
 
+            CBKernelCache.SelectedValuePath = "Key";
+            CBKernelCache.DisplayMemberPath = "Value";
+            CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.Disabled, KernelCacheMode.Disabled.ToString()));
+            CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.MetaDataOnly, KernelCacheMode.MetaDataOnly.ToString()));
+            CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.DataAndMetaData, KernelCacheMode.DataAndMetaData.ToString()));
+            CBKernelCache.SelectedIndex = 0;
+
+            CBSyncOps.SelectedValuePath = "Key";
+            CBSyncOps.DisplayMemberPath = "Value";
+            CBSyncOps.Items.Add(new KeyValuePair<int, string>(0, "No"));
+            CBSyncOps.Items.Add(new KeyValuePair<int, string>(0, "Yes"));
+            CBSyncOps.SelectedIndex = 0;
+
             T = new Thread(() => service.Run());
             T.Start();
         }
@@ -81,7 +95,7 @@ namespace KS2Drive
 
                 try
                 {
-                    service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password);
+                    service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password, (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), Convert.ToInt32(CBKernelCache.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue)));
                 }
                 catch ( Exception ex)
                 {

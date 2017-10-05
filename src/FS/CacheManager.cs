@@ -12,11 +12,18 @@ namespace KS2Drive.FS
     {
         public EventHandler CacheRefreshed;
 
+        private CacheMode _mode;
         private static object CacheLock = new object();
         public Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
 
+        public CacheManager(CacheMode mode)
+        {
+            this._mode = mode;
+        }
+
         public FileNode GetFileNode(String FileOrFolderLocalPath)
         {
+            if (_mode == CacheMode.Disabled) return null;
             lock (CacheLock)
             {
                 return GetFileNodeNoLock(FileOrFolderLocalPath);
@@ -25,12 +32,14 @@ namespace KS2Drive.FS
 
         public FileNode GetFileNodeNoLock(String FileOrFolderLocalPath)
         {
+            if (_mode == CacheMode.Disabled) return null;
             if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return null;
             else return FileNodeCache[FileOrFolderLocalPath];
         }
 
         public void AddFileNode(FileNode node)
         {
+            if (_mode == CacheMode.Disabled) return;
             lock (CacheLock)
             {
                 AddFileNodeNoLock(node);
@@ -39,6 +48,8 @@ namespace KS2Drive.FS
 
         public void AddFileNodeNoLock(FileNode node)
         {
+            if (_mode == CacheMode.Disabled) return;
+
             FileNodeCache.Add(node.LocalPath, node);
             CacheRefreshed?.Invoke(this, null);
         }
@@ -48,6 +59,8 @@ namespace KS2Drive.FS
         /// </summary>
         public void RenameFileNodeKey(String PreviousKey, String NewKey)
         {
+            if (_mode == CacheMode.Disabled) return;
+
             lock (CacheLock)
             {
                 FileNodeCache.RenameKey(PreviousKey, NewKey);
@@ -57,6 +70,8 @@ namespace KS2Drive.FS
 
         public void RenameFolderSubElements(String OldFolderName, String NewFolderName)
         {
+            if (_mode == CacheMode.Disabled) return;
+
             lock (CacheLock)
             {
                 foreach (var FolderSubElement in FileNodeCache.Where(x => x.Key.StartsWith(OldFolderName + "\\")).ToList())
@@ -75,6 +90,8 @@ namespace KS2Drive.FS
 
         public void DeleteFileNode(FileNode node)
         {
+            if (_mode == CacheMode.Disabled) return;
+
             lock (CacheLock)
             {
                 FileNodeCache.Remove(node.LocalPath);
@@ -91,6 +108,8 @@ namespace KS2Drive.FS
 
         public void InvalidateFileNode(FileNode node)
         {
+            if (_mode == CacheMode.Disabled) return;
+
             lock (CacheLock)
             {
                 FileNodeCache.Remove(node.LocalPath);
@@ -104,60 +123,66 @@ namespace KS2Drive.FS
         /// If the folder as not already been parsed, we parse it from the server
         /// If the folder has been parsed, we serve content from the cache and update the cache from the server in a background task. So that we have a refreshed view for next call
         /// </summary>
-        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(String FolderName, String Marker)
+        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker)
         {
             bool RunRefreshTask = false;
             List<Tuple<String, FileNode>> ReturnList = null;
 
-            lock (CacheLock)
+            if (_mode == CacheMode.Disabled)
             {
-                if (!FileNodeCache.ContainsKey(FolderName)) return (false, null, "Unknown folder");
-
-                var CFN = FileNodeCache[FolderName];
-
-                if (!CFN.IsParsed)
+                var Result = InternalGetFolderContent(CurrentFolder, Marker);
+                if (!Result.Success) return Result;
+                ReturnList = Result.Content;
+            }
+            else
+            {
+                lock (CacheLock)
                 {
-                    var Result = InternalGetFolderContent(CFN, Marker);
-                    if (!Result.Success) return Result;
-
-                    //Mise en cache du contenu du répertoire
-                    foreach (var Node in Result.Content)
+                    if (!CurrentFolder.IsParsed)
                     {
-                        if (Node.Item1 == "." || Node.Item1 == "..") continue;
-                        if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath)) this.AddFileNodeNoLock(Node.Item2);
-                    }
+                        var Result = InternalGetFolderContent(CurrentFolder, Marker);
+                        if (!Result.Success) return Result;
 
-                    ReturnList = Result.Content;
-                }
-                else
-                {
-                    String FolderNameForSearch = FolderName;
-                    if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
-                    ReturnList = new List<Tuple<String, FileNode>>();
-                    //TODO : Add . && .. from cache
-                    ReturnList.AddRange(FileNodeCache.Where(x => x.Key != FolderName && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
-                    if ((DateTime.Now - FileNodeCache[FolderName].LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
-                }
+                        //Mise en cache du contenu du répertoire
+                        foreach (var Node in Result.Content)
+                        {
+                            if (Node.Item1 == "." || Node.Item1 == "..") continue;
+                            if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath)) this.AddFileNodeNoLock(Node.Item2);
+                        }
 
-                ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
-
-                if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
-                {
-                    var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
-                    var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
-                    if (WantedTupleIndex + 1 < ReturnList.Count)
-                    {
-                        ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
+                        ReturnList = Result.Content;
                     }
                     else
                     {
-                        ReturnList.Clear();
+                        String FolderNameForSearch = CurrentFolder.LocalPath;
+                        if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
+                        ReturnList = new List<Tuple<String, FileNode>>();
+                        //TODO : Add . && .. from cache
+                        ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
+                        if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
                     }
+                }
+
+                ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
+            }
+
+            if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
+            {
+                var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
+                var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
+                if (WantedTupleIndex + 1 < ReturnList.Count)
+                {
+                    ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
+                }
+                else
+                {
+                    ReturnList.Clear();
                 }
             }
 
-            if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(FileNodeCache[FolderName]));
+            if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(CurrentFolder));
             return (true, ReturnList, null);
+
         }
 
         public void Clear()

@@ -28,4 +28,10 @@ namespace KS2Drive.FS
         Disabled = 0,
         MetaDataOnly = 1000
     }
+
+    public enum CacheMode
+    {
+        Enabled,
+        Disabled
+    }
 }
