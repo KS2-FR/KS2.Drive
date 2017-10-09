@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,7 +15,14 @@ namespace KS2Drive.FS
 
         private CacheMode _mode;
         private static object CacheLock = new object();
-        public Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
+        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
+        public ReadOnlyDictionary<String, FileNode> CacheContent
+        {
+            get
+            {
+                return new ReadOnlyDictionary<String, FileNode>(FileNodeCache);
+            }
+        }
 
         public CacheManager(CacheMode mode)
         {
@@ -24,6 +32,7 @@ namespace KS2Drive.FS
         public FileNode GetFileNode(String FileOrFolderLocalPath)
         {
             if (_mode == CacheMode.Disabled) return null;
+
             lock (CacheLock)
             {
                 return GetFileNodeNoLock(FileOrFolderLocalPath);
@@ -136,12 +145,13 @@ namespace KS2Drive.FS
             }
             else
             {
-                lock (CacheLock)
+                if (!CurrentFolder.IsParsed)
                 {
-                    if (!CurrentFolder.IsParsed)
+                    var Result = InternalGetFolderContent(CurrentFolder, Marker);
+                    if (!Result.Success) return Result;
+
+                    lock (CacheLock)
                     {
-                        var Result = InternalGetFolderContent(CurrentFolder, Marker);
-                        if (!Result.Success) return Result;
 
                         //Mise en cache du contenu du répertoire
                         foreach (var Node in Result.Content)
@@ -149,18 +159,18 @@ namespace KS2Drive.FS
                             if (Node.Item1 == "." || Node.Item1 == "..") continue;
                             if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath)) this.AddFileNodeNoLock(Node.Item2);
                         }
+                    }
 
-                        ReturnList = Result.Content;
-                    }
-                    else
-                    {
-                        String FolderNameForSearch = CurrentFolder.LocalPath;
-                        if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
-                        ReturnList = new List<Tuple<String, FileNode>>();
-                        //TODO : Add . && .. from cache
-                        ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
-                        if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
-                    }
+                    ReturnList = Result.Content;
+                }
+                else
+                {
+                    String FolderNameForSearch = CurrentFolder.LocalPath;
+                    if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
+                    ReturnList = new List<Tuple<String, FileNode>>();
+                    //TODO : Add . && .. from cache
+                    ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
+                    if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
                 }
 
                 ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
@@ -182,7 +192,6 @@ namespace KS2Drive.FS
 
             if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(CurrentFolder));
             return (true, ReturnList, null);
-
         }
 
         public void Clear()

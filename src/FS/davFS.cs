@@ -654,8 +654,6 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, CFN);
 
-            Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
-
             if (this.FlushMode == FlushMode.FlushAtCleanup)
             {
                 if (CFN.HasUnflushedData)
@@ -678,6 +676,10 @@ namespace KS2Drive.FS
                     CFN.HasUnflushedData = false;
                 }
             }
+
+            Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
+            //No more handle on the file, we free its content
+            if (HandleCount == 0) CFN.FileData = null;
 
             DebugEnd(OperationId, $"STATUS_SUCCESS - Handle 0");
         }
