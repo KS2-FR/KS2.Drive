@@ -42,18 +42,8 @@ namespace KS2Drive.FS
         public const UInt16 MEMFS_SECTOR_SIZE = 4096;
         public const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
-        public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, KernelCacheMode kernelCacheMode, String DAVLogin, String DAVPassword, bool UseProxy = false, String ProxyURL = "", bool UseProxyAuthentication = false, String ProxyLogin = "", String ProxyPassword = "")
+        public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, KernelCacheMode kernelCacheMode, String DAVLogin, String DAVPassword)
         {
-            if (UseProxy)
-            {
-                if (UseProxyAuthentication) WebRequest.DefaultWebProxy = new WebProxy(ProxyURL, false, null, new NetworkCredential(ProxyLogin, ProxyPassword));
-                else WebRequest.DefaultWebProxy = new WebProxy(ProxyURL, false);
-            }
-
-            //TEMP
-            //WebRequest.DefaultWebProxy = new WebProxy("http://10.10.100.102:8888", false);
-            //TEMP
-
             this.MaxFileNodes = 500000;
             this.MaxFileSize = UInt32.MaxValue;
             this.FlushMode = flushMode;
@@ -159,8 +149,16 @@ namespace KS2Drive.FS
                 Cache.Lock();
 
                 var KnownNode = Cache.GetFileNodeNoLock(FileName);
-                if (KnownNode == null)
+                if (KnownNode.node == null)
                 {
+                    if (KnownNode.IsNonExistent)
+                    {
+                        //The file is known to be non-existent
+                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND");
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
+
                     WebDAVClient.Model.Item FoundElement;
 
                     try
@@ -170,6 +168,7 @@ namespace KS2Drive.FS
                     }
                     catch (WebDAVException ex)
                     {
+                        Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
@@ -182,6 +181,7 @@ namespace KS2Drive.FS
                     }
                     catch (Exception ex)
                     {
+                        Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
@@ -189,6 +189,7 @@ namespace KS2Drive.FS
 
                     if (FoundElement == null)
                     {
+                        Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
                         return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
@@ -205,8 +206,8 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    FileAttributes = KnownNode.FileInfo.FileAttributes;
-                    if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.FileSecurity;
+                    FileAttributes = KnownNode.node.FileInfo.FileAttributes;
+                    if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.node.FileSecurity;
                     DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
                     return STATUS_SUCCESS;
                 }
@@ -238,23 +239,26 @@ namespace KS2Drive.FS
             {
                 Cache.Lock();
 
-                FileNode CFN = Cache.GetFileNodeNoLock(FileName);
-                if (CFN == null)
+                var KnownNode = Cache.GetFileNodeNoLock(FileName);
+                if (KnownNode.node == null)
                 {
+                    if (KnownNode.IsNonExistent)
+                    {
+                        //The file is known to be non-existent
+                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND");
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
+
                     WebDAVClient.Model.Item RepositoryObject;
 
                     try
                     {
                         var Proxy = new WebDavClient2();
                         RepositoryObject = Proxy.GetRepositoryElement(FileName);
-                        if (RepositoryObject == null)
-                        {
-                            DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
-                            return STATUS_OBJECT_NAME_NOT_FOUND;
-                        }
                     }
                     catch (WebDAVException ex)
                     {
+                        Cache.AddMissingFileNoLock(FileName);
                         DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
@@ -265,23 +269,31 @@ namespace KS2Drive.FS
                     }
                     catch (Exception ex)
                     {
+                        Cache.AddMissingFileNoLock(FileName);
                         DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
-                    CFN = new FileNode(RepositoryObject);
-                    Cache.AddFileNodeNoLock(CFN);
-                    Int32 i = Interlocked.Increment(ref CFN.OpenCount);
+                    if (RepositoryObject == null)
+                    {
+                        Cache.AddMissingFileNoLock(FileName);
+                        DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
+
+                    KnownNode.node = new FileNode(RepositoryObject);
+                    Cache.AddFileNodeNoLock(KnownNode.node);
+                    Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
                     DebugEnd(OperationId, $"STATUS_SUCCESS - From Repository - Handle {i}");
                 }
                 else
                 {
-                    Int32 i = Interlocked.Increment(ref CFN.OpenCount);
+                    Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
                     DebugEnd(OperationId, $"STATUS_SUCCESS - From cache - Handle {i}");
                 }
 
-                FileNode0 = CFN;
-                FileInfo = CFN.FileInfo;
+                FileNode0 = KnownNode.node;
+                FileInfo = KnownNode.node.FileInfo;
                 NormalizedName = FileName;
             }
             finally

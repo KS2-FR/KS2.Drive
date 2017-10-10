@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,10 +10,14 @@ namespace KS2Drive.FS
 {
     public class CacheManager
     {
+        //TODO : Add periodic missing file cleanup
+
         public EventHandler CacheRefreshed;
 
+        private Int32 CacheDurationInSeconds = 5;
         private CacheMode _mode;
         private static object CacheLock = new object();
+        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(); //Store the file that have been called by the FS and that do not exists
         private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
         public ReadOnlyDictionary<String, FileNode> CacheContent
         {
@@ -29,21 +32,32 @@ namespace KS2Drive.FS
             this._mode = mode;
         }
 
-        public FileNode GetFileNode(String FileOrFolderLocalPath)
+        /// <summary>
+        /// Look in the cache for the FileNode matching the path
+        /// Return the FileNode if found or an information notifying that the path is known to be non-existent
+        /// </summary>
+        public (FileNode node, bool IsNonExistent) GetFileNodeNoLock(String FileOrFolderLocalPath)
         {
-            if (_mode == CacheMode.Disabled) return null;
+            if (_mode == CacheMode.Disabled) return (null, false);
 
-            lock (CacheLock)
+            if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath))
             {
-                return GetFileNodeNoLock(FileOrFolderLocalPath);
+                //Is there a valid mising file entry for this file
+                if (MissingFileCache.ContainsKey(FileOrFolderLocalPath) && (DateTime.Now - MissingFileCache[FileOrFolderLocalPath]).TotalSeconds <= CacheDurationInSeconds)
+                {
+                    //Less than (CacheDurationInSeconds) seconds ago, the file was not existing
+                    //We send the same answer
+                    return (null, true);
+                }
+                else
+                {
+                    return (null, false);
+                }
             }
-        }
-
-        public FileNode GetFileNodeNoLock(String FileOrFolderLocalPath)
-        {
-            if (_mode == CacheMode.Disabled) return null;
-            if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return null;
-            else return FileNodeCache[FileOrFolderLocalPath];
+            else
+            {
+                return (FileNodeCache[FileOrFolderLocalPath], false);
+            }
         }
 
         public void AddFileNode(FileNode node)
@@ -60,6 +74,7 @@ namespace KS2Drive.FS
             if (_mode == CacheMode.Disabled) return;
 
             FileNodeCache.Add(node.LocalPath, node);
+            MissingFileCache.Remove(node.LocalPath); //Remove the file from the known missing files list
             CacheRefreshed?.Invoke(this, null);
         }
 
@@ -170,7 +185,7 @@ namespace KS2Drive.FS
                     ReturnList = new List<Tuple<String, FileNode>>();
                     //TODO : Add . && .. from cache
                     ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
-                    if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > 5) RunRefreshTask = true;
+                    if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) RunRefreshTask = true;
                 }
 
                 ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
@@ -283,6 +298,13 @@ namespace KS2Drive.FS
             CFN.LastRefresh = DateTime.Now;
 
             return (true, ChildrenFileNames, null);
+        }
+
+        public void AddMissingFileNoLock(String FileOrFolderPath)
+        {
+            if (_mode == CacheMode.Disabled) return;
+            MissingFileCache.Remove(FileOrFolderPath);
+            MissingFileCache.Add(FileOrFolderPath, DateTime.Now);
         }
     }
 }

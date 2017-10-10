@@ -1,0 +1,74 @@
+﻿<Window x:Class="KS2Drive.Options"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:KS2Drive"
+        mc:Ignorable="d"
+        Title="Options" Height="300" Width="413.771" WindowStyle="ToolWindow">
+    <Window.Resources>
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <local:MultiBooleanConverter x:Key="MultiBooleanConverter" />
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="35"></RowDefinition>
+            <RowDefinition Height="180"></RowDefinition>
+            <RowDefinition Height="*"></RowDefinition>
+        </Grid.RowDefinitions>
+
+        <CheckBox Grid.Row="0" x:Name="checkBox" Content="Use HTTP Proxy" HorizontalAlignment="Left" Margin="10" VerticalAlignment="Top" IsChecked="{Binding AppConfiguration.UseHTTPProxy, Mode=TwoWay}"/>
+
+        <Border Grid.Row="1" BorderThickness="1" BorderBrush="#FF939090" Margin="30,0,20,0" Padding="10" IsEnabled="{Binding AppConfiguration.UseHTTPProxy}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="25"></RowDefinition>
+                    <RowDefinition Height="25"></RowDefinition>
+                    <RowDefinition Height="95"></RowDefinition>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+
+                <Label Grid.Row="0" Grid.Column="0" Content="Proxy URL" />
+                <TextBox Grid.Row="0" Grid.Column="1" x:Name="textBox" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyURL}"/>
+
+                <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" IsChecked="{Binding AppConfiguration.UseProxyAuthentication, Mode=TwoWay}"/>
+
+                <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
+                    <Border.IsEnabled>
+                        <MultiBinding Converter="{StaticResource MultiBooleanConverter}">
+                            <Binding Path="AppConfiguration.UseHTTPProxy" />
+                            <Binding Path="AppConfiguration.UseProxyAuthentication" />
+                        </MultiBinding>
+                    </Border.IsEnabled>
+                       
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30"></RowDefinition>
+                            <RowDefinition Height="30"></RowDefinition>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"></ColumnDefinition>
+                            <ColumnDefinition Width="*"></ColumnDefinition>
+                        </Grid.ColumnDefinitions>
+
+                        <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.Login}" Margin="5"/>
+
+                        <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
+                        <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="PasswordBox_PasswordChanged"/>
+                    </Grid>
+                    
+                </Border>
+            </Grid>
+        </Border>
+
+        <Button x:Name="bt_Save" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="10" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click"></Button>
+
+
+
+
+    </Grid>
+</Window>

@@ -1,23 +1,11 @@
-﻿using Fsp;
-using KS2Drive.FS;
+﻿using KS2Drive.FS;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace KS2Drive
 {
@@ -126,6 +114,17 @@ namespace KS2Drive
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             service.Stop();
+        }
+
+        private void MenuOptions_Click(object sender, RoutedEventArgs e)
+        {
+            Options OptionWindow = new Options();
+            OptionWindow.ShowDialog();
+        }
+
+        private void MenuExit_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
         }
     }
 }
