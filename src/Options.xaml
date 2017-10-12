@@ -5,70 +5,90 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
         mc:Ignorable="d"
-        Title="Options" Height="300" Width="413.771" WindowStyle="ToolWindow">
+        Title="Options" Height="400" Width="450" WindowStyle="ToolWindow">
     <Window.Resources>
         <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <local:MultiBooleanConverter x:Key="MultiBooleanConverter" />
     </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="35"></RowDefinition>
-            <RowDefinition Height="180"></RowDefinition>
             <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition Height="35"></RowDefinition>
         </Grid.RowDefinitions>
 
-        <CheckBox Grid.Row="0" x:Name="checkBox" Content="Use HTTP Proxy" HorizontalAlignment="Left" Margin="10" VerticalAlignment="Top" IsChecked="{Binding AppConfiguration.UseHTTPProxy, Mode=TwoWay}"/>
+        <TabControl Grid.Row="0">
+            <TabItem Header="General">
+                <StackPanel>
+                    <CheckBox x:Name="chk_AutoMount" Content="Auto-mount drive" Margin="10" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}"/>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Proxy">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="9*"/>
+                        <ColumnDefinition Width="191*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="180"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                    </Grid.RowDefinitions>
 
-        <Border Grid.Row="1" BorderThickness="1" BorderBrush="#FF939090" Margin="30,0,20,0" Padding="10" IsEnabled="{Binding AppConfiguration.UseHTTPProxy}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="25"></RowDefinition>
-                    <RowDefinition Height="25"></RowDefinition>
-                    <RowDefinition Height="95"></RowDefinition>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="110"></ColumnDefinition>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Row="0" x:Name="checkBox" Content="Use HTTP Proxy" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" IsChecked="{Binding AppConfiguration.UseHTTPProxy, Mode=TwoWay}" Grid.ColumnSpan="2"/>
 
-                <Label Grid.Row="0" Grid.Column="0" Content="Proxy URL" />
-                <TextBox Grid.Row="0" Grid.Column="1" x:Name="textBox" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyURL}"/>
+                    <Border Grid.Row="1" BorderThickness="1" BorderBrush="#FF939090" Margin="11.76,0,20,0" Padding="10" IsEnabled="{Binding AppConfiguration.UseHTTPProxy}" Grid.Column="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="95"></RowDefinition>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"></ColumnDefinition>
+                                <ColumnDefinition Width="*"></ColumnDefinition>
+                            </Grid.ColumnDefinitions>
 
-                <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" IsChecked="{Binding AppConfiguration.UseProxyAuthentication, Mode=TwoWay}"/>
+                            <Label Grid.Row="0" Grid.Column="0" Content="Proxy URL" />
+                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="textBox" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyURL}"/>
 
-                <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
-                    <Border.IsEnabled>
-                        <MultiBinding Converter="{StaticResource MultiBooleanConverter}">
-                            <Binding Path="AppConfiguration.UseHTTPProxy" />
-                            <Binding Path="AppConfiguration.UseProxyAuthentication" />
-                        </MultiBinding>
-                    </Border.IsEnabled>
-                       
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="30"></RowDefinition>
-                            <RowDefinition Height="30"></RowDefinition>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="70"></ColumnDefinition>
-                            <ColumnDefinition Width="*"></ColumnDefinition>
-                        </Grid.ColumnDefinitions>
+                            <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" IsChecked="{Binding AppConfiguration.UseProxyAuthentication, Mode=TwoWay}"/>
 
-                        <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
-                        <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.Login}" Margin="5"/>
+                            <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
+                                <Border.IsEnabled>
+                                    <MultiBinding Converter="{StaticResource MultiBooleanConverter}">
+                                        <Binding Path="AppConfiguration.UseHTTPProxy" />
+                                        <Binding Path="AppConfiguration.UseProxyAuthentication" />
+                                    </MultiBinding>
+                                </Border.IsEnabled>
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
-                        <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="PasswordBox_PasswordChanged"/>
-                    </Grid>
-                    
-                </Border>
-            </Grid>
-        </Border>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="30"></RowDefinition>
+                                        <RowDefinition Height="30"></RowDefinition>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70"></ColumnDefinition>
+                                        <ColumnDefinition Width="*"></ColumnDefinition>
+                                    </Grid.ColumnDefinitions>
 
-        <Button x:Name="bt_Save" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="10" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click"></Button>
+                                    <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.Login}" Margin="5"/>
 
+                                    <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
+                                    <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="PasswordBox_PasswordChanged"/>
+                                </Grid>
 
+                            </Border>
+                        </Grid>
+                    </Border>
 
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Button x:Name="bt_Save" Grid.Row="1" HorizontalAlignment="Right" Height="25" Width="100" Margin="5" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click"></Button>
 
     </Grid>
+
 </Window>

@@ -14,65 +14,69 @@
             </MenuItem>
         </Menu>
 
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="20"></RowDefinition>
-                <RowDefinition Height="*"></RowDefinition>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="50"/>
-                <ColumnDefinition Width="450"/>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="100"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">Letter</TextBlock>
-            <TextBlock Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">URL</TextBlock>
-            <TextBlock Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">Type</TextBlock>
-            <TextBlock Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center">Login</TextBlock>
-            <TextBlock Grid.Row="0" Grid.Column="5" HorizontalAlignment="Center" VerticalAlignment="Center">Password</TextBlock>
-            <TextBlock Grid.Row="0" Grid.Column="7" HorizontalAlignment="Center" VerticalAlignment="Center">Kernel Cache</TextBlock>
-            <TextBlock Grid.Row="0" Grid.Column="9" HorizontalAlignment="Center" VerticalAlignment="Center">Sync ops</TextBlock>
+        <Border BorderThickness="1" BorderBrush="Gainsboro">
 
-            <Button Grid.Row="0" x:Name="button1" Content="Mount" Click="button1_Click" Grid.Column="11" Grid.RowSpan="2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Height="50"/>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="20"></RowDefinition>
+                    <RowDefinition Height="*"></RowDefinition>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="50"/>
+                    <ColumnDefinition Width="450"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">Letter</TextBlock>
+                <TextBlock Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">URL</TextBlock>
+                <TextBlock Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">Type</TextBlock>
+                <TextBlock Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center">Login</TextBlock>
+                <TextBlock Grid.Row="0" Grid.Column="5" HorizontalAlignment="Center" VerticalAlignment="Center">Password</TextBlock>
+                <TextBlock Grid.Row="0" Grid.Column="7" HorizontalAlignment="Center" VerticalAlignment="Center">Kernel Cache</TextBlock>
+                <TextBlock Grid.Row="0" Grid.Column="9" HorizontalAlignment="Center" VerticalAlignment="Center">Sync ops</TextBlock>
 
-            <ComboBox Grid.Row="1" Grid.Column="0" x:Name="CBFreeDrives" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-            <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL">
-                <TextBox.Style>
-                    <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
-                        <Style.Resources>
-                            <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
-                                <VisualBrush.Visual>
-                                    <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
-                                </VisualBrush.Visual>
-                            </VisualBrush>
-                        </Style.Resources>
-                        <Style.Triggers>
-                            <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
-                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
-                            </Trigger>
-                            <Trigger Property="Text" Value="{x:Null}">
-                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter Property="Background" Value="White" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBox.Style>
-            </TextBox>
-            <ComboBox Grid.Row="1" Grid.Column="2" x:Name="CBMode"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-            <TextBox Grid.Row="1" Grid.Column="3" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
-            <PasswordBox Grid.Row="1" Grid.Column="5" Height="20" VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
-            <ComboBox Grid.Row="1" Grid.Column="7" x:Name="CBKernelCache"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-            <ComboBox Grid.Row="1" Grid.Column="9" x:Name="CBSyncOps"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-        </Grid>
+                <Button Grid.Row="0" x:Name="button1" Content="Mount" Click="button1_Click" Grid.Column="11" Grid.RowSpan="2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Height="50"/>
+
+                <ComboBox Grid.Row="1" Grid.Column="0" x:Name="CBFreeDrives" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                            <Style.Resources>
+                                <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                    <VisualBrush.Visual>
+                                        <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
+                                    </VisualBrush.Visual>
+                                </VisualBrush>
+                            </Style.Resources>
+                            <Style.Triggers>
+                                <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                </Trigger>
+                                <Trigger Property="Text" Value="{x:Null}">
+                                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter Property="Background" Value="White" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+                <ComboBox Grid.Row="1" Grid.Column="2" x:Name="CBMode"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="1" Grid.Column="3" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
+                <PasswordBox Grid.Row="1" Grid.Column="5" Height="20" VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
+                <ComboBox Grid.Row="1" Grid.Column="7" x:Name="CBKernelCache"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                <ComboBox Grid.Row="1" Grid.Column="9" x:Name="CBSyncOps"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
     </DockPanel>
 </Window>

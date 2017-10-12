@@ -8,6 +8,10 @@ namespace KS2Drive
 {
     public class Configuration
     {
+        public bool AutoMount { get; set; }
+        
+
+        //Proxy
         public bool UseHTTPProxy { get; set; }
         public String ProxyURL { get; set; }
         public bool UseProxyAuthentication { get; set; }

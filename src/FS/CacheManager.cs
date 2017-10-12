@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NLog;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -16,6 +17,28 @@ namespace KS2Drive.FS
 
         private Int32 CacheDurationInSeconds = 5;
         private CacheMode _mode;
+
+        private object CurrentRefreshLock = new object();
+        private List<String> CurrentRefresh = new List<string>();
+
+        private void AddRefreshTask(FileNode CFN)
+        {
+            lock (CurrentRefreshLock)
+            {
+                if (CurrentRefresh.Contains(CFN.LocalPath)) return;
+                CurrentRefresh.Add(CFN.LocalPath);
+                new Thread(() => InternalRefreshFolderCacheContent(CFN)).Start();
+            }
+        }
+
+        private void RemoteRefreshTask(FileNode CFN)
+        {
+            lock (CurrentRefreshLock)
+            {
+                CurrentRefresh.Remove(CFN.LocalPath);
+            }
+        }
+
         private static object CacheLock = new object();
         private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(); //Store the file that have been called by the FS and that do not exists
         private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
@@ -73,6 +96,7 @@ namespace KS2Drive.FS
         {
             if (_mode == CacheMode.Disabled) return;
 
+            FileNodeCache.Remove(node.LocalPath);
             FileNodeCache.Add(node.LocalPath, node);
             MissingFileCache.Remove(node.LocalPath); //Remove the file from the known missing files list
             CacheRefreshed?.Invoke(this, null);
@@ -149,31 +173,33 @@ namespace KS2Drive.FS
         /// </summary>
         public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker)
         {
-            bool RunRefreshTask = false;
+            logger.Trace($"GetFolderContent {CurrentFolder.LocalPath}");
+
+            List<FileNode> FileNodeToRefreshList = new List<FileNode>();
             List<Tuple<String, FileNode>> ReturnList = null;
 
             if (_mode == CacheMode.Disabled)
             {
                 var Result = InternalGetFolderContent(CurrentFolder, Marker);
                 if (!Result.Success) return Result;
-                ReturnList = Result.Content;
+                else return (true, Result.Content, null);
             }
-            else
+
+            lock (CacheLock)
             {
                 if (!CurrentFolder.IsParsed)
                 {
                     var Result = InternalGetFolderContent(CurrentFolder, Marker);
                     if (!Result.Success) return Result;
 
-                    lock (CacheLock)
-                    {
+                    CurrentFolder.IsParsed = true;
+                    CurrentFolder.LastRefresh = DateTime.Now;
 
-                        //Mise en cache du contenu du répertoire
-                        foreach (var Node in Result.Content)
-                        {
-                            if (Node.Item1 == "." || Node.Item1 == "..") continue;
-                            if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath)) this.AddFileNodeNoLock(Node.Item2);
-                        }
+                    //Mise en cache du contenu du répertoire
+                    foreach (var Node in Result.Content)
+                    {
+                        if (Node.Item1 == "." || Node.Item1 == "..") continue; //Bypass special folders
+                        this.AddFileNodeNoLock(Node.Item2);
                     }
 
                     ReturnList = Result.Content;
@@ -185,27 +211,33 @@ namespace KS2Drive.FS
                     ReturnList = new List<Tuple<String, FileNode>>();
                     //TODO : Add . && .. from cache
                     ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
-                    if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) RunRefreshTask = true;
+                    if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) FileNodeToRefreshList.Add(CurrentFolder); //Refresh current directory if the cache is too old
                 }
 
+                //sort list by path (mandatory if we want to handle a potential marker correctly)
                 ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
+
+                if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
+                {
+                    var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
+                    var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
+                    if (WantedTupleIndex + 1 < ReturnList.Count) ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
+                    else ReturnList.Clear();
+                }
+
+                foreach (var FolderNode in ReturnList.Where(x => (x.Item2.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0))
+                {
+                    if (FolderNode.Item1 == "." || FolderNode.Item1 == "..") continue; //Bypass special folders
+                    //Pre-loading of sub-folders of current folder
+                    if (!FileNodeCache[FolderNode.Item2.LocalPath].IsParsed) FileNodeToRefreshList.Add(FolderNode.Item2);
+                }
             }
 
-            if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
+            foreach (var FileNodeToRefresh in FileNodeToRefreshList)
             {
-                var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
-                var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
-                if (WantedTupleIndex + 1 < ReturnList.Count)
-                {
-                    ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
-                }
-                else
-                {
-                    ReturnList.Clear();
-                }
+                AddRefreshTask(FileNodeToRefresh);
             }
 
-            if (RunRefreshTask) Task.Run(() => InternalRefreshFolderCacheContent(CurrentFolder));
             return (true, ReturnList, null);
         }
 
@@ -225,13 +257,21 @@ namespace KS2Drive.FS
             Monitor.Exit(CacheLock);
         }
 
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+
         private void InternalRefreshFolderCacheContent(FileNode CFN)
         {
             var Result = InternalGetFolderContent(CFN, null);
+            RemoteRefreshTask(CFN); //Server parsing opeartion has been made. The filenode statut is now parsed
             if (!Result.Success) return;
 
             lock (CacheLock)
             {
+                CFN.IsParsed = true;
+                CFN.LastRefresh = DateTime.Now;
+
+                if (FileNodeCache == null) return; //Handle the case when the thread is still performing while the class has been unloaded
+
                 //Remove folder content
                 foreach (var s in FileNodeCache.Where(x => x.Key.StartsWith(CFN.LocalPath + "\\")).ToList())
                 {
@@ -279,7 +319,6 @@ namespace KS2Drive.FS
 
             try
             {
-                //LogTrace("Read directory list start");
                 ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
             }
             catch (Exception ex)
@@ -293,9 +332,6 @@ namespace KS2Drive.FS
                 if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue; //Bypass l'entrée correspondant à l'élément appelant
                 ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
             }
-
-            CFN.IsParsed = true;
-            CFN.LastRefresh = DateTime.Now;
 
             return (true, ChildrenFileNames, null);
         }

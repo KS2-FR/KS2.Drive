@@ -351,17 +351,12 @@ namespace KS2Drive.FS
 
             if (Context == null)
             {
-                LogTrace("Read directory start");
-
                 Enumerator = null;
                 OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
                 List<Tuple<String, FileNode>> ChildrenFileNames = null;
-
-                LogTrace("Read directory list start");
                 var Result = Cache.GetFolderContent(CFN, Marker);
-                LogTrace("Read directory list End");
                 if (!Result.Success)
                 {
                     DebugEnd(OperationId, $"Exception : {Result.ErrorMessage}");
@@ -374,8 +369,6 @@ namespace KS2Drive.FS
                     ChildrenFileNames = Result.Content;
                 }
 
-                LogTrace("Read directory list transformed to FileNode");
-
                 Enumerator = ChildrenFileNames.GetEnumerator();
                 Context = new DirectoryEnumeratorContext() { Enumerator = Enumerator, OperationId = OperationId };
             }
@@ -387,7 +380,6 @@ namespace KS2Drive.FS
 
             if (Enumerator.MoveNext())
             {
-                LogTrace("Read directory enumerate");
                 Tuple<String, FileNode> CurrentCFN = Enumerator.Current;
                 FileName = CurrentCFN.Item1;
                 FileInfo = CurrentCFN.Item2.FileInfo;
@@ -395,7 +387,6 @@ namespace KS2Drive.FS
             }
 
             DebugEnd(OperationId, "STATUS_SUCCESS");
-            LogTrace("Read directory end");
 
             FileName = default(String);
             FileInfo = default(FileInfo);
