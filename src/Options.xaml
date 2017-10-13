@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
         mc:Ignorable="d"
-        Title="Options" Height="400" Width="450" WindowStyle="ToolWindow">
+        Title="Options" Height="400" Width="450" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <local:MultiBooleanConverter x:Key="MultiBooleanConverter" />
@@ -73,7 +73,7 @@
                                     </Grid.ColumnDefinitions>
 
                                     <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
-                                    <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.Login}" Margin="5"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyLogin}" Margin="5"/>
 
                                     <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
                                     <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="PasswordBox_PasswordChanged"/>

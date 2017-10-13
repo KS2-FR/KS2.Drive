@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Linq;
 
 namespace KS2Drive
 {
@@ -17,6 +18,7 @@ namespace KS2Drive
         private FSPService service = new FSPService();
         private bool IsMounted = false;
         private Thread T;
+        private Configuration AppConfiguration;
 
         public MainWindow()
         {
@@ -56,11 +58,47 @@ namespace KS2Drive
             CBSyncOps.SelectedValuePath = "Key";
             CBSyncOps.DisplayMemberPath = "Value";
             CBSyncOps.Items.Add(new KeyValuePair<int, string>(0, "No"));
-            CBSyncOps.Items.Add(new KeyValuePair<int, string>(0, "Yes"));
+            CBSyncOps.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
             CBSyncOps.SelectedIndex = 0;
 
             T = new Thread(() => service.Run());
-            T.Start();
+            try
+            {
+                T.Start();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to start WinFSP Server. Please ensure you have installed version 2017.2. {ex.Message}");
+                this.Close();
+            }
+
+            //Reload values from config
+            this.AppConfiguration = ((App)Application.Current).AppConfiguration;
+            if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]);
+            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerURL)) txtURL.Text = this.AppConfiguration.ServerURL;
+
+            if (this.AppConfiguration.ServerType.HasValue)
+            {
+                var SelectedMode = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType.Value));
+                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = SelectedMode;
+            }
+
+            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerLogin)) txtLogin.Text = this.AppConfiguration.ServerLogin;
+            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerPassword)) txtPassword.Password = this.AppConfiguration.ServerPassword;
+
+            if (this.AppConfiguration.KernelCacheMode.HasValue)
+            {
+                var SelectedMode = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode.Value));
+                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = SelectedMode;
+            }
+
+            if (this.AppConfiguration.SyncOps.HasValue)
+            {
+                var SelectedMode = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt16(this.AppConfiguration.SyncOps.Value)));
+                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SelectedMode;
+            }
+       
+            if (this.AppConfiguration.AutoMount) button1_Click(null, null);
         }
 
         private void button1_Click(object sender, RoutedEventArgs e)
@@ -90,6 +128,16 @@ namespace KS2Drive
                     MessageBox.Show(ex.Message);
                     return;
                 }
+
+                //Update saved configuration
+                this.AppConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
+                this.AppConfiguration.ServerURL = txtURL.Text;
+                this.AppConfiguration.ServerType = (Int32)CBMode.SelectedValue;
+                this.AppConfiguration.ServerLogin = txtLogin.Text;
+                this.AppConfiguration.ServerPassword = txtPassword.Password;
+                this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
+                this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
+                this.AppConfiguration.Save();
 
                 button1.Content = "Unmount";
                 IsMounted = true;

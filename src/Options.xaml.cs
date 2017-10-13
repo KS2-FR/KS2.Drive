@@ -17,45 +17,23 @@ using System.Windows.Shapes;
 
 namespace KS2Drive
 {
-    public partial class Options : Window, INotifyPropertyChanged
+    public partial class Options : Window
     {
         public Configuration AppConfiguration { get; set; }
 
         public Options()
         {
             this.DataContext = this;
-
-            if (((App)Application.Current).AppConfiguration != null)
-            {
-                this.AppConfiguration = ((App)Application.Current).AppConfiguration;
-            }
-            else
-            {
-                this.AppConfiguration = new Configuration() { UseHTTPProxy = false, UseProxyAuthentication = false, Login = "", Password = "", ProxyURL = "" };
-            }
-
+            this.AppConfiguration = ((App)Application.Current).AppConfiguration;
             InitializeComponent();
         }
-
-        #region INotifyPropertyChanged Implementation
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        public void NotifyPropertyChanged(string propName)
-        {
-            if (this.PropertyChanged != null)
-                this.PropertyChanged(this, new PropertyChangedEventArgs(propName));
-        }
-
-
-        #endregion
 
         private void bt_Save_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 Tools.LoadProxy(this.AppConfiguration);
-                File.WriteAllText(((App)Application.Current).ConfigurationFilePath,Tools.Protect(JsonConvert.SerializeObject(this.AppConfiguration)));
+                this.AppConfiguration.Save();
                 this.Close();
             }
             catch (Exception ex)
@@ -66,7 +44,7 @@ namespace KS2Drive
 
         private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
         {
-            this.AppConfiguration.Password = ProxyPassword.Password;
+            this.AppConfiguration.ProxyPassword = ProxyPassword.Password;
         }
     }
 }

@@ -34,7 +34,7 @@ namespace KS2Drive
             {
                 if (C.UseProxyAuthentication)
                 {
-                    WebRequest.DefaultWebProxy = new WebProxy(C.ProxyURL, false, null, new NetworkCredential(C.Login, C.Password));
+                    WebRequest.DefaultWebProxy = new WebProxy(C.ProxyURL, false, null, new NetworkCredential(C.ProxyLogin, C.ProxyPassword));
                 }
                 else
                 {

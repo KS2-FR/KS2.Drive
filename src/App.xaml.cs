@@ -33,18 +33,7 @@ namespace KS2Drive
             }
 
             ConfigurationFilePath = Path.Combine(ConfigurationFolderPath, "config.json");
-
-            if (File.Exists(ConfigurationFilePath))
-            {
-                try
-                {
-                    this.AppConfiguration = JsonConvert.DeserializeObject<Configuration>(Tools.Unprotect(File.ReadAllText(ConfigurationFilePath)));
-                }
-                catch
-                {
-                    //Invalid configuration file
-                }
-            }
+            this.AppConfiguration = Configuration.Load(ConfigurationFilePath);
 
             Tools.LoadProxy(this.AppConfiguration);
         }
