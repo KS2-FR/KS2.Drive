@@ -393,6 +393,7 @@ namespace KS2Drive.FS
             return false;
         }
 
+
         public override Int32 CanDelete(
             Object FileNode0,
             Object FileDesc,

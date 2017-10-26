@@ -680,6 +680,14 @@
             Converts a Windows kernel status code to a Win32 error code.
             </summary>
         </member>
+        <member name="M:Fsp.FileSystemBase.GetOperationProcessId">
+            <summary>
+            Gets the originating process ID.
+            </summary>
+            <remarks>
+            Valid only during Create, Open and Rename requests when the target exists.
+            </remarks>
+        </member>
         <member name="M:Fsp.FileSystemBase.ModifySecurityDescriptor(System.Byte[],System.Security.AccessControl.AccessControlSections,System.Byte[])">
             <summary>
             Modifies a security descriptor.
