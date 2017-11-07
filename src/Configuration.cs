@@ -48,6 +48,8 @@ namespace KS2Drive
         public String ServerPassword { get; set; }
         public Int32? KernelCacheMode { get; set; }
         public bool? SyncOps { get; set; }
+        public bool? PreLoading { get; set; }
+        public bool? AllowDirtyRead { get; set; }
 
         //Proxy
         public bool UseHTTPProxy { get; set; }
@@ -55,5 +57,6 @@ namespace KS2Drive
         public bool UseProxyAuthentication { get; set; }
         public String ProxyLogin { get; set; }
         public String ProxyPassword { get; set; }
+
     }
 }

@@ -61,6 +61,18 @@ namespace KS2Drive
             CBSyncOps.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
             CBSyncOps.SelectedIndex = 0;
 
+            CBPreloading.SelectedValuePath = "Key";
+            CBPreloading.DisplayMemberPath = "Value";
+            CBPreloading.Items.Add(new KeyValuePair<int, string>(0, "No"));
+            CBPreloading.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
+            CBPreloading.SelectedIndex = 0;
+
+            CBDirtyRead.SelectedValuePath = "Key";
+            CBDirtyRead.DisplayMemberPath = "Value";
+            CBDirtyRead.Items.Add(new KeyValuePair<int, string>(0, "No"));
+            CBDirtyRead.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
+            CBDirtyRead.SelectedIndex = 0;
+
             T = new Thread(() => service.Run());
             try
             {
@@ -97,7 +109,19 @@ namespace KS2Drive
                 var SelectedMode = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt16(this.AppConfiguration.SyncOps.Value)));
                 if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SelectedMode;
             }
-       
+
+            if (this.AppConfiguration.PreLoading.HasValue)
+            {
+                var SelectedMode = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt16(this.AppConfiguration.PreLoading.Value)));
+                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBPreloading.SelectedItem = SelectedMode;
+            }
+
+            if (this.AppConfiguration.AllowDirtyRead.HasValue)
+            {
+                var SelectedMode = CBDirtyRead.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt16(this.AppConfiguration.AllowDirtyRead.Value)));
+                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBDirtyRead.SelectedItem = SelectedMode;
+            }
+
             if (this.AppConfiguration.AutoMount) button1_Click(null, null);
         }
 
@@ -121,7 +145,7 @@ namespace KS2Drive
 
                 try
                 {
-                    service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password, (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), Convert.ToInt32(CBKernelCache.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue)));
+                    service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password, (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), Convert.ToInt32(CBKernelCache.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBDirtyRead.SelectedValue)));
                 }
                 catch ( Exception ex)
                 {
@@ -137,6 +161,8 @@ namespace KS2Drive
                 this.AppConfiguration.ServerPassword = txtPassword.Password;
                 this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
                 this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
+                this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
+                this.AppConfiguration.AllowDirtyRead = Convert.ToBoolean(Convert.ToInt16(CBDirtyRead.SelectedValue));
                 this.AppConfiguration.Save();
 
                 button1.Content = "Unmount";
