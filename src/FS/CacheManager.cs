@@ -11,14 +11,11 @@ namespace KS2Drive.FS
 {
     public class CacheManager
     {
-        //TODO : Add periodic missing file cleanup
-
         public EventHandler CacheRefreshed;
 
         private Int32 CacheDurationInSeconds = 5;
         private CacheMode _mode;
         private bool _PreLoadFoldersInCache;
-        private bool _AllowDirtyRead;
 
         private object CurrentRefreshLock = new object();
         private List<String> CurrentRefresh = new List<string>();
@@ -42,6 +39,7 @@ namespace KS2Drive.FS
         }
 
         private static object CacheLock = new object();
+        //TODO : Add periodic MissingFileCache cleanup
         private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(); //Store the file that have been called by the FS and that do not exists
         private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
         public ReadOnlyDictionary<String, FileNode> CacheContent
@@ -52,11 +50,10 @@ namespace KS2Drive.FS
             }
         }
 
-        public CacheManager(CacheMode mode, bool PreLoadFoldersInCache, bool AllowDirtyRead)
+        public CacheManager(CacheMode mode, bool PreLoadFoldersInCache)
         {
             this._mode = mode;
             this._PreLoadFoldersInCache = PreLoadFoldersInCache;
-            this._AllowDirtyRead = AllowDirtyRead;
         }
 
         /// <summary>
@@ -189,7 +186,7 @@ namespace KS2Drive.FS
                 else return (true, Result.Content, null);
             }
 
-            if (this._AllowDirtyRead) //TEMP : Very temporary duplicate code, for testing purpose
+            lock (CacheLock)
             {
                 if (!CurrentFolder.IsParsed)
                 {
@@ -239,61 +236,6 @@ namespace KS2Drive.FS
                     }
                 }
             }
-            else
-            {
-                lock (CacheLock)
-                {
-                    if (!CurrentFolder.IsParsed)
-                    {
-                        var Result = InternalGetFolderContent(CurrentFolder, Marker);
-                        if (!Result.Success) return Result;
-
-                        CurrentFolder.IsParsed = true;
-                        CurrentFolder.LastRefresh = DateTime.Now;
-
-                        //Mise en cache du contenu du répertoire
-                        foreach (var Node in Result.Content)
-                        {
-                            if (Node.Item1 == "." || Node.Item1 == "..") continue; //Bypass special folders
-                            this.AddFileNodeNoLock(Node.Item2);
-                        }
-
-                        ReturnList = Result.Content;
-                    }
-                    else
-                    {
-                        String FolderNameForSearch = CurrentFolder.LocalPath;
-                        if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
-                        ReturnList = new List<Tuple<String, FileNode>>();
-                        //TODO : Add . && .. from cache
-                        ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
-                        if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) FileNodeToRefreshList.Add(CurrentFolder); //Refresh current directory if the cache is too old
-                    }
-
-                    //Sort list by path (mandatory if we want to handle a potential marker correctly)
-                    ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
-
-                    if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
-                    {
-                        var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
-                        var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
-                        if (WantedTupleIndex + 1 < ReturnList.Count) ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
-                        else ReturnList.Clear();
-                    }
-
-                    if (this._PreLoadFoldersInCache)
-                    {
-                        foreach (var FolderNode in ReturnList.Where(x => (x.Item2.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0))
-                        {
-                            if (FolderNode.Item1 == "." || FolderNode.Item1 == "..") continue; //Bypass special folders
-                                                                                               //Pre-loading of sub-folders of current folder
-                            if (!FileNodeCache[FolderNode.Item2.LocalPath].IsParsed) FileNodeToRefreshList.Add(FolderNode.Item2);
-                        }
-                    }
-                }
-            }
-
-
 
             foreach (var FileNodeToRefresh in FileNodeToRefreshList)
             {

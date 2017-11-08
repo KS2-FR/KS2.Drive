@@ -42,7 +42,7 @@ namespace KS2Drive.FS
         public const UInt16 MEMFS_SECTOR_SIZE = 4096;
         public const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
-        public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, KernelCacheMode kernelCacheMode, String DAVLogin, String DAVPassword, bool PreloadCache, bool AllowDirtyRead)
+        public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, KernelCacheMode kernelCacheMode, String DAVLogin, String DAVPassword, bool PreloadCache)
         {
             this.MaxFileNodes = 500000;
             this.MaxFileSize = UInt32.MaxValue;
@@ -60,7 +60,7 @@ namespace KS2Drive.FS
 
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
             WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword);
-            Cache = new CacheManager(CacheMode.Enabled, PreloadCache, AllowDirtyRead);
+            Cache = new CacheManager(CacheMode.Enabled, PreloadCache);
 
             //Test Connection
             var Proxy = new WebDavClient2();
@@ -1073,6 +1073,7 @@ namespace KS2Drive.FS
             String NewFileName,
             Boolean ReplaceIfExists)
         {
+
             FileNode CFN = (FileNode)FileNode0;
 
             String OperationId = Guid.NewGuid().ToString();

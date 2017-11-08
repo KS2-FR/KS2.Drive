@@ -13,8 +13,9 @@ namespace KS2Drive.FS
     public class FileNode
     {
         public Int32 OpenCount;
-        //static int _handle;
-        public string handle;
+        //private static Int32 _handle;
+        //private static object _handlelock = new object();
+        public String handle = "";
         public string Name;
         public String RepositoryPath;
         public String LocalPath;
@@ -64,7 +65,7 @@ namespace KS2Drive.FS
         public FileNode(WebDAVClient.Model.Item WebDavObject)
         {
             if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
-
+            
             this.LastRefresh = DateTime.Now;
             this.Name = WebDavObject.DisplayName;
 
