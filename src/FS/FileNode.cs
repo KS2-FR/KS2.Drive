@@ -1,4 +1,5 @@
 ﻿using Fsp.Interop;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,46 +13,31 @@ namespace KS2Drive.FS
 {
     public class FileNode
     {
+        [JsonIgnore]
+        private static Int32 _handle = 0;
+        [JsonIgnore]
+        private static object _handlelock = new object();
+
         public Int32 OpenCount;
-        //private static Int32 _handle;
-        //private static object _handlelock = new object();
-        public String handle = "";
+        public String ObjectId;
         public string Name;
         public String RepositoryPath;
         public String LocalPath;
         public FileInfo FileInfo;
+
+        [JsonIgnore]
         public Byte[] FileSecurity;
+        [JsonIgnore]
         public Byte[] FileData;
+
         public bool IsCreationPending { get; set; } = false;
         public bool HasUnflushedData { get; set; } = false;
         public DateTime LastRefresh { get; set; }
 
-        //private object IsParsedLock = new object();
         public bool IsParsed;
-        /*public bool IsParsed
-        {
-            get
-            {
-                lock (IsParsedLock)
-                {
-                    return _IsParsed;
-                }
-            }
-            set
-            {
-                lock (IsParsedLock)
-                {
-                    _IsParsed = value;
-                }
-            }
-        }
-        */
+
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
-
-        //private static ulong FileIndex = 0;
-        //private static object DictionnaryLock = new object();
-        //private static Dictionary<String, ulong> MappingNodeRef_FileId = new Dictionary<string, ulong>();
 
         private static bool _IsInited = false;
 
@@ -66,6 +52,11 @@ namespace KS2Drive.FS
         {
             if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
             
+            lock(_handlelock)
+            {
+                this.ObjectId = (++_handle).ToString();
+            }
+
             this.LastRefresh = DateTime.Now;
             this.Name = WebDavObject.DisplayName;
 

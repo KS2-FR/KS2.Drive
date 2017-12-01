@@ -61,14 +61,19 @@ namespace KS2Drive.Debug
 
             EventDisplayTask = Task.Factory.StartNew(() =>
             {
-                if (listView1.InvokeRequired)
+                try
                 {
-                    listView1.Invoke(new MethodInvoker(delegate { DisplayEventSafe(); }));
+                    if (listView1.InvokeRequired)
+                    {
+                        listView1.Invoke(new MethodInvoker(delegate { DisplayEventSafe(); }));
+                    }
+                    else
+                    {
+                        DisplayEventSafe();
+                    };
                 }
-                else
-                {
-                    DisplayEventSafe();
-                };
+                catch
+                { }
             });
         }
 
@@ -80,12 +85,13 @@ namespace KS2Drive.Debug
                 {
                     Token.ThrowIfCancellationRequested();
 
-                    if (DM.MessageType == 1)
+                    if (DM.MessageType == 1) //DebugEnd
                     {
                         for (int i = listView1.Items.Count - 1; i >= Math.Max(0, listView1.Items.Count - 25); i--)
                         {
                             if (listView1.Items[i].SubItems[0].Text.Equals(DM.OperationId))
                             {
+                                listView1.Items[i].SubItems[5].Text = DM.FileNode?.ObjectId;
                                 listView1.Items[i].SubItems[5].Text = DM.date.ToString("HH:MM:ss:ffff");
                                 listView1.Items[i].SubItems[6].Text = DM.Result;
                                 listView1.Items[i].SubItems[7].Text = Convert.ToInt32((DM.date - (DateTime)listView1.Items[i].SubItems[4].Tag).TotalMilliseconds).ToString();
@@ -95,9 +101,10 @@ namespace KS2Drive.Debug
                             }
                         }
                     }
-                    else
+                    else //DebugStart
                     {
-                        listView1.Items.Add(new ListViewItem(new String[] { DM.OperationId, DM.Handle, DM.Caller, DM.Path, DM.date.ToString("HH:mm:ss:ffff"), "", "", "" }));
+                        listView1.Items.Add(new ListViewItem(new String[] { DM.OperationId, "", DM.Caller, DM.Path, DM.date.ToString("HH:mm:ss:ffff"), "", "", "" }));
+                        listView1.Items[listView1.Items.Count - 1].SubItems[4].Text = DM.date.ToString("HH:MM:ss:ffff");
                         listView1.Items[listView1.Items.Count - 1].SubItems[4].Tag = DM.date;
                         listView1.Items[listView1.Items.Count - 1].EnsureVisible();
                     }
@@ -106,7 +113,7 @@ namespace KS2Drive.Debug
                 {
                     //Catch cancellation
                 }
-                catch( Exception)
+                catch (Exception)
                 {
                     //This could be a real error
                 }
@@ -166,7 +173,7 @@ namespace KS2Drive.Debug
         private void RefreshViewSafe()
         {
             listView2.Items.Clear();
-            foreach (var E in Host.Cache.CacheContent.OrderBy(x=>x.Key))
+            foreach (var E in Host.Cache.CacheContent.OrderBy(x => x.Key))
             {
                 listView2.Items.Add(E.Key);
             }

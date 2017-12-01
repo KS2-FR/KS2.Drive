@@ -10,7 +10,7 @@ namespace KS2Drive.FS
     {
         public Int16 MessageType;
         public String OperationId;
-        public String Handle;
+        public FileNode FileNode;
         public String Caller;
         public String Path;
         public DateTime date;

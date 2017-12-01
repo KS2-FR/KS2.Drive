@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using System.Collections.Concurrent;
 using WebDAVClient.Helpers;
 using System.Net.Http;
+using Newtonsoft.Json;
 
 namespace KS2Drive.FS
 {
@@ -142,7 +143,7 @@ namespace KS2Drive.FS
             }
 
             String OperationId = Guid.NewGuid().ToString();
-            DebugStart(OperationId, "", FileName);
+            DebugStart(OperationId, FileName);
 
             try
             {
@@ -155,7 +156,7 @@ namespace KS2Drive.FS
                     {
                         //The file is known to be non-existent
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND");
+                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
@@ -170,20 +171,20 @@ namespace KS2Drive.FS
                     {
                         Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
                     catch (HttpRequestException ex)
                     {
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                        DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (Exception ex)
                     {
                         Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
@@ -191,7 +192,7 @@ namespace KS2Drive.FS
                     {
                         Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                        DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_NOT_FOUND");
                         return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
                     }
                     else
@@ -200,7 +201,7 @@ namespace KS2Drive.FS
                         if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
                         FileAttributes = D.FileInfo.FileAttributes;
                         Cache.AddFileNodeNoLock(D);
-                        DebugEnd(OperationId, "STATUS_SUCCESS - From Repository");
+                        DebugEnd(OperationId, D, "STATUS_SUCCESS - From Repository");
                         return STATUS_SUCCESS;
                     }
                 }
@@ -208,7 +209,7 @@ namespace KS2Drive.FS
                 {
                     FileAttributes = KnownNode.node.FileInfo.FileAttributes;
                     if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.node.FileSecurity;
-                    DebugEnd(OperationId, "STATUS_SUCCESS - From Cache");
+                    DebugEnd(OperationId, KnownNode.node, "STATUS_SUCCESS - From Cache");
                     return STATUS_SUCCESS;
                 }
             }
@@ -228,7 +229,7 @@ namespace KS2Drive.FS
             out String NormalizedName)
         {
             String OperationId = Guid.NewGuid().ToString();
-            DebugStart(OperationId, "", FileName);
+            DebugStart(OperationId, FileName);
 
             FileNode0 = default(Object);
             FileDesc = default(Object);
@@ -245,7 +246,7 @@ namespace KS2Drive.FS
                     if (KnownNode.IsNonExistent)
                     {
                         //The file is known to be non-existent
-                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND");
+                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
@@ -259,37 +260,37 @@ namespace KS2Drive.FS
                     catch (WebDAVException ex)
                     {
                         Cache.AddMissingFileNoLock(FileName);
-                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
                     catch (HttpRequestException ex)
                     {
-                        DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                        DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (Exception ex)
                     {
                         Cache.AddMissingFileNoLock(FileName);
-                        DebugEnd(OperationId, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
+                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
                     if (RepositoryObject == null)
                     {
                         Cache.AddMissingFileNoLock(FileName);
-                        DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                        DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
                     KnownNode.node = new FileNode(RepositoryObject);
                     Cache.AddFileNodeNoLock(KnownNode.node);
                     Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
-                    DebugEnd(OperationId, $"STATUS_SUCCESS - From Repository - Handle {i}");
+                    DebugEnd(OperationId, KnownNode.node, $"STATUS_SUCCESS - From Repository - Handle {i}");
                 }
                 else
                 {
                     Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
-                    DebugEnd(OperationId, $"STATUS_SUCCESS - From cache - Handle {i}");
+                    DebugEnd(OperationId, KnownNode.node, $"STATUS_SUCCESS - From cache - Handle {i}");
                 }
 
                 FileNode0 = KnownNode.node;
@@ -314,7 +315,7 @@ namespace KS2Drive.FS
 
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, CFN);
-            DebugEnd(OperationId, "STATUS_SUCCESS");
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
 
             return STATUS_SUCCESS;
         }
@@ -331,7 +332,7 @@ namespace KS2Drive.FS
 
             SecurityDescriptor = CFN.FileSecurity;
 
-            DebugEnd(OperationId, "STATUS_SUCCESS");
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
 
             return STATUS_SUCCESS;
         }
@@ -359,7 +360,7 @@ namespace KS2Drive.FS
                 var Result = Cache.GetFolderContent(CFN, Marker);
                 if (!Result.Success)
                 {
-                    DebugEnd(OperationId, $"Exception : {Result.ErrorMessage}");
+                    DebugEnd(OperationId, CFN, $"Exception : {Result.ErrorMessage}");
                     FileName = default(String);
                     FileInfo = default(FileInfo);
                     return false;
@@ -386,7 +387,7 @@ namespace KS2Drive.FS
                 return true;
             }
 
-            DebugEnd(OperationId, "STATUS_SUCCESS");
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
 
             FileName = default(String);
             FileInfo = default(FileInfo);
@@ -415,7 +416,7 @@ namespace KS2Drive.FS
             out String NormalizedName)
         {
             String OperationId = Guid.NewGuid().ToString();
-            DebugStart(OperationId, "", FileName);
+            DebugStart(OperationId, FileName);
 
             FileNode0 = default(Object);
             FileDesc = default(Object);
@@ -430,20 +431,20 @@ namespace KS2Drive.FS
                 WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(FileName);
                 if (KnownRepositoryElement != null)
                 {
-                    DebugEnd(OperationId, "STATUS_OBJECT_NAME_COLLISION");
+                    DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_COLLISION");
                     return STATUS_OBJECT_NAME_COLLISION;
                 }
             }
             catch (HttpRequestException ex)
             {
                 FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 return STATUS_NETWORK_UNREACHABLE;
             }
             catch (Exception ex)
             {
                 FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                DebugEnd(OperationId, null, $"STATUS_CANNOT_MAKE - {ex.Message}");
                 return FileSystemBase.STATUS_CANNOT_MAKE;
             }
 
@@ -461,7 +462,7 @@ namespace KS2Drive.FS
                     }
                     else
                     {
-                        DebugEnd(OperationId, "STATUS_CANNOT_MAKE");
+                        DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
                         return STATUS_CANNOT_MAKE;
                     }
                 }
@@ -469,22 +470,22 @@ namespace KS2Drive.FS
                 {
                     //Seems that we get Conflict response when the folder cannot be created
                     //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (HttpRequestException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_CANNOT_MAKE - {ex.Message}");
                     return STATUS_CANNOT_MAKE;
                 }
                 catch (Exception ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
             }
@@ -498,7 +499,7 @@ namespace KS2Drive.FS
                     }
                     else
                     {
-                        DebugEnd(OperationId, "STATUS_CANNOT_MAKE");
+                        DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
                         return STATUS_CANNOT_MAKE;
                     }
                 }
@@ -506,22 +507,22 @@ namespace KS2Drive.FS
                 {
                     //Seems that we get Conflict response when the folder cannot be created
                     //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (WebDAVException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_CANNOT_MAKE - {ex.Message}");
                     return STATUS_CANNOT_MAKE;
                 }
                 catch (HttpRequestException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
             }
@@ -533,7 +534,7 @@ namespace KS2Drive.FS
             FileInfo = CFN.FileInfo;
             NormalizedName = FileName;
 
-            DebugEnd(OperationId, $"STATUS_SUCCESS - Handle {CFN.OpenCount}");
+            DebugEnd(OperationId, CFN, $"STATUS_SUCCESS - Handle {CFN.OpenCount}");
             return STATUS_SUCCESS;
 
             /*
@@ -595,7 +596,7 @@ namespace KS2Drive.FS
                 Int32 Result = SetFileSizeInternal(CFN, AllocationSize, true);
                 if (Result < 0)
                 {
-                    DebugEnd(OperationId, Result.ToString());
+                    DebugEnd(OperationId, CFN, Result.ToString());
                     return Result;
                 }
 
@@ -639,12 +640,12 @@ namespace KS2Drive.FS
                 FileInfo = FileNode.GetFileInfo();
                 */
 
-                DebugEnd(OperationId, "STATUS_SUCCESS");
+                DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                 return STATUS_SUCCESS;
             }
             catch (Exception ex)
             {
-                DebugEnd(OperationId, $"Exception {ex.Message}");
+                DebugEnd(OperationId, CFN, $"Exception {ex.Message}");
                 return STATUS_UNEXPECTED_IO_ERROR;
             }
         }
@@ -672,7 +673,7 @@ namespace KS2Drive.FS
                     }
                     catch (Exception ex)
                     {
-                        DebugEnd(OperationId, ex.Message);
+                        DebugEnd(OperationId, CFN, ex.Message);
                         Cache.DeleteFileNode(CFN);
 
                         return;
@@ -682,10 +683,9 @@ namespace KS2Drive.FS
             }
 
             Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
-            //No more handle on the file, we free its content
-            if (HandleCount == 0) CFN.FileData = null;
+            if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
 
-            DebugEnd(OperationId, $"STATUS_SUCCESS - Handle 0");
+            DebugEnd(OperationId, CFN, $"STATUS_SUCCESS  - Handle {HandleCount}");
         }
 
         public override void Cleanup(
@@ -719,11 +719,11 @@ namespace KS2Drive.FS
                         //Fichier
                         Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
-                        DebugEnd(OperationId, "STATUS_SUCCESS - Delete");
+                        DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
                     {
-                        DebugEnd(OperationId, $"Exception : {ex.Message}");
+                        DebugEnd(OperationId, CFN, $"Exception : {ex.Message}");
                     }
                 }
                 else
@@ -733,11 +733,11 @@ namespace KS2Drive.FS
                         //Répertoire
                         Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
-                        DebugEnd(OperationId, "STATUS_SUCCESS - Delete");
+                        DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
                     {
-                        DebugEnd(OperationId, $"Exception : {ex.Message}");
+                        DebugEnd(OperationId, CFN, $"Exception : {ex.Message}");
                     }
                 }
             }
@@ -759,7 +759,7 @@ namespace KS2Drive.FS
                             }
                             catch (Exception ex)
                             {
-                                DebugEnd(OperationId, ex.Message);
+                                DebugEnd(OperationId, CFN, ex.Message);
                                 //TODO : Remove from Cache
                                 return;
                             }
@@ -767,7 +767,7 @@ namespace KS2Drive.FS
                         }
                     }
                 }
-                DebugEnd(OperationId, "STATUS_SUCCESS");
+                DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
             }
 
             /*
@@ -841,20 +841,20 @@ namespace KS2Drive.FS
                 catch (HttpRequestException ex)
                 {
                     CFN.FileData = null;
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
                     CFN.FileData = null;
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
             }
 
             if (CFN.FileData == null)
             {
-                DebugEnd(OperationId, "STATUS_OBJECT_NAME_NOT_FOUND");
+                DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
                 return STATUS_OBJECT_NAME_NOT_FOUND;
             }
 
@@ -863,7 +863,7 @@ namespace KS2Drive.FS
             if (Offset >= FileSize)
             {
                 BytesTransferred = default(UInt32);
-                DebugEnd(OperationId, "STATUS_END_OF_FILE");
+                DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
                 return STATUS_END_OF_FILE;
             }
 
@@ -892,7 +892,7 @@ namespace KS2Drive.FS
             */
 
             //LogSuccess($"{CFN.handle} Read {CFN.LocalPath} from {Offset} for {BytesTransferred} bytes | requested {Length} bytes");
-            DebugEnd(OperationId, "STATUS_SUCCESS");
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
             return STATUS_SUCCESS;
         }
 
@@ -942,10 +942,10 @@ namespace KS2Drive.FS
                 //ContrainedIo - we cannot increase the file size so EndOffset will always be at maximum equal to CFN.FileInfo.FileSize
                 if (Offset >= CFN.FileInfo.FileSize)
                 {
-                    LogTrace($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 1");
+                    logger.Trace($"{CFN.ObjectId} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 1");
                     BytesTransferred = default(UInt32);
                     FileInfo = default(FileInfo);
-                    DebugEnd(OperationId, "STATUS_SUCCESS");
+                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                     return STATUS_SUCCESS;
                 }
 
@@ -960,14 +960,14 @@ namespace KS2Drive.FS
 
                 if (EndOffset > CFN.FileInfo.FileSize) //We are not in a ConstrainedIo so we expand the file size if the EndOffset goes beyond the current file size
                 {
-                    LogTrace($"{CFN.handle} Write Increase FileSize {CFN.Name}");
+                    logger.Trace($"{CFN.ObjectId} Write Increase FileSize {CFN.Name}");
                     Int32 Result = SetFileSizeInternal(CFN, EndOffset, false);
                     if (Result < 0)
                     {
-                        LogTrace($"{CFN.handle} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
+                        logger.Trace($"{CFN.ObjectId} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
                         BytesTransferred = default(UInt32);
                         FileInfo = default(FileInfo);
-                        DebugEnd(OperationId, Result.ToString());
+                        DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR : " + Result.ToString());
                         return STATUS_UNEXPECTED_IO_ERROR;
                     }
                 }
@@ -980,10 +980,10 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
-                LogTrace($"{CFN.handle} Write Exception {ex.Message}");
+                logger.Trace($"{CFN.ObjectId} Write Exception {ex.Message}");
                 BytesTransferred = default(UInt32);
                 FileInfo = default(FileInfo);
-                DebugEnd(OperationId, "-1");
+                DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
                 return STATUS_UNEXPECTED_IO_ERROR;
             }
 
@@ -1000,19 +1000,19 @@ namespace KS2Drive.FS
                 catch (WebDAVConflictException ex)
                 {
                     Cache.InvalidateFileNode(CFN);
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (HttpRequestException ex)
                 {
                     Cache.InvalidateFileNode(CFN);
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
                     Cache.InvalidateFileNode(CFN);
-                    DebugEnd(OperationId, $"STATUS_UNEXPECTED_IO_ERROR - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_UNEXPECTED_IO_ERROR - {ex.Message}");
                     return STATUS_UNEXPECTED_IO_ERROR;
                 }
             }
@@ -1022,8 +1022,8 @@ namespace KS2Drive.FS
             }
             FileInfo = CFN.FileInfo;
 
-            LogTrace($"{CFN.handle} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
-            DebugEnd(OperationId, "STATUS_SUCCESS");
+            logger.Trace($"{CFN.ObjectId} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
             return STATUS_SUCCESS;
 
             /*
@@ -1091,18 +1091,18 @@ namespace KS2Drive.FS
                 WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(NewFileName);
                 if (KnownRepositoryElement != null && !ReplaceIfExists)
                 {
-                    DebugEnd(OperationId, $"STATUS_OBJECT_NAME_COLLISION");
+                    DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
                     return STATUS_OBJECT_NAME_COLLISION;
                 }
             }
             catch (HttpRequestException ex)
             {
-                DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 return STATUS_NETWORK_UNREACHABLE;
             }
             catch (Exception ex)
             {
-                DebugEnd(OperationId, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                DebugEnd(OperationId, CFN, $"STATUS_CANNOT_MAKE - {ex.Message}");
                 return FileSystemBase.STATUS_CANNOT_MAKE;
             }
 
@@ -1113,18 +1113,18 @@ namespace KS2Drive.FS
                 {
                     if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
-                        DebugEnd(OperationId, "STATUS_ACCESS_DENIED");
+                        DebugEnd(OperationId, CFN, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
                     }
                 }
                 catch (HttpRequestException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return FileSystemBase.STATUS_ACCESS_DENIED;
                 }
             }
@@ -1135,19 +1135,19 @@ namespace KS2Drive.FS
                 {
                     if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
-                        DebugEnd(OperationId, "STATUS_ACCESS_DENIED");
+                        DebugEnd(OperationId, CFN, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
                     }
 
                 }
                 catch (HttpRequestException ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
-                    DebugEnd(OperationId, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return FileSystemBase.STATUS_ACCESS_DENIED;
                 }
             }
@@ -1190,7 +1190,7 @@ namespace KS2Drive.FS
                 FileNodeMap.Insert(DescendantFileNode);
             }
             */
-            DebugEnd(OperationId, $"STATUS_SUCCESS. Renamed to {NewFileName}");
+            DebugEnd(OperationId, CFN, $"STATUS_SUCCESS. Renamed to {NewFileName}");
             return STATUS_SUCCESS;
         }
 
@@ -1207,7 +1207,7 @@ namespace KS2Drive.FS
 
             FileInfo = (null != CFN ? CFN.FileInfo : default(FileInfo));
 
-            DebugEnd(OperationId, "STATUS_SUCCESS");
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
 
             return STATUS_SUCCESS;
         }
@@ -1275,7 +1275,7 @@ namespace KS2Drive.FS
             Int32 Result = SetFileSizeInternal(CFN, NewSize, SetAllocationSize);
             FileInfo = Result >= 0 ? CFN.FileInfo : default(FileInfo);
 
-            LogTrace($"{CFN.handle} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}");
+            logger.Trace($"{CFN.ObjectId} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1345,7 +1345,7 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
-                LogTrace($"{FileNode.handle} SetFileSizeInternal {ex.Message} {ex.StackTrace}");
+                logger.Trace($"{FileNode.ObjectId} SetFileSizeInternal {ex.Message} {ex.StackTrace}");
             }
 
             return STATUS_SUCCESS;
@@ -1377,7 +1377,7 @@ namespace KS2Drive.FS
             out UInt64 StreamSize,
             out UInt64 StreamAllocationSize)
         {
-            LogTrace("Not implemented : GetStreamEntry");
+            logger.Trace("Not implemented : GetStreamEntry");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1425,7 +1425,7 @@ namespace KS2Drive.FS
             Boolean IsDirectory,
             ref Byte[] ReparseData)
         {
-            LogTrace("Not implemented : GetReparsePointByName");
+            logger.Trace("Not implemented : GetReparsePointByName");
 
             /*
             FileNode FileNode;
@@ -1448,7 +1448,7 @@ namespace KS2Drive.FS
             String FileName,
             ref Byte[] ReparseData)
         {
-            LogTrace("Not implemented : GetReparsePoint");
+            logger.Trace("Not implemented : GetReparsePoint");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1470,7 +1470,7 @@ namespace KS2Drive.FS
             String FileName,
             Byte[] ReparseData)
         {
-            LogTrace("Not implemented : SetReparsePoint");
+            logger.Trace("Not implemented : SetReparsePoint");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1501,7 +1501,7 @@ namespace KS2Drive.FS
             String FileName,
             Byte[] ReparseData)
         {
-            LogTrace("Not implemented : DeleteReparsePoint");
+            logger.Trace("Not implemented : DeleteReparsePoint");
 
             /*
             FileNode FileNode = (FileNode)FileNode0;
@@ -1527,20 +1527,6 @@ namespace KS2Drive.FS
 
         #endregion
 
-        #region Tools
-
-        private static object loglock = new object();
-
-        public static void LogTrace(String Message)
-        {
-            lock (loglock)
-            {
-                logger.Trace(Message);
-            }
-        }
-
-        #endregion
-
         public override void Unmounted(object Host)
         {
             Cache.Clear();
@@ -1549,23 +1535,23 @@ namespace KS2Drive.FS
 
         private void DebugStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
-            DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, Handle = CFN.handle, OperationId = OperationId, Path = CFN.LocalPath, Caller = Caller });
+            DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, FileNode = CFN, OperationId = OperationId, Path = CFN.LocalPath, Caller = Caller });
             DebugMessagePosted?.Invoke(null, null);
-            //DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            logger.Trace($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
         }
 
-        private void DebugStart(String OperationId, String Handle, String FileName, [CallerMemberName]string Caller = "")
+        private void DebugStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
-            DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, Handle = Handle, OperationId = OperationId, Path = FileName, Caller = Caller });
-            //DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, OperationId = OperationId, Path = FileName, Caller = Caller });
             DebugMessagePosted?.Invoke(null, null);
+            logger.Trace($"{OperationId}|{Caller}|Start|{FileName}");
         }
 
-        private void DebugEnd(String OperationId, String Result)
+        private void DebugEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
-            DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 1, date = DateTime.Now, OperationId = OperationId, Result = Result });
-            //DebugMessagePosted?.BeginInvoke(this, null, DebugMessagePostedEndAsync, null);
+            DebugMessageQueue.Enqueue(new DebugMessage() { FileNode = CFN, MessageType = 1, date = DateTime.Now, OperationId = OperationId, Result = Result });
             DebugMessagePosted?.Invoke(null, null);
+            logger.Trace($"{OperationId}|{Caller}|End|{Result}"); /*|{JsonConvert.SerializeObject(CFN)}*/
         }
 
         //private void DebugMessagePostedEndAsync(IAsyncResult iar)

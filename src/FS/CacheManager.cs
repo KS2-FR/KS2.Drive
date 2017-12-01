@@ -13,6 +13,8 @@ namespace KS2Drive.FS
     {
         public EventHandler CacheRefreshed;
 
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+
         private Int32 CacheDurationInSeconds = 5;
         private CacheMode _mode;
         private bool _PreLoadFoldersInCache;
@@ -174,8 +176,6 @@ namespace KS2Drive.FS
         /// </summary>
         public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker)
         {
-            logger.Trace($"GetFolderContent {CurrentFolder.LocalPath}");
-
             List<FileNode> FileNodeToRefreshList = new List<FileNode>();
             List<Tuple<String, FileNode>> ReturnList = null;
 
@@ -260,8 +260,6 @@ namespace KS2Drive.FS
         {
             Monitor.Exit(CacheLock);
         }
-
-        private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private void InternalRefreshFolderCacheContent(FileNode CFN)
         {

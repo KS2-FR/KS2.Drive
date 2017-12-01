@@ -81,7 +81,7 @@
             // 
             // Handle_
             // 
-            this.Handle_.Text = "Handle";
+            this.Handle_.Text = "Obj ID";
             // 
             // Type
             // 

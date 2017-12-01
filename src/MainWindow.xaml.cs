@@ -10,19 +10,33 @@ using System.Linq;
 
 namespace KS2Drive
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         private FSPService service = new FSPService();
         private bool IsMounted = false;
         private Thread T;
         private Configuration AppConfiguration;
+        private System.Windows.Forms.NotifyIcon ni;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            #region Icon
+
+            ni = new System.Windows.Forms.NotifyIcon();
+            Stream iconStream = Application.GetResourceStream(new Uri("pack://application:,,,/KS2Drive;component/Resources/Main.ico")).Stream;
+            ni.Icon = new System.Drawing.Icon(iconStream);
+            ni.Visible = true;
+            ni.Text = "KS² Drive";
+            ni.BalloonTipText = "KS² Drive";
+            ni.DoubleClick += delegate (object sender, EventArgs args)
+                            {
+                                this.Show();
+                                this.WindowState = WindowState.Normal;
+                            };
+            
+            #endregion
 
             //Get Free drives
             ArrayList FreeDrives = new ArrayList(26); // Allocate space for alphabet
@@ -67,9 +81,9 @@ namespace KS2Drive
             CBPreloading.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
             CBPreloading.SelectedIndex = 0;
 
-            T = new Thread(() => service.Run());
             try
             {
+                T = new Thread(() => service.Run());
                 T.Start();
             }
             catch (Exception ex)
@@ -111,6 +125,12 @@ namespace KS2Drive
             }
 
             if (this.AppConfiguration.AutoMount) button1_Click(null, null);
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            if (WindowState == System.Windows.WindowState.Minimized) this.Hide();
+            base.OnStateChanged(e);
         }
 
         private void button1_Click(object sender, RoutedEventArgs e)
@@ -172,11 +192,6 @@ namespace KS2Drive
             }
         }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            service.Stop();
-        }
-
         private void MenuOptions_Click(object sender, RoutedEventArgs e)
         {
             Options OptionWindow = new Options();
@@ -185,12 +200,25 @@ namespace KS2Drive
 
         private void MenuExit_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            QuitApp();
         }
 
         private void MenuDebug_Click(object sender, RoutedEventArgs e)
         {
             service.ShowDebug();
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            QuitApp();
+        }
+
+        private void QuitApp()
+        {
+            ni.Visible = false;
+            ni.Dispose();
+            service.Stop();
+            Application.Current.Shutdown();
         }
     }
 }
