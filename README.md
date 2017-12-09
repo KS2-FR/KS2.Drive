@@ -6,7 +6,7 @@ The software is intented to be used in conjunction with Alfresco ECM (and tested
 
 
 Usage :
-- Install the latest release of WinFSP (https://github.com/billziss-gh/winfsp/releases). Currently WinFsp 2017.2 B2.
+- Install the latest release of WinFSP (https://github.com/billziss-gh/winfsp/releases). Currently WinFsp 2017.2
 - Download the lastest build of KS² Drive (https://ci.appveyor.com/api/projects/FrKaram/ks2-drive/artifacts/src/bin/KS2Drive.zip)
 - Run KS2Drive.exe
 - Select the drive letter you want your server to been mounted as
