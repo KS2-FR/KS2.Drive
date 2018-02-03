@@ -9,6 +9,6 @@ namespace KS2Drive.FS
     public class DirectoryEnumeratorContext
     {
         public IEnumerator<Tuple<string, FileNode>> Enumerator { get; internal set; }
-        public string OperationId { get; internal set; }
+        public Guid OperationId { get; internal set; }
     }
 }

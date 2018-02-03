@@ -177,6 +177,11 @@ namespace KS2Drive
                 txtURL.IsEnabled = false;
                 txtLogin.IsEnabled = false;
                 txtPassword.IsEnabled = false;
+                CBMode.IsEnabled = false;
+                CBFreeDrives.IsEnabled = false;
+                CBKernelCache.IsEnabled = false;
+                CBPreloading.IsEnabled = false;
+                CBSyncOps.IsEnabled = false;
 
                 Process.Start($@"{CBFreeDrives.SelectedValue.ToString()}:\");
             }
@@ -189,6 +194,11 @@ namespace KS2Drive
                 txtURL.IsEnabled = true;
                 txtLogin.IsEnabled = true;
                 txtPassword.IsEnabled = true;
+                CBMode.IsEnabled = true;
+                CBFreeDrives.IsEnabled = true;
+                CBKernelCache.IsEnabled = true;
+                CBPreloading.IsEnabled = true;
+                CBSyncOps.IsEnabled = true;
             }
         }
 

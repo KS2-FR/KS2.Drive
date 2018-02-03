@@ -15,6 +15,7 @@ using System.Collections.Concurrent;
 using WebDAVClient.Helpers;
 using System.Net.Http;
 using Newtonsoft.Json;
+using System.Text;
 
 namespace KS2Drive.FS
 {
@@ -23,6 +24,8 @@ namespace KS2Drive.FS
         public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
         public EventHandler DebugMessagePosted;
         private static Logger logger = LogManager.GetCurrentClassLogger();
+
+        private List<LogWriter> ActiveWriter = new List<LogWriter>();
 
         private UInt32 MaxFileNodes;
         private UInt32 MaxFileSize;
@@ -144,19 +147,26 @@ namespace KS2Drive.FS
 
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, FileName);
+            var L = new LogWriter(FileName);
 
             try
             {
+                L.Append("Before entering lock");
                 Cache.Lock();
+                L.Append("After entering Lock");
 
+                L.Append("Before calling GetFileNodeNoLock");
                 var KnownNode = Cache.GetFileNodeNoLock(FileName);
+                L.Append("After calling GetFileNodeNoLock");
                 if (KnownNode.node == null)
                 {
+                    L.Append("Node unknown");
                     if (KnownNode.IsNonExistent)
                     {
                         //The file is known to be non-existent
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND");
+                        L.Append("Node is no existant. Return STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
@@ -165,10 +175,13 @@ namespace KS2Drive.FS
                     try
                     {
                         var Proxy = new WebDavClient2();
+                        L.Append("Before calling GetRepositoryElement");
                         FoundElement = Proxy.GetRepositoryElement(FileName);
+                        L.Append("After calling GetRepositoryElement");
                     }
                     catch (WebDAVException ex)
                     {
+                        L.Append("WebDAVException exception. Return STATUS_OBJECT_NAME_NOT_FOUND");
                         Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
@@ -176,12 +189,14 @@ namespace KS2Drive.FS
                     }
                     catch (HttpRequestException ex)
                     {
+                        L.Append("HttpRequestException exception. Return STATUS_NETWORK_UNREACHABLE");
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (Exception ex)
                     {
+                        L.Append("Exception exception. Return STATUS_OBJECT_NAME_NOT_FOUND");
                         Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
@@ -190,20 +205,23 @@ namespace KS2Drive.FS
 
                     if (FoundElement == null)
                     {
+                        L.Append("FoundElement == null. Return STATUS_OBJECT_NAME_NOT_FOUND");
                         Cache.AddMissingFileNoLock(FileName);
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_NOT_FOUND");
                         return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
                     }
-                    else
-                    {
-                        var D = new FileNode(FoundElement);
-                        if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
-                        FileAttributes = D.FileInfo.FileAttributes;
-                        Cache.AddFileNodeNoLock(D);
-                        DebugEnd(OperationId, D, "STATUS_SUCCESS - From Repository");
-                        return STATUS_SUCCESS;
-                    }
+
+                    var D = new FileNode(FoundElement);
+                    if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
+                    FileAttributes = D.FileInfo.FileAttributes;
+                    L.Append("Before AddFileNodeNoLock");
+                    Cache.AddFileNodeNoLock(D);
+                    L.Append("After AddFileNodeNoLock");
+                    DebugEnd(OperationId, D, "STATUS_SUCCESS - From Repository");
+                    L.Append("Return STATUS_SUCCESS");
+                    return STATUS_SUCCESS;
+
                 }
                 else
                 {
@@ -215,7 +233,10 @@ namespace KS2Drive.FS
             }
             finally
             {
+                L.Append("Before quitting lock");
                 Cache.Unlock();
+                L.Append("After quitting lock");
+                L.Write();
             }
         }
 
@@ -236,17 +257,25 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             NormalizedName = default(String);
 
+            var L = new LogWriter(FileName);
+
             try
             {
+                L.Append("Before entering lock");
                 Cache.Lock();
+                L.Append("After entering Lock");
 
+                L.Append("Before calling GetFileNodeNoLock");
                 var KnownNode = Cache.GetFileNodeNoLock(FileName);
+                L.Append("After calling GetFileNodeNoLock");
+
                 if (KnownNode.node == null)
                 {
                     if (KnownNode.IsNonExistent)
                     {
                         //The file is known to be non-existent
                         DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND");
+                        L.Append("Node is no existant. Return STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
@@ -255,7 +284,9 @@ namespace KS2Drive.FS
                     try
                     {
                         var Proxy = new WebDavClient2();
+                        L.Append("Before calling GetRepositoryElement");
                         RepositoryObject = Proxy.GetRepositoryElement(FileName);
+                        L.Append("After calling GetRepositoryElement");
                     }
                     catch (WebDAVException ex)
                     {
@@ -277,13 +308,18 @@ namespace KS2Drive.FS
 
                     if (RepositoryObject == null)
                     {
+                        L.Append("RepositoryObject == null. Return STATUS_OBJECT_NAME_NOT_FOUND");
                         Cache.AddMissingFileNoLock(FileName);
                         DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_NOT_FOUND");
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
                     KnownNode.node = new FileNode(RepositoryObject);
+                    L.Append("Before AddFileNodeNoLock");
                     Cache.AddFileNodeNoLock(KnownNode.node);
+                    L.Append("After AddFileNodeNoLock");
+                    L.Append("Return STATUS_SUCCESS");
+
                     Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
                     DebugEnd(OperationId, KnownNode.node, $"STATUS_SUCCESS - From Repository - Handle {i}");
                 }
@@ -299,7 +335,10 @@ namespace KS2Drive.FS
             }
             finally
             {
+                L.Append("Before quitting lock");
                 Cache.Unlock();
+                L.Append("After quitting lock");
+                L.Write();
             }
 
             return STATUS_SUCCESS;
@@ -348,19 +387,26 @@ namespace KS2Drive.FS
         {
             FileNode CFN = (FileNode)FileNode0;
             IEnumerator<Tuple<String, FileNode>> Enumerator;
-            String OperationId;
+            Guid OperationId;
+            LogWriter L;
 
             if (Context == null)
             {
                 Enumerator = null;
-                OperationId = Guid.NewGuid().ToString();
-                DebugStart(OperationId, CFN);
+                OperationId = Guid.NewGuid();
+                DebugStart(OperationId.ToString(), CFN);
+
+                L = new LogWriter(OperationId, CFN.Name);
+                ActiveWriter.Add(L);
 
                 List<Tuple<String, FileNode>> ChildrenFileNames = null;
-                var Result = Cache.GetFolderContent(CFN, Marker);
+                var Result = Cache.GetFolderContent(CFN, Marker, L);
                 if (!Result.Success)
                 {
-                    DebugEnd(OperationId, CFN, $"Exception : {Result.ErrorMessage}");
+                    DebugEnd(OperationId.ToString(), CFN, $"Exception : {Result.ErrorMessage}");
+                    L.Append($"Exception : {Result.ErrorMessage}");
+                    L.Write();
+
                     FileName = default(String);
                     FileInfo = default(FileInfo);
                     return false;
@@ -377,6 +423,8 @@ namespace KS2Drive.FS
             {
                 Enumerator = ((DirectoryEnumeratorContext)Context).Enumerator;
                 OperationId = ((DirectoryEnumeratorContext)Context).OperationId;
+
+                L = ActiveWriter.First(x => x.OperationId.Equals(OperationId));
             }
 
             if (Enumerator.MoveNext())
@@ -387,7 +435,9 @@ namespace KS2Drive.FS
                 return true;
             }
 
-            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+            DebugEnd(OperationId.ToString(), CFN, "STATUS_SUCCESS");
+            L.Write();
+            ActiveWriter.Remove(L);
 
             FileName = default(String);
             FileInfo = default(FileInfo);
@@ -527,7 +577,9 @@ namespace KS2Drive.FS
                 }
             }
 
-            Cache.AddFileNode(CFN);
+            Cache.Lock();
+            Cache.AddFileNodeNoLock(CFN);
+            Cache.Unlock();
 
             Interlocked.Increment(ref CFN.OpenCount);
             FileNode0 = CFN;
@@ -831,12 +883,16 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             DebugStart(OperationId, CFN);
 
+            var L = new LogWriter(CFN.Name);
+
             if (CFN.FileData == null)
             {
                 var Proxy = new WebDavClient2();
                 try
                 {
+                    L.Append("Before loading content");
                     CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                    L.Append("After loading content");
                 }
                 catch (HttpRequestException ex)
                 {
@@ -893,6 +949,8 @@ namespace KS2Drive.FS
 
             //LogSuccess($"{CFN.handle} Read {CFN.LocalPath} from {Offset} for {BytesTransferred} bytes | requested {Length} bytes");
             DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+            L.Append("Read end");
+            L.Write();
             return STATUS_SUCCESS;
         }
 
@@ -1537,21 +1595,21 @@ namespace KS2Drive.FS
         {
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, FileNode = CFN, OperationId = OperationId, Path = CFN.LocalPath, Caller = Caller });
             DebugMessagePosted?.Invoke(null, null);
-            logger.Trace($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
+            //logger.Trace($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
         }
 
         private void DebugStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, OperationId = OperationId, Path = FileName, Caller = Caller });
             DebugMessagePosted?.Invoke(null, null);
-            logger.Trace($"{OperationId}|{Caller}|Start|{FileName}");
+            //logger.Trace($"{OperationId}|{Caller}|Start|{FileName}");
         }
 
         private void DebugEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
             DebugMessageQueue.Enqueue(new DebugMessage() { FileNode = CFN, MessageType = 1, date = DateTime.Now, OperationId = OperationId, Result = Result });
             DebugMessagePosted?.Invoke(null, null);
-            logger.Trace($"{OperationId}|{Caller}|End|{Result}"); /*|{JsonConvert.SerializeObject(CFN)}*/
+            //logger.Trace($"{OperationId}|{Caller}|End|{Result}"); /*|{JsonConvert.SerializeObject(CFN)}*/
         }
 
         //private void DebugMessagePostedEndAsync(IAsyncResult iar)
@@ -1577,6 +1635,49 @@ namespace KS2Drive.FS
             TValue value = dic[fromKey];
             dic.Remove(fromKey);
             dic[toKey] = value;
+        }
+    }
+
+    public class LogWriter
+    {
+        StringBuilder SB = new StringBuilder();
+
+        public DateTime StartDate { get; }
+
+        public String FileName;
+        public String Caller;
+        public Guid OperationId;
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+
+        public LogWriter(Guid operationId, String fileName, [CallerMemberName]string caller = "")
+        {
+            this.OperationId = operationId;
+            this.StartDate = DateTime.Now;
+            this.FileName = fileName;
+            this.Caller = caller;
+            SB.AppendLine($"{DateTime.Now.ToString("HH:mm:ss:fff")} - {caller} -> {fileName}");
+        }
+
+        public LogWriter(String fileName, [CallerMemberName]string caller = "")
+        {
+            this.StartDate = DateTime.Now;
+            this.FileName = fileName;
+            this.Caller = caller;
+            SB.AppendLine($"{DateTime.Now.ToString("HH:mm:ss:fff")} - {caller} -> {fileName}");
+        }
+
+        public void Append(String text)
+        {
+            SB.AppendLine($"{DateTime.Now.ToString("HH:mm:ss:fff")} - {text}");
+        }
+
+        public void Write()
+        {
+            double TotalProcessingTimeInSec = (DateTime.Now - StartDate).TotalMilliseconds;
+            SB.AppendLine($"Total millisec : {TotalProcessingTimeInSec}");
+            //if (TotalProcessingTimeInSec > 1d)
+            /*if (Caller == "ReadDirectoryEntry" || Caller == "Open" || Caller == "Read")*/
+            //logger.Trace(SB.ToString());
         }
     }
 }
