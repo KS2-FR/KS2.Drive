@@ -16,6 +16,7 @@ using WebDAVClient.Helpers;
 using System.Net.Http;
 using Newtonsoft.Json;
 using System.Text;
+using System.Diagnostics;
 
 namespace KS2Drive.FS
 {

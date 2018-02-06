@@ -15,7 +15,7 @@ namespace KS2Drive.FS
 
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private Int32 CacheDurationInSeconds = 5;
+        private Int32 CacheDurationInSeconds = 30;
         private CacheMode _mode;
         private bool _PreLoadFoldersInCache;
 
@@ -173,9 +173,12 @@ namespace KS2Drive.FS
 
             if (_mode == CacheMode.Disabled)
             {
-                var Result = InternalGetFolderContent(CurrentFolder, Marker);
+                //TODO
+                /*
+                var Result = ListRemoteServerFolderContent(CurrentFolder);
                 if (!Result.Success) return Result;
                 else return (true, Result.Content, null);
+                */
             }
 
             lock (CacheLock)
@@ -183,7 +186,7 @@ namespace KS2Drive.FS
                 if (!CurrentFolder.IsParsed)
                 {
                     l.Append("Start Alf request");
-                    var Result = InternalGetFolderContent(CurrentFolder, Marker);
+                    var Result = ListRemoteServerFolderContent(CurrentFolder);
                     l.Append("End Alf request");
                     if (!Result.Success) return Result;
 
@@ -193,8 +196,27 @@ namespace KS2Drive.FS
                     //Mise en cache du contenu du répertoire
                     foreach (var Node in Result.Content)
                     {
-                        if (Node.Item1 == "." || Node.Item1 == "..") continue; //Bypass special folders
                         this.AddFileNodeNoLock(Node.Item2);
+                    }
+
+                    //Gestion de . et ..
+
+                    if (!FileNode.IsRepositoryRootPath(CurrentFolder.RepositoryPath))
+                    {
+                        //if this is not the root directory add the dot entries
+                        if (Marker == null) Result.Content.Add(new Tuple<String, FileNode>(".", CurrentFolder));
+
+                        if (Marker == null || Marker == ".")
+                        {
+                            String ParentPath = FileNode.ConvertRepositoryPathToLocalPath(FileNode.GetRepositoryParentPath(CurrentFolder.RepositoryPath));
+                            if (ParentPath != null)
+                            {
+                                if (FileNodeCache.ContainsKey(ParentPath))
+                                {
+                                    Result.Content.Add(new Tuple<String, FileNode>("..", FileNodeCache[ParentPath]));
+                                }
+                            }
+                        }
                     }
 
                     ReturnList = Result.Content;
@@ -230,8 +252,7 @@ namespace KS2Drive.FS
                     foreach (var FolderNode in ReturnList.Where(x => (x.Item2.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0))
                     {
                         if (FolderNode.Item1 == "." || FolderNode.Item1 == "..") continue; //Bypass special folders
-                                                                                           //Pre-loading of sub-folders of current folder
-                        if (!FileNodeCache[FolderNode.Item2.LocalPath].IsParsed) FileNodeToRefreshList.Add(FolderNode.Item2);
+                        if (!FileNodeCache[FolderNode.Item2.LocalPath].IsParsed) FileNodeToRefreshList.Add(FolderNode.Item2); //Pre-loading of sub-folders of current folder
                     }
                 }
             }
@@ -263,8 +284,8 @@ namespace KS2Drive.FS
 
         private void InternalRefreshFolderCacheContent(FileNode CFN)
         {
-            var Result = InternalGetFolderContent(CFN, null);
-            RemoveRefreshTask(CFN); //Server parsing opeartion has been made. The filenode statut is now parsed
+            var Result = ListRemoteServerFolderContent(CFN);
+            RemoveRefreshTask(CFN); //Server parsing operation has been made. The filenode status is now parsed
             if (!Result.Success) return;
 
             lock (CacheLock)
@@ -274,24 +295,26 @@ namespace KS2Drive.FS
 
                 if (FileNodeCache == null) return; //Handle the case when the thread is still performing while the class has been unloaded
 
-                String Filter1 = FileNode.IsRepositoryRootPath(CFN.RepositoryPath) ? "\\" : CFN.LocalPath + "\\";
+                String Filter = FileNode.IsRepositoryRootPath(CFN.RepositoryPath) ? "\\" : CFN.LocalPath + "\\";
 
                 //Refresh from server result
                 foreach (var Node in Result.Content)
                 {
-                    if (Node.Item1 == "." || Node.Item1 == "..") continue;
                     if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath))
                     {
                         this.AddFileNodeNoLock(Node.Item2);
                     }
                     else
                     {
-                        //TODO : Refresh node with updated properties
+                        //Refresh node with updated properties
+                        //TODO : Should moire properties be updated
+                        var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
+                        KnownCachedItem.FileInfo = Node.Item2.FileInfo;
                     }
                 }
 
                 //Supprimer les entrées de FileNodeCache qui ne sont plus dans Result.Content
-                foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter1) && x.Key.LastIndexOf('\\').Equals(Filter1.Length - 1)).ToList())
+                foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
                 {
                     if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
                     {
@@ -303,31 +326,10 @@ namespace KS2Drive.FS
             }
         }
 
-        private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) InternalGetFolderContent(FileNode CFN, String Marker)
+        private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) ListRemoteServerFolderContent(FileNode CFN)
         {
             var Proxy = new WebDavClient2();
             List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
-
-            if (!FileNode.IsRepositoryRootPath(CFN.RepositoryPath))
-            {
-                //if this is not the root directory add the dot entries
-                if (Marker == null) ChildrenFileNames.Add(new Tuple<String, FileNode>(".", CFN));
-
-                if (null == Marker || "." == Marker)
-                {
-                    String ParentPath = FileNode.ConvertRepositoryPathToLocalPath(FileNode.GetRepositoryParentPath(CFN.RepositoryPath));
-                    if (ParentPath != null)
-                    {
-                        //RepositoryElement ParentElement;
-                        try
-                        {
-                            var ParentElement = Proxy.GetRepositoryElement(ParentPath);
-                            if (ParentElement != null) ChildrenFileNames.Add(new Tuple<String, FileNode>("..", new FileNode(ParentElement)));
-                        }
-                        catch { }
-                    }
-                }
-            }
 
             IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NLog;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -39,16 +40,16 @@ namespace WebDAVClient
             //"  </prop> " +
             "</propfind>";
 
-        private static readonly string AssemblyVersion = typeof (IClient).Assembly.GetName().Version.ToString();
+        private static readonly string AssemblyVersion = typeof(IClient).Assembly.GetName().Version.ToString();
 
         private readonly HttpClient _client;
         private readonly HttpClient _uploadClient;
         private string _server;
         private string _basePath = "/";
 
-        private string _encodedBasePath;
-        
+        private static Logger logger = LogManager.GetCurrentClassLogger();
 
+        private string _encodedBasePath;
 
         #region WebDAV connection parameters
 
@@ -90,7 +91,7 @@ namespace WebDAVClient
         /// Specify the UserAgent (and UserAgent version) string to use in requests
         /// </summary>
         public string UserAgent { get; set; }
-        
+
         /// <summary>
         /// Specify the UserAgent (and UserAgent version) string to use in requests
         /// </summary>
@@ -121,7 +122,6 @@ namespace WebDAVClient
                 _uploadClient.DefaultRequestHeaders.ExpectContinue = false;
                 _uploadClient.Timeout = uploadTimeout.Value;
             }
-
         }
 
         #region WebDAV operations
@@ -134,6 +134,8 @@ namespace WebDAVClient
         /// <returns>A list of files (entries without a trailing slash) and directories (entries with a trailing slash)</returns>
         public async Task<IEnumerable<Item>> List(string path = "/", int? depth = 1)
         {
+            //logger.Trace($"WEBDAVCLIENT List {path}");
+
             var listUri = await GetServerUrl(path, true).ConfigureAwait(false);
 
             // Depth header: http://webdav.org/specs/rfc4918.html#rfc.section.9.1.4
@@ -150,9 +152,9 @@ namespace WebDAVClient
                 response = await HttpRequest(listUri.Uri, PropFind, headers, Encoding.UTF8.GetBytes(PropFindRequestContent)).ConfigureAwait(false);
 
                 if (response.StatusCode != HttpStatusCode.OK &&
-                    (int) response.StatusCode != HttpStatusCode_MultiStatus)
+                    (int)response.StatusCode != HttpStatusCode_MultiStatus)
                 {
-                    throw new WebDAVException((int) response.StatusCode, "Failed retrieving items in folder.");
+                    throw new WebDAVException((int)response.StatusCode, "Failed retrieving items in folder.");
                 }
 
                 using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
@@ -226,6 +228,8 @@ namespace WebDAVClient
         /// <returns>A list of files (entries without a trailing slash) and directories (entries with a trailing slash)</returns>
         private async Task<Item> Get(Uri listUri, string path)
         {
+            //logger.Trace($"WEBDAVCLIENT Get {listUri}");
+
             // Depth header: http://webdav.org/specs/rfc4918.html#rfc.section.9.1.4
             IDictionary<string, string> headers = new Dictionary<string, string>();
             headers.Add("Depth", "0");
@@ -237,7 +241,7 @@ namespace WebDAVClient
                 response = await HttpRequest(listUri, PropFind, headers, Encoding.UTF8.GetBytes(PropFindRequestContent)).ConfigureAwait(false);
 
                 if (response.StatusCode != HttpStatusCode.OK &&
-                    (int) response.StatusCode != HttpStatusCode_MultiStatus)
+                    (int)response.StatusCode != HttpStatusCode_MultiStatus)
                 {
                     throw new WebDAVException((int)response.StatusCode, string.Format("Failed retrieving item/folder (Status Code: {0})", response.StatusCode));
                 }
@@ -271,6 +275,8 @@ namespace WebDAVClient
         /// <param name="remoteFilePath">Source path and filename of the file on the server</param>
         public async Task<Byte[]> Download(string remoteFilePath)
         {
+            //logger.Trace($"WEBDAVCLIENT Download {remoteFilePath}");
+
             // Should not have a trailing slash.
             var downloadUri = await GetServerUrl(remoteFilePath, false).ConfigureAwait(false);
 
@@ -292,7 +298,7 @@ namespace WebDAVClient
             {
                 throw ex;
             }
-             finally
+            finally
             {
                 if (response != null)
                     response.Dispose();
@@ -319,7 +325,7 @@ namespace WebDAVClient
                 response.StatusCode != HttpStatusCode.NoContent &&
                 response.StatusCode != HttpStatusCode.Created)
             {
-                throw new WebDAVException((int) response.StatusCode, "Failed uploading file.");
+                throw new WebDAVException((int)response.StatusCode, "Failed uploading file.");
             }
 
             return response.IsSuccessStatusCode;
@@ -333,13 +339,15 @@ namespace WebDAVClient
         /// <param name="name"></param>
         public async Task<bool> CreateDir(string remotePath, string name)
         {
+            //logger.Trace($"WEBDAVCLIENT CreateDir {remotePath}");
+
             // Should not have a trailing slash.
             var dirUri = await GetServerUrl(remotePath.TrimEnd('/') + "/" + name.TrimStart('/'), false).ConfigureAwait(false);
 
             HttpResponseMessage response = await HttpRequest(dirUri.Uri, MkCol).ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.Conflict)
-                throw new WebDAVConflictException((int) response.StatusCode, "Failed creating folder.");
+                throw new WebDAVConflictException((int)response.StatusCode, "Failed creating folder.");
 
             if (response.StatusCode != HttpStatusCode.OK &&
                 response.StatusCode != HttpStatusCode.NoContent &&
@@ -366,6 +374,8 @@ namespace WebDAVClient
 
         private async Task Delete(Uri listUri)
         {
+            //logger.Trace($"WEBDAVCLIENT Delete {listUri}");
+
             try
             {
                 var response = await HttpRequest(listUri, HttpMethod.Delete).ConfigureAwait(false);
@@ -403,6 +413,8 @@ namespace WebDAVClient
 
         private async Task<bool> Move(Uri srcUri, Uri dstUri)
         {
+            //logger.Trace($"WEBDAVCLIENT Move {srcUri}");
+
             const string requestContent = "MOVE";
 
             IDictionary<string, string> headers = new Dictionary<string, string>();
@@ -433,6 +445,8 @@ namespace WebDAVClient
         /// <param name="content"></param>
         private async Task<HttpResponseMessage> HttpRequest(Uri uri, HttpMethod method, IDictionary<string, string> headers = null, byte[] content = null)
         {
+            //logger.Trace($"WEBDAVCLIENT HttpRequest {uri}");
+
             using (var request = new HttpRequestMessage(method, uri))
             {
                 request.Headers.Connection.Add("Keep-Alive");
@@ -513,6 +527,16 @@ namespace WebDAVClient
 
         private async Task<UriBuilder> GetServerUrl(string path, bool appendTrailingSlash)
         {
+            //logger.Trace($"WEBDAVCLIENT GetServerUrl {path}");
+            UriBuilder ReturnValue;
+
+            if (path == "/") ReturnValue = new UriBuilder(_server) { Path = _basePath };
+            else ReturnValue = new UriBuilder(_server) { Path = _basePath + path };
+
+            //logger.Trace($"WEBDAVCLIENT GetServerUrl out {ReturnValue}");
+            return ReturnValue;
+            /*
+
             // Resolve the base path on the server
             if (_encodedBasePath == null)
             {
@@ -522,7 +546,6 @@ namespace WebDAVClient
                 _encodedBasePath = root.Href;
             }
 
-
             // If we've been asked for the "root" folder
             if (string.IsNullOrEmpty(path))
             {
@@ -530,11 +553,13 @@ namespace WebDAVClient
                 Uri absoluteBaseUri;
                 if (TryCreateAbsolute(_encodedBasePath, out absoluteBaseUri))
                 {
+                    //logger.Trace($"WEBDAVCLIENT GetServerUrl out {absoluteBaseUri}");
                     return new UriBuilder(absoluteBaseUri);
                 }
 
                 // Otherwise, use the resolved base path relatively to the server
                 var baseUri = new UriBuilder(_server) {Path = _encodedBasePath};
+                //logger.Trace($"WEBDAVCLIENT GetServerUrl out {baseUri}");
                 return baseUri;
             }
 
@@ -543,6 +568,7 @@ namespace WebDAVClient
             if (TryCreateAbsolute(path, out absoluteUri))
             {
                 var baseUri = new UriBuilder(absoluteUri);
+                //logger.Trace($"WEBDAVCLIENT GetServerUrl out {baseUri}");
                 return baseUri;
             }
             else
@@ -573,10 +599,10 @@ namespace WebDAVClient
 
                     baseUri.Path = finalPath;
                 }
-                
 
+                //logger.Trace($"WEBDAVCLIENT GetServerUrl out {baseUri}");
                 return baseUri;
-            }
+                */
         }
 
         #endregion
