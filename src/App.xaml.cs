@@ -1,4 +1,4 @@
-﻿using KS2Drive.Log;
+﻿//using KS2Drive.Log;
 using Newtonsoft.Json;
 using NLog.LayoutRenderers;
 using System;
@@ -39,7 +39,7 @@ namespace KS2Drive
 
             Tools.LoadProxy(this.AppConfiguration);
 
-            LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
+            //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
         }
     }
 }
