@@ -7,6 +7,7 @@ using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Linq;
+using System.Collections.ObjectModel;
 
 namespace KS2Drive
 {
@@ -17,10 +18,13 @@ namespace KS2Drive
         private Thread T;
         private Configuration AppConfiguration;
         private System.Windows.Forms.NotifyIcon ni;
+        public ObservableCollection<LogListItem> ItemsToLog = new ObservableCollection<LogListItem>();
 
         public MainWindow()
         {
             InitializeComponent();
+
+            service.RepositoryActionPerformed += (s1, e1) => { Dispatcher.Invoke(() => ItemsToLog.Add(e1)); };
 
             #region Icon
 
@@ -125,6 +129,8 @@ namespace KS2Drive
             }
 
             if (this.AppConfiguration.AutoMount) button1_Click(null, null);
+
+            LogList.ItemsSource = ItemsToLog;
         }
 
         protected override void OnStateChanged(EventArgs e)
@@ -230,5 +236,18 @@ namespace KS2Drive
             service.Stop();
             Application.Current.Shutdown();
         }
+
+        private void ClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            ItemsToLog.Clear();
+        }
+    }
+
+    public class LogListItem
+    {
+        public String Date { get; set; }
+        public String Action { get; set; }
+        public String Fichier { get; set; }
+        public String Resultat { get; set; }
     }
 }

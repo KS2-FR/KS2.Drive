@@ -90,6 +90,7 @@
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />
+    <Compile Include="ListboxBehaviour.cs" />
     <Compile Include="Tools.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

@@ -23,7 +23,8 @@ namespace KS2Drive.FS
     public class DavFS : FileSystemBase
     {
         public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
-        public EventHandler DebugMessagePosted;
+        public event EventHandler DebugMessagePosted;
+        public event EventHandler<LogListItem> RepositoryActionPerformed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private List<LogWriter> ActiveWriter = new List<LogWriter>();
@@ -77,7 +78,7 @@ namespace KS2Drive.FS
             {
                 throw new Exception($"Impossible de se connecter au serveur : {ex.Message}");
             }
-        }
+        } 
 
         /// <summary>
         /// Defini les paramétres généraux du systéme de fichiers
@@ -483,6 +484,7 @@ namespace KS2Drive.FS
                 if (KnownRepositoryElement != null)
                 {
                     DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_COLLISION");
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_OBJECT_NAME_COLLISION" });
                     return STATUS_OBJECT_NAME_COLLISION;
                 }
             }
@@ -490,12 +492,14 @@ namespace KS2Drive.FS
             {
                 FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                 DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_NETWORK_UNREACHABLE" });
                 return STATUS_NETWORK_UNREACHABLE;
             }
             catch (Exception ex)
             {
                 FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                 DebugEnd(OperationId, null, $"STATUS_CANNOT_MAKE - {ex.Message}");
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_CANNOT_MAKE" });
                 return FileSystemBase.STATUS_CANNOT_MAKE;
             }
 
@@ -513,6 +517,7 @@ namespace KS2Drive.FS
                     }
                     else
                     {
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_CANNOT_MAKE" });
                         DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
                         return STATUS_CANNOT_MAKE;
                     }
@@ -522,20 +527,24 @@ namespace KS2Drive.FS
                     //Seems that we get Conflict response when the folder cannot be created
                     //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
                     DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_ACCESS_DENIED" });
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (HttpRequestException ex)
                 {
                     DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_NETWORK_UNREACHABLE" });
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_CANNOT_MAKE" });
                     DebugEnd(OperationId, null, $"STATUS_CANNOT_MAKE - {ex.Message}");
                     return STATUS_CANNOT_MAKE;
                 }
                 catch (Exception ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_ACCESS_DENIED" });
                     DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
@@ -550,6 +559,7 @@ namespace KS2Drive.FS
                     }
                     else
                     {
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_CANNOT_MAKE" });
                         DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
                         return STATUS_CANNOT_MAKE;
                     }
@@ -558,21 +568,25 @@ namespace KS2Drive.FS
                 {
                     //Seems that we get Conflict response when the folder cannot be created
                     //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_ACCESS_DENIED" });
                     DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
                 catch (WebDAVException ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_CANNOT_MAKE" });
                     DebugEnd(OperationId, null, $"STATUS_CANNOT_MAKE - {ex.Message}");
                     return STATUS_CANNOT_MAKE;
                 }
                 catch (HttpRequestException ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_NETWORK_UNREACHABLE" });
                     DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_ACCESS_DENIED" });
                     DebugEnd(OperationId, null, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
@@ -588,6 +602,7 @@ namespace KS2Drive.FS
             NormalizedName = FileName;
 
             DebugEnd(OperationId, CFN, $"STATUS_SUCCESS - Handle {CFN.OpenCount}");
+            RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Create", Fichier = FileName, Resultat = "STATUS_SUCCESS" });
             return STATUS_SUCCESS;
 
             /*
@@ -772,6 +787,7 @@ namespace KS2Drive.FS
                         //Fichier
                         Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
                         DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
@@ -786,6 +802,7 @@ namespace KS2Drive.FS
                         //Répertoire
                         Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
                         DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
@@ -807,6 +824,7 @@ namespace KS2Drive.FS
                             {
                                 if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                                 {
+                                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_FAILED" });
                                     throw new Exception("Upload failed");
                                 }
                             }
@@ -820,6 +838,7 @@ namespace KS2Drive.FS
                         }
                     }
                 }
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
                 DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
             }
 
@@ -1051,7 +1070,7 @@ namespace KS2Drive.FS
                 var Proxy = new WebDavClient2();
                 try
                 {
-                    if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                    if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.LocalPath).GetAwaiter().GetResult())
                     {
                         throw new Exception();
                     }
@@ -1059,6 +1078,7 @@ namespace KS2Drive.FS
                 catch (WebDAVConflictException ex)
                 {
                     Cache.InvalidateFileNode(CFN);
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_ACCESS_DENIED" });
                     DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return STATUS_ACCESS_DENIED;
                 }
@@ -1066,14 +1086,17 @@ namespace KS2Drive.FS
                 {
                     Cache.InvalidateFileNode(CFN);
                     DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_NETWORK_UNREACHABLE" });
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
                     Cache.InvalidateFileNode(CFN);
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_UNEXPECTED_IO_ERROR" });
                     DebugEnd(OperationId, CFN, $"STATUS_UNEXPECTED_IO_ERROR - {ex.Message}");
                     return STATUS_UNEXPECTED_IO_ERROR;
                 }
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
             }
             else
             {
@@ -1150,17 +1173,20 @@ namespace KS2Drive.FS
                 WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(NewFileName);
                 if (KnownRepositoryElement != null && !ReplaceIfExists)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_OBJECT_NAME_COLLISION" });
                     DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
                     return STATUS_OBJECT_NAME_COLLISION;
                 }
             }
             catch (HttpRequestException ex)
             {
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_NETWORK_UNREACHABLE" });
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 return STATUS_NETWORK_UNREACHABLE;
             }
             catch (Exception ex)
             {
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_CANNOT_MAKE" });
                 DebugEnd(OperationId, CFN, $"STATUS_CANNOT_MAKE - {ex.Message}");
                 return FileSystemBase.STATUS_CANNOT_MAKE;
             }
@@ -1172,17 +1198,20 @@ namespace KS2Drive.FS
                 {
                     if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_ACCESS_DENIED" });
                         DebugEnd(OperationId, CFN, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
                     }
                 }
                 catch (HttpRequestException ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_NETWORK_UNREACHABLE" });
                     DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_ACCESS_DENIED" });
                     DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return FileSystemBase.STATUS_ACCESS_DENIED;
                 }
@@ -1194,6 +1223,7 @@ namespace KS2Drive.FS
                 {
                     if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
                     {
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_ACCESS_DENIED" });
                         DebugEnd(OperationId, CFN, "STATUS_ACCESS_DENIED");
                         return STATUS_ACCESS_DENIED;
                     }
@@ -1201,11 +1231,13 @@ namespace KS2Drive.FS
                 }
                 catch (HttpRequestException ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_NETWORK_UNREACHABLE" });
                     DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (Exception ex)
                 {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_ACCESS_DENIED" });
                     DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
                     return FileSystemBase.STATUS_ACCESS_DENIED;
                 }
@@ -1249,6 +1281,7 @@ namespace KS2Drive.FS
                 FileNodeMap.Insert(DescendantFileNode);
             }
             */
+            RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = $"{FileName} -> {NewFileName}", Resultat = "STATUS_SUCCESS" });
             DebugEnd(OperationId, CFN, $"STATUS_SUCCESS. Renamed to {NewFileName}");
             return STATUS_SUCCESS;
         }

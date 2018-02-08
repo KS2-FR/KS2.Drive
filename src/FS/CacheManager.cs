@@ -15,7 +15,7 @@ namespace KS2Drive.FS
 
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private Int32 CacheDurationInSeconds = 30;
+        private Int32 CacheDurationInSeconds = 15;
         private CacheMode _mode;
         private bool _PreLoadFoldersInCache;
 

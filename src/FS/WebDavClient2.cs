@@ -71,21 +71,18 @@ namespace KS2Drive.FS
 
         public new Task<WebDAVClient.Model.Item> GetFile(string remotePath = "/")
         {
-            logger.Trace($"DAV2 GetFile {remotePath}");
             remotePath = ParameterConvert(remotePath);
             return base.GetFile(remotePath);
         }
 
         public new Task<WebDAVClient.Model.Item> GetFolder(string remotePath = "/")
         {
-            logger.Trace($"DAV2 GetFolder {remotePath}");
             remotePath = ParameterConvert(remotePath);
             return base.GetFolder(remotePath);
         }
 
         public new Task<IEnumerable<WebDAVClient.Model.Item>> List(string remotePath = "/", int? depth = 1)
         {
-            logger.Trace($"DAV2 List {remotePath}");
             remotePath = ParameterConvert(remotePath);
             return base.List(remotePath, depth);
         }

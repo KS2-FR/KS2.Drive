@@ -527,20 +527,25 @@ namespace WebDAVClient
 
         private async Task<UriBuilder> GetServerUrl(string path, bool appendTrailingSlash)
         {
-            //logger.Trace($"WEBDAVCLIENT GetServerUrl {path}");
-            UriBuilder ReturnValue;
+            String URL;
 
-            if (path == "/") ReturnValue = new UriBuilder(_server) { Path = _basePath };
-            else ReturnValue = new UriBuilder(_server) { Path = _basePath + path };
+            if (path == "/") URL = _server + _basePath;
+            else if (path.StartsWith(_server)) URL = path;
+            else if (path.StartsWith(_basePath)) URL = _server + _basePath + path.Replace(_basePath, "");
+            else URL = _server + _basePath + (path.StartsWith("/") ? path.Substring(1) : path);
 
-            //logger.Trace($"WEBDAVCLIENT GetServerUrl out {ReturnValue}");
-            return ReturnValue;
+            if (appendTrailingSlash && !URL.EndsWith("/")) URL += "/";
+
+            return new UriBuilder(URL);
+
+            //TODO : Avoid server call for resolving URI
             /*
+            logger.Trace($"WEBDAVCLIENT GetServerUrl {path}");
 
             // Resolve the base path on the server
             if (_encodedBasePath == null)
             {
-                var baseUri = new UriBuilder(_server) {Path = _basePath};
+                var baseUri = new UriBuilder(_server) { Path = _basePath };
                 var root = await Get(baseUri.Uri, null).ConfigureAwait(false);
 
                 _encodedBasePath = root.Href;
@@ -558,7 +563,7 @@ namespace WebDAVClient
                 }
 
                 // Otherwise, use the resolved base path relatively to the server
-                var baseUri = new UriBuilder(_server) {Path = _encodedBasePath};
+                var baseUri = new UriBuilder(_server) { Path = _encodedBasePath };
                 //logger.Trace($"WEBDAVCLIENT GetServerUrl out {baseUri}");
                 return baseUri;
             }
@@ -600,9 +605,10 @@ namespace WebDAVClient
                     baseUri.Path = finalPath;
                 }
 
-                //logger.Trace($"WEBDAVCLIENT GetServerUrl out {baseUri}");
+                logger.Trace($"WEBDAVCLIENT GetServerUrl out {baseUri}");
                 return baseUri;
-                */
+            }
+            */
         }
 
         #endregion

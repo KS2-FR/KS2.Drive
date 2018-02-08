@@ -4,11 +4,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
-        mc:Ignorable="d" Height="130" Width="1260" Closing="Window_Closing" ResizeMode="CanMinimize" Title="KS² Drive - Alpha 5">
+        mc:Ignorable="d" Height="330" Width="1260" Closing="Window_Closing" ResizeMode="CanMinimize" Title="KS² Drive - Alpha 5">
     <DockPanel LastChildFill="True">
         <Menu Grid.Row="0" Grid.ColumnSpan="12" IsMainMenu="True" DockPanel.Dock="Top" Height="20">
             <MenuItem Header="_MENU">
                 <MenuItem Header="_DEBUG" Click="MenuDebug_Click" />
+                <MenuItem Header="_CLEAR LOG" Click="ClearLog_Click" />
                 <MenuItem Header="_OPTIONS" Click="MenuOptions_Click" />
                 <Separator />
                 <MenuItem Header="_EXIT" Click="MenuExit_Click" />
@@ -21,6 +22,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="20"></RowDefinition>
                     <RowDefinition Height="*"></RowDefinition>
+                    <RowDefinition Height="200"></RowDefinition>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="50"/>
@@ -80,6 +82,17 @@
                 <ComboBox Grid.Row="1" Grid.Column="11" x:Name="CBPreloading"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
 
                 <Button Grid.Row="0" Grid.Column="13" x:Name="button1" Content="Mount" Click="button1_Click" Grid.RowSpan="2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Height="50"/>
+
+                <ListView Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="14" x:Name="LogList" local:ListBoxBehavior.ScrollOnNewItem="true" Width="1240">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}" />
+                            <GridViewColumn Header="Action" Width="75" DisplayMemberBinding="{Binding Action}" />
+                            <GridViewColumn Header="Fichier" Width="700" DisplayMemberBinding="{Binding Fichier}" />
+                            <GridViewColumn Header="Resultat" Width="200" DisplayMemberBinding="{Binding Resultat}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
             </Grid>
         </Border>
 
