@@ -90,6 +90,8 @@ namespace KS2Drive.FS
         {
             if (_mode == CacheMode.Disabled) return;
 
+            if (FileNodeCache.ContainsKey(node.LocalPath)) return; //TODO : monitor which condition can lead to this
+
             FileNodeCache.Add(node.LocalPath, node);
             MissingFileCache.Remove(node.LocalPath); //Remove the file from the known missing files list
             CacheRefreshed?.Invoke(this, null);
@@ -164,12 +166,10 @@ namespace KS2Drive.FS
         /// If the folder as not already been parsed, we parse it from the server
         /// If the folder has been parsed, we serve content from the cache and update the cache from the server in a background task. So that we have a refreshed view for next call
         /// </summary>
-        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker, LogWriter l)
+        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker)
         {
             List<FileNode> FileNodeToRefreshList = new List<FileNode>();
             List<Tuple<String, FileNode>> ReturnList = null;
-
-            l.Append("Start GetFolderContent");
 
             if (_mode == CacheMode.Disabled)
             {
@@ -185,9 +185,7 @@ namespace KS2Drive.FS
             {
                 if (!CurrentFolder.IsParsed)
                 {
-                    l.Append("Start Alf request");
                     var Result = ListRemoteServerFolderContent(CurrentFolder);
-                    l.Append("End Alf request");
                     if (!Result.Success) return Result;
 
                     CurrentFolder.IsParsed = true;
@@ -223,7 +221,6 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    l.Append("Start cache read");
                     String FolderNameForSearch = CurrentFolder.LocalPath;
                     if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
                     ReturnList = new List<Tuple<String, FileNode>>();
@@ -231,7 +228,6 @@ namespace KS2Drive.FS
                     //TODO : Add .. from cache
                     ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
                     if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) FileNodeToRefreshList.Add(CurrentFolder); //Refresh current directory if the cache is too old
-                    l.Append("Start end read");
                 }
 
                 //Sort list by path (mandatory if we want to handle a potential marker correctly)
@@ -239,12 +235,10 @@ namespace KS2Drive.FS
 
                 if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
                 {
-                    l.Append("Start marker filter");
                     var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
                     var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
                     if (WantedTupleIndex + 1 < ReturnList.Count) ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
                     else ReturnList.Clear();
-                    l.Append("End marker filter");
                 }
 
                 if (this._PreLoadFoldersInCache)
@@ -262,7 +256,6 @@ namespace KS2Drive.FS
                 AddRefreshTask(FileNodeToRefresh);
             }
 
-            l.Append("End GetFolderContent");
             return (true, ReturnList, null);
         }
 
@@ -309,7 +302,7 @@ namespace KS2Drive.FS
                         //Refresh node with updated properties
                         //TODO : Should moire properties be updated
                         var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
-                        KnownCachedItem.FileInfo = Node.Item2.FileInfo;
+                        if (!KnownCachedItem.HasUnflushedData) KnownCachedItem.FileInfo = Node.Item2.FileInfo;
                     }
                 }
 

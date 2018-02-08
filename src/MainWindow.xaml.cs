@@ -24,7 +24,15 @@ namespace KS2Drive
         {
             InitializeComponent();
 
-            service.RepositoryActionPerformed += (s1, e1) => { Dispatcher.Invoke(() => ItemsToLog.Add(e1)); };
+            service.RepositoryActionPerformed += (s1, e1) =>
+            {
+                Dispatcher.Invoke(() => ItemsToLog.Add(e1));
+                if (!e1.Resultat.Equals("STATUS_SUCCESS"))
+                {
+                    Dispatcher.Invoke(() => ni.ShowBalloonTip(3000, "KS² Drive", $"L'action {e1.Action} pour le fichier {e1.Fichier} a échoué", System.Windows.Forms.ToolTipIcon.Warning));
+
+                };
+            };
 
             #region Icon
 
@@ -39,7 +47,7 @@ namespace KS2Drive
                                 this.Show();
                                 this.WindowState = WindowState.Normal;
                             };
-            
+
             #endregion
 
             //Get Free drives
@@ -161,7 +169,7 @@ namespace KS2Drive
                 {
                     service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password, (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), Convert.ToInt32(CBKernelCache.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue)));
                 }
-                catch ( Exception ex)
+                catch (Exception ex)
                 {
                     MessageBox.Show(ex.Message);
                     return;
@@ -188,6 +196,8 @@ namespace KS2Drive
                 CBKernelCache.IsEnabled = false;
                 CBPreloading.IsEnabled = false;
                 CBSyncOps.IsEnabled = false;
+
+                ItemsToLog.Clear();
 
                 Process.Start($@"{CBFreeDrives.SelectedValue.ToString()}:\");
             }

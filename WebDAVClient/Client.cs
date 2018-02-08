@@ -536,6 +536,8 @@ namespace WebDAVClient
 
             if (appendTrailingSlash && !URL.EndsWith("/")) URL += "/";
 
+            logger.Trace($"WEBDAVCLIENT GetServerUrl {path} -> {URL}");
+
             return new UriBuilder(URL);
 
             //TODO : Avoid server call for resolving URI
