@@ -681,7 +681,7 @@ namespace KS2Drive.FS
 
             if (this.FlushMode == FlushMode.FlushAtCleanup)
             {
-                if (CFN.HasUnflushedData)
+                if (CFN.HasUnflushedData && CFN.FileData != null)
                 {
                     try
                     {
@@ -765,7 +765,7 @@ namespace KS2Drive.FS
             }
             else
             {
-                if (this.FlushMode == FlushMode.FlushAtCleanup)
+                if (this.FlushMode == FlushMode.FlushAtCleanup && CFN.FileData != null)
                 {
                     if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
                     {
@@ -1101,7 +1101,6 @@ namespace KS2Drive.FS
             String NewFileName,
             Boolean ReplaceIfExists)
         {
-
             FileNode CFN = (FileNode)FileNode0;
 
             String OperationId = Guid.NewGuid().ToString();

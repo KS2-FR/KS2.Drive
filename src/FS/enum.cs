@@ -8,8 +8,8 @@ namespace KS2Drive.FS
 {
     public enum FlushMode
     {
-        FlushAtWrite,
-        FlushAtCleanup
+        FlushAtWrite = 0,
+        FlushAtCleanup =1
     }
 
     public enum WebDAVMode

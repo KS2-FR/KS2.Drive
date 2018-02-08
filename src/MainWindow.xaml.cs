@@ -81,6 +81,12 @@ namespace KS2Drive
             CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.DataAndMetaData, KernelCacheMode.DataAndMetaData.ToString()));
             CBKernelCache.SelectedIndex = 0;
 
+            CBFlush.SelectedValuePath = "Key";
+            CBFlush.DisplayMemberPath = "Value";
+            CBFlush.Items.Add(new KeyValuePair<int, string>((Int32)FlushMode.FlushAtCleanup, FlushMode.FlushAtCleanup.ToString()));
+            CBFlush.Items.Add(new KeyValuePair<int, string>((Int32)FlushMode.FlushAtWrite, FlushMode.FlushAtWrite.ToString()));
+            CBFlush.SelectedIndex = 0;
+
             CBSyncOps.SelectedValuePath = "Key";
             CBSyncOps.DisplayMemberPath = "Value";
             CBSyncOps.Items.Add(new KeyValuePair<int, string>(0, "No"));
@@ -122,6 +128,12 @@ namespace KS2Drive
             {
                 var SelectedMode = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode.Value));
                 if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = SelectedMode;
+            }
+
+            if (this.AppConfiguration.FlushMode.HasValue)
+            {
+                var SelectedMode = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.FlushMode.Value));
+                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBFlush.SelectedItem = SelectedMode;
             }
 
             if (this.AppConfiguration.SyncOps.HasValue)
@@ -167,7 +179,15 @@ namespace KS2Drive
 
                 try
                 {
-                    service.Mount(CBFreeDrives.SelectedValue.ToString(), txtURL.Text, (Int32)CBMode.SelectedValue, txtLogin.Text, txtPassword.Password, (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), Convert.ToInt32(CBKernelCache.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue)), Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue)));
+                    service.Mount(CBFreeDrives.SelectedValue.ToString(), 
+                        txtURL.Text, 
+                        (Int32)CBMode.SelectedValue, 
+                        txtLogin.Text, 
+                        txtPassword.Password,
+                        (FlushMode)Enum.ToObject(typeof(FlushMode), Convert.ToInt32(CBFlush.SelectedValue)),
+                        (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), Convert.ToInt32(CBKernelCache.SelectedValue)), 
+                        Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue)), 
+                        Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue)));
                 }
                 catch (Exception ex)
                 {
@@ -184,6 +204,7 @@ namespace KS2Drive
                 this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
                 this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
                 this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
+                this.AppConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
                 this.AppConfiguration.Save();
 
                 button1.Content = "Unmount";
@@ -194,6 +215,7 @@ namespace KS2Drive
                 CBMode.IsEnabled = false;
                 CBFreeDrives.IsEnabled = false;
                 CBKernelCache.IsEnabled = false;
+                CBFlush.IsEnabled = false;
                 CBPreloading.IsEnabled = false;
                 CBSyncOps.IsEnabled = false;
 
@@ -215,6 +237,7 @@ namespace KS2Drive
                 CBKernelCache.IsEnabled = true;
                 CBPreloading.IsEnabled = true;
                 CBSyncOps.IsEnabled = true;
+                CBFlush.IsEnabled = true;
             }
         }
 

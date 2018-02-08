@@ -20,9 +20,9 @@ namespace KS2Drive
         {
         }
 
-        public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password, KernelCacheMode KernelMode, bool SyncOps, bool PreLoadFolders)
+        public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password, FlushMode FlushMode, KernelCacheMode KernelMode, bool SyncOps, bool PreLoadFolders)
         {
-            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode.FlushAtCleanup, KernelMode, Login, Password, PreLoadFolders);
+            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode, KernelMode, Login, Password, PreLoadFolders);
             davFs.RepositoryActionPerformed += (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
 
             Host = new FileSystemHost(davFs);

@@ -47,6 +47,7 @@ namespace KS2Drive
         public String ServerLogin { get; set; }
         public String ServerPassword { get; set; }
         public Int32? KernelCacheMode { get; set; }
+        public Int32? FlushMode { get; set; }
         public bool? SyncOps { get; set; }
         public bool? PreLoading { get; set; }
         public bool? AllowDirtyRead { get; set; }
