@@ -681,14 +681,17 @@ namespace KS2Drive.FS
 
             if (this.FlushMode == FlushMode.FlushAtCleanup)
             {
-                if (CFN.HasUnflushedData && CFN.FileData != null)
+                if (CFN.HasUnflushedData)
                 {
                     try
                     {
-                        var Proxy = new WebDavClient2();
-                        if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
+                        if (CFN.FileData != null)
                         {
-                            throw new Exception("Upload failed");
+                            var Proxy = new WebDavClient2();
+                            if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
+                            {
+                                throw new Exception("Upload failed");
+                            }
                         }
                         CFN.HasUnflushedData = false;
                         RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
@@ -765,18 +768,21 @@ namespace KS2Drive.FS
             }
             else
             {
-                if (this.FlushMode == FlushMode.FlushAtCleanup && CFN.FileData != null)
+                if (this.FlushMode == FlushMode.FlushAtCleanup)
                 {
                     if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
                     {
+                        var Proxy = new WebDavClient2();
                         if (CFN.HasUnflushedData)
                         {
-                            var Proxy = new WebDavClient2();
                             try
                             {
-                                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
+                                if (CFN.FileData != null)
                                 {
-                                    throw new Exception("Upload failed");
+                                    if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
+                                    {
+                                        throw new Exception("Upload failed");
+                                    }
                                 }
                                 CFN.HasUnflushedData = false;
                                 RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
