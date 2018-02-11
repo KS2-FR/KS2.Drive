@@ -58,6 +58,5 @@ namespace KS2Drive
         public bool UseProxyAuthentication { get; set; }
         public String ProxyLogin { get; set; }
         public String ProxyPassword { get; set; }
-
     }
 }

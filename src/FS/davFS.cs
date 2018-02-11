@@ -76,7 +76,7 @@ namespace KS2Drive.FS
             {
                 throw new Exception($"Impossible de se connecter au serveur : {ex.Message}");
             }
-        } 
+        }
 
         /// <summary>
         /// Defini les paramétres généraux du systéme de fichiers

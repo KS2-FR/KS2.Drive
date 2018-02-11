@@ -49,7 +49,7 @@ namespace WebDAVClient
 
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private string _encodedBasePath;
+        //private string _encodedBasePath;
 
         #region WebDAV connection parameters
 
@@ -423,7 +423,8 @@ namespace WebDAVClient
             var response = await HttpRequest(srcUri, MoveMethod, headers, Encoding.UTF8.GetBytes(requestContent)).ConfigureAwait(false);
 
             if (response.StatusCode != HttpStatusCode.OK &&
-                response.StatusCode != HttpStatusCode.Created)
+                response.StatusCode != HttpStatusCode.Created &&
+                response.StatusCode != HttpStatusCode.NoContent)
             {
                 throw new WebDAVException((int)response.StatusCode, "Failed moving file.");
             }
@@ -536,7 +537,7 @@ namespace WebDAVClient
 
             if (appendTrailingSlash && !URL.EndsWith("/")) URL += "/";
 
-            logger.Trace($"WEBDAVCLIENT GetServerUrl {path} -> {URL}");
+            //logger.Trace($"WEBDAVCLIENT GetServerUrl {path} -> {URL}");
 
             return new UriBuilder(URL);
 
