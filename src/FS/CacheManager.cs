@@ -149,6 +149,17 @@ namespace KS2Drive.FS
             }
         }
 
+        public void DeleteFileEntry(String EntryCode)
+        {
+            if (_mode == CacheMode.Disabled) return;
+
+            lock (CacheLock)
+            {
+                FileNodeCache.Remove(EntryCode);
+                CacheRefreshed?.Invoke(this, null);
+            }
+        }
+
         public void InvalidateFileNode(FileNode node)
         {
             if (_mode == CacheMode.Disabled) return;

@@ -71,7 +71,7 @@ namespace KS2Drive
             CBMode.SelectedValuePath = "Key";
             CBMode.DisplayMemberPath = "Value";
             CBMode.Items.Add(new KeyValuePair<int, string>(0, "webDAV"));
-            CBMode.Items.Add(new KeyValuePair<int, string>(1, "AOS"));
+            //CBMode.Items.Add(new KeyValuePair<int, string>(1, "AOS")); //TEMP
             CBMode.SelectedIndex = 0;
 
             CBKernelCache.SelectedValuePath = "Key";

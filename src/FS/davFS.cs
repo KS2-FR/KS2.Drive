@@ -744,9 +744,11 @@ namespace KS2Drive.FS
                         Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
                         RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
+                        DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
                     catch (Exception ex)
                     {
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_FAILED" });
                         DebugEnd(OperationId, CFN, $"Exception : {ex.Message}");
                     }
                 }
@@ -762,6 +764,7 @@ namespace KS2Drive.FS
                     }
                     catch (Exception ex)
                     {
+                        RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_FAILED" });
                         DebugEnd(OperationId, CFN, $"Exception : {ex.Message}");
                     }
                 }
@@ -1122,10 +1125,28 @@ namespace KS2Drive.FS
             try
             {
                 WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(NewFileName);
-                if (KnownRepositoryElement != null && !ReplaceIfExists)
+                if (KnownRepositoryElement != null)
                 {
-                    DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
-                    return STATUS_OBJECT_NAME_COLLISION;
+                    if (!ReplaceIfExists)
+                    {
+                        DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
+                        return STATUS_OBJECT_NAME_COLLISION;
+                    }
+                    else
+                    {
+                        /*
+                        if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
+                        {
+                            Proxy.DeleteFile(FileNode.ConvertLocalPathToRepositoryPath(NewFileName));
+                            Cache.DeleteFileEntry(NewFileName);
+                        }
+                        else
+                        {
+                            DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
+                            return STATUS_OBJECT_NAME_COLLISION;
+                        }
+                        */
+                    }
                 }
             }
             catch (HttpRequestException ex)
