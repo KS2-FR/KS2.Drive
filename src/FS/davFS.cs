@@ -1134,8 +1134,7 @@ namespace KS2Drive.FS
                     }
                     else
                     {
-                        /*
-                        if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
+                        if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0 && WebDAVMode == WebDAVMode.AOS)
                         {
                             Proxy.DeleteFile(FileNode.ConvertLocalPathToRepositoryPath(NewFileName));
                             Cache.DeleteFileEntry(NewFileName);
@@ -1145,7 +1144,6 @@ namespace KS2Drive.FS
                             DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
                             return STATUS_OBJECT_NAME_COLLISION;
                         }
-                        */
                     }
                 }
             }
