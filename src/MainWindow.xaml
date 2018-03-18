@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
-        mc:Ignorable="d" Height="330" Width="1370" Closing="Window_Closing" ResizeMode="CanMinimize" Title="KS² Drive - Alpha 6">
+        mc:Ignorable="d" Height="330" Width="1370" Closing="Window_Closing" ResizeMode="CanMinimize" Title="KS² Drive - Alpha 7">
     <DockPanel LastChildFill="True">
         <Menu Grid.Row="0" Grid.ColumnSpan="12" IsMainMenu="True" DockPanel.Dock="Top" Height="20">
             <MenuItem Header="_MENU">

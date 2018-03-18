@@ -743,6 +743,7 @@ namespace KS2Drive.FS
                         //Fichier
                         Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
+                        //CFN.IsDeleted = true;
                         RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
                         DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
@@ -759,6 +760,7 @@ namespace KS2Drive.FS
                         //Répertoire
                         Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
                         Cache.DeleteFileNode(CFN);
+                        //CFN.IsDeleted = true;
                         RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Delete", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
                         DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Delete");
                     }
@@ -769,38 +771,46 @@ namespace KS2Drive.FS
                     }
                 }
             }
-            else
+            else if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
             {
                 if (this.FlushMode == FlushMode.FlushAtCleanup)
                 {
-                    if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
+                    /*if (!CFN.IsDeleted)
+                    {*/
+                    var Proxy = new WebDavClient2();
+                    if (CFN.HasUnflushedData)
                     {
-                        var Proxy = new WebDavClient2();
-                        if (CFN.HasUnflushedData)
+                        try
                         {
-                            try
+                            if (CFN.FileData != null)
                             {
-                                if (CFN.FileData != null)
+                                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                                 {
-                                    if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
-                                    {
-                                        throw new Exception("Upload failed");
-                                    }
+                                    throw new Exception("Upload failed");
                                 }
-                                CFN.HasUnflushedData = false;
-                                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
-                                DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                             }
-                            catch (Exception ex)
-                            {
-                                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_FAILED" });
-                                DebugEnd(OperationId, CFN, ex.Message);
-                                //TODO : Remove from Cache ??
-                                return;
-                            }
+                            CFN.HasUnflushedData = false;
+                            RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
+                            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+                        }
+                        catch (Exception ex)
+                        {
+                            RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Update", Fichier = CFN.LocalPath, Resultat = "STATUS_FAILED" });
+                            DebugEnd(OperationId, CFN, ex.Message);
+                            //TODO : Remove from Cache ??
+                            return;
                         }
                     }
+                    /*}*/
                 }
+                else
+                {
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Cleanup 2", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
+                }
+            }
+            else
+            {
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Action = "Cleanup 1", Fichier = CFN.LocalPath, Resultat = "STATUS_SUCCESS" });
             }
 
             /*

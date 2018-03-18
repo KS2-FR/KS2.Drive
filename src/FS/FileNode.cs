@@ -30,11 +30,11 @@ namespace KS2Drive.FS
         [JsonIgnore]
         public Byte[] FileData;
 
-        public bool IsCreationPending { get; set; } = false;
         public bool HasUnflushedData { get; set; } = false;
         public DateTime LastRefresh { get; set; }
 
-        public bool IsParsed;
+        public bool IsParsed = false;
+        //public bool IsDeleted = false;
 
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
