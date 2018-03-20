@@ -279,6 +279,7 @@ namespace KS2Drive
     public class LogListItem
     {
         public String Date { get; set; }
+        public String Object { get; set; }
         public String Action { get; set; }
         public String Fichier { get; set; }
         public String Resultat { get; set; }

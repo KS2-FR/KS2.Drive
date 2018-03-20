@@ -91,7 +91,8 @@
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}" />
-                            <GridViewColumn Header="Action" Width="75" DisplayMemberBinding="{Binding Action}" />
+                            <GridViewColumn Header="Object" Width="50" DisplayMemberBinding="{Binding Object}" />
+                            <GridViewColumn Header="Action" Width="100" DisplayMemberBinding="{Binding Action}" />
                             <GridViewColumn Header="Fichier" Width="700" DisplayMemberBinding="{Binding Fichier}" />
                             <GridViewColumn Header="Resultat" Width="200" DisplayMemberBinding="{Binding Resultat}" />
                         </GridView>

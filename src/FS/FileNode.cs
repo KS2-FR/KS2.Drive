@@ -13,6 +13,8 @@ namespace KS2Drive.FS
 {
     public class FileNode
     {
+        public object OperationLock = new object();
+
         [JsonIgnore]
         private static Int32 _handle = 0;
         [JsonIgnore]
@@ -34,7 +36,7 @@ namespace KS2Drive.FS
         public DateTime LastRefresh { get; set; }
 
         public bool IsParsed = false;
-        //public bool IsDeleted = false;
+        public bool IsDeleted = false;
 
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
