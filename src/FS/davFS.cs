@@ -734,7 +734,6 @@ namespace KS2Drive.FS
 
             lock (CFN.OperationLock)
             {
-
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
@@ -879,7 +878,6 @@ namespace KS2Drive.FS
 
             lock (CFN.OperationLock)
             {
-
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
@@ -1140,7 +1138,6 @@ namespace KS2Drive.FS
 
             lock (CFN.OperationLock)
             {
-
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 

@@ -8,6 +8,8 @@ using System.Threading;
 using System.Windows;
 using System.Linq;
 using System.Collections.ObjectModel;
+using System.Text;
+
 
 namespace KS2Drive
 {
@@ -273,6 +275,33 @@ namespace KS2Drive
         private void ClearLog_Click(object sender, RoutedEventArgs e)
         {
             ItemsToLog.Clear();
+        }
+
+        private void Export_Click(object sender, RoutedEventArgs e)
+        {
+            StringBuilder SB = new StringBuilder();
+            foreach(var I in ItemsToLog)
+            {
+                SB.AppendLine($"{I.Date};{I.Object};{I.Action};{I.Fichier};{I.Resultat};");
+            }
+
+            System.Windows.Forms.SaveFileDialog SFD = new System.Windows.Forms.SaveFileDialog();
+            SFD.Filter = "CSV File|*.csv";
+            SFD.Title = "Save a CSV File";
+            SFD.FileName = "LogExport.csv";
+            SFD.ShowDialog();
+
+            if(!String.IsNullOrEmpty(SFD.FileName))
+            {
+                try
+                {
+                    File.WriteAllText(SFD.FileName, SB.ToString());
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+            }
         }
     }
 

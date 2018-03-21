@@ -9,6 +9,7 @@
         <Menu Grid.Row="0" Grid.ColumnSpan="12" IsMainMenu="True" DockPanel.Dock="Top" Height="20">
             <MenuItem Header="_MENU">
                 <MenuItem Header="_DEBUG" Click="MenuDebug_Click" />
+                <MenuItem Header="_EXPORT LOG" Click="Export_Click" />
                 <MenuItem Header="_CLEAR LOG" Click="ClearLog_Click" />
                 <MenuItem Header="_OPTIONS" Click="MenuOptions_Click" />
                 <Separator />
