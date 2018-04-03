@@ -1,9 +1,8 @@
 # KS2.Drive
-This software allows you to mount a webDAV / AOS server as if it was a local HDD.<br/>
+This software allows you to mount a webDAV / AOS server as a local HDD.<br/>
 It is similar to what webdrive© or netdrive© do.
 
 The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.
-
 
 Usage :
 - Install the latest release of WinFSP (https://github.com/billziss-gh/winfsp/releases). Currently WinFsp 2017.2
