@@ -16,9 +16,9 @@ Usage :
 
 Important note:
 This a an alpha release, there is still lot of work to be done.<br/>
-Basic operations (open / read/ write / delete / move) are working<br/>
+Nevertheless, basic operations (open / read/ write / delete / move) are working<br/>
 Currently, the focus is made on speed improvement and reliability.
-Next will be the implementation of a better UI (including multi-drive mounting)
+Next will be the implementation of a better UI (including multi-drive mounting) and maybe also multi-protocol.
 
 Note :
 AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
