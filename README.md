@@ -18,7 +18,9 @@ Usage :
 
 Note :
 AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
-Master branch is based on the alpha channel
+Master branch is based on the beta channel
+Next version will implement a retry-on-error mechanism.
+
 <br/>
 <br/>
 <br/>
