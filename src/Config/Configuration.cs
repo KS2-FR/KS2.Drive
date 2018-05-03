@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KS2Drive
+namespace KS2Drive.Config
 {
     public class Configuration
     {
@@ -24,12 +24,12 @@ namespace KS2Drive
                 }
                 catch
                 {
-                    return new Configuration() { UseHTTPProxy = false, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
+                    return new Configuration() { IsConfigured = false, UseHTTPProxy = false, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
                 }
             }
             else
             {
-                return new Configuration() { UseHTTPProxy = false, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
+                return new Configuration() { IsConfigured = false, UseHTTPProxy = false, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
             }
         }
 
@@ -38,8 +38,13 @@ namespace KS2Drive
             File.WriteAllText(Path, Tools.Protect(JsonConvert.SerializeObject(this)));
         }
 
+        [JsonIgnore]
+        public bool IsConfigured { get; set; } = true;
+
+        //Startup
         public bool AutoMount { get; set; }
-        
+        public bool AutoStart { get; set; }
+
         //Drive Parameter
         public String DriveLetter { get; set; }
         public String ServerURL { get; set; }
@@ -50,7 +55,6 @@ namespace KS2Drive
         public Int32? FlushMode { get; set; }
         public bool? SyncOps { get; set; }
         public bool? PreLoading { get; set; }
-        public bool? AllowDirtyRead { get; set; }
 
         //Proxy
         public bool UseHTTPProxy { get; set; }

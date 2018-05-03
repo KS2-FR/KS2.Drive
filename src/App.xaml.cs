@@ -1,4 +1,5 @@
 ﻿//using KS2Drive.Log;
+using KS2Drive.Config;
 using Newtonsoft.Json;
 using NLog.LayoutRenderers;
 using System;
@@ -18,8 +19,11 @@ namespace KS2Drive
         public Configuration AppConfiguration { get; set; }
         public String ConfigurationFolderPath { get; set; }
         public String ConfigurationFilePath { get; set; }
+
         public App()
         {
+            #region Loading configuration
+
             this.ConfigurationFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KS2Drive");
             if (!Directory.Exists(ConfigurationFolderPath))
             {
@@ -38,6 +42,8 @@ namespace KS2Drive
             this.AppConfiguration = Configuration.Load(ConfigurationFilePath);
 
             Tools.LoadProxy(this.AppConfiguration);
+
+            #endregion
 
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
         }

@@ -1,0 +1,65 @@
+﻿<Control:MetroWindow
+    xmlns:Control="http://metro.mahapps.com/winfx/xaml/controls" x:Class="KS2Drive.About.About"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="clr-namespace:KS2Drive.About"
+    mc:Ignorable="d"
+    Title="About" Height="700" Width="700" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico" WindowStartupLocation="CenterScreen">
+    <Grid>
+        <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
+            <FlowDocument>
+                <Paragraph FontSize="30" Margin="0">KS² Drive - Beta 1</Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a webDAV / AOS server as a local drive.</Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.</Paragraph>
+
+                <Paragraph FontSize="24" Margin="0,30,0,0">Usage</Paragraph>
+
+                <List MarkerStyle="Box" >
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">
+                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the latest release of WinFSP</Hyperlink>. Currently WinFsp 2017.2</Paragraph>
+                        
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">
+                            <Hyperlink NavigateUri="https://ci.appveyor.com/api/projects/FrKaram/ks2-drive/artifacts/src/bin/KS2Drive.zip" RequestNavigate="Hyperlink_RequestNavigate">Download the lastest build of KS² Drive</Hyperlink>
+                            </Paragraph>
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Run KS2Drive.exe</Paragraph>
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Right-click on the icon loaded in the notification area and select "CONFIGURE"</Paragraph>
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Enter the Webdav/AOS URL of the server</Paragraph>
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Select the protocol (Webdav or AOS)</Paragraph>
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Enter your credentials</Paragraph>
+                    </ListItem>
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Hit "SAVE"</Paragraph>
+                    </ListItem>                    
+                    <ListItem>
+                        <Paragraph TextAlignment="Left" FontSize="14">Right-click on the icon loaded in the notification area and select "MOUNT"</Paragraph>
+                    </ListItem>
+                </List>
+
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray" Margin="0,60,0,0">Based on WinFSP by Bill Zissimopoulos :
+                    <Hyperlink NavigateUri="http://www.secfs.net/winfsp" RequestNavigate="Hyperlink_RequestNavigate">http://www.secfs.net/winfsp</Hyperlink></Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">Based on the WebdavClient library by Sagui Itay:
+                    <Hyperlink NavigateUri="https://github.com/saguiitay/WebDAVClient" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/saguiitay/WebDAVClient</Hyperlink></Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">This software is under GPLV3.
+                    <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink></Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12">More information on KS² : 
+                    <Hyperlink NavigateUri="http://www.ks2.fr" IsEnabled="True" RequestNavigate="Hyperlink_RequestNavigate">http://www.ks2.fr</Hyperlink>
+                </Paragraph>
+            </FlowDocument>
+        </RichTextBox>
+    </Grid>
+</Control:MetroWindow>
