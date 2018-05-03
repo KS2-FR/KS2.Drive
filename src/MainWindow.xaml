@@ -1,106 +1,41 @@
-﻿<Window x:Class="KS2Drive.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:KS2Drive"
-        mc:Ignorable="d" Height="330" Width="1370" Closing="Window_Closing" ResizeMode="CanMinimize" Title="KS² Drive - Alpha 7">
-    <DockPanel LastChildFill="True">
-        <Menu Grid.Row="0" Grid.ColumnSpan="12" IsMainMenu="True" DockPanel.Dock="Top" Height="20">
-            <MenuItem Header="_MENU">
-                <MenuItem Header="_DEBUG" Click="MenuDebug_Click" />
-                <MenuItem Header="_EXPORT LOG" Click="Export_Click" />
-                <MenuItem Header="_CLEAR LOG" Click="ClearLog_Click" />
-                <MenuItem Header="_OPTIONS" Click="MenuOptions_Click" />
-                <Separator />
-                <MenuItem Header="_EXIT" Click="MenuExit_Click" />
-            </MenuItem>
-        </Menu>
-
-        <Border BorderThickness="1" BorderBrush="Gainsboro">
-
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="20"></RowDefinition>
-                    <RowDefinition Height="*"></RowDefinition>
-                    <RowDefinition Height="200"></RowDefinition>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="50"/>
-                    <ColumnDefinition Width="450"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">Letter</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">URL</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">Type</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center">Login</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="5" HorizontalAlignment="Center" VerticalAlignment="Center">Password</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="7" HorizontalAlignment="Center" VerticalAlignment="Center">Kernel Cache</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="9" HorizontalAlignment="Center" VerticalAlignment="Center">Sync ops</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="11" HorizontalAlignment="Center" VerticalAlignment="Center">Pre-Loading</TextBlock>
-                <TextBlock Grid.Row="0" Grid.Column="13" HorizontalAlignment="Center" VerticalAlignment="Center">FlushMode</TextBlock>
-
-                <ComboBox Grid.Row="1" Grid.Column="0" x:Name="CBFreeDrives" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL">
-                    <TextBox.Style>
-                        <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
-                            <Style.Resources>
-                                <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
-                                    <VisualBrush.Visual>
-                                        <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
-                                    </VisualBrush.Visual>
-                                </VisualBrush>
-                            </Style.Resources>
-                            <Style.Triggers>
-                                <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
-                                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
-                                </Trigger>
-                                <Trigger Property="Text" Value="{x:Null}">
-                                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
-                                </Trigger>
-                                <Trigger Property="IsKeyboardFocused" Value="True">
-                                    <Setter Property="Background" Value="White" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBox.Style>
-                </TextBox>
-                <ComboBox Grid.Row="1" Grid.Column="2" x:Name="CBMode"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="1" Grid.Column="3" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
-                <PasswordBox Grid.Row="1" Grid.Column="5" Height="20" VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
-                <ComboBox Grid.Row="1" Grid.Column="7" x:Name="CBKernelCache"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                <ComboBox Grid.Row="1" Grid.Column="9" x:Name="CBSyncOps"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                <ComboBox Grid.Row="1" Grid.Column="11" x:Name="CBPreloading"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                <ComboBox Grid.Row="1" Grid.Column="13" x:Name="CBFlush"  Width="80" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-
-                <Button Grid.Row="0" Grid.Column="15" x:Name="button1" Content="Mount" Click="button1_Click" Grid.RowSpan="2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Height="50"/>
-
-                <ListView Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="16" x:Name="LogList" local:ListBoxBehavior.ScrollOnNewItem="true" Width="1350">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}" />
-                            <GridViewColumn Header="Object" Width="50" DisplayMemberBinding="{Binding Object}" />
-                            <GridViewColumn Header="Action" Width="100" DisplayMemberBinding="{Binding Action}" />
-                            <GridViewColumn Header="Fichier" Width="700" DisplayMemberBinding="{Binding Fichier}" />
-                            <GridViewColumn Header="Resultat" Width="200" DisplayMemberBinding="{Binding Resultat}" />
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </Grid>
-        </Border>
-
-    </DockPanel>
-</Window>
+﻿<Control:MetroWindow
+    xmlns:Control="http://metro.mahapps.com/winfx/xaml/controls" x:Class="KS2Drive.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="clr-namespace:KS2Drive"
+    mc:Ignorable="d" Height="430" Width="1370" ResizeMode="NoResize" Title="KS² Drive">
+    <Window.Resources>
+        <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
+            <MenuItem Header="_MOUNT" Click="MenuMount_Click"/>
+            <MenuItem Header="_LOG" Click="MenuLog_Click" />
+            <MenuItem Header="_CONFIGURE" Click="MenuConfigure_Click" />
+            <MenuItem Header="_ABOUT" Click="MenuAbout_Click" />
+            <MenuItem Header="_EXIT" Click="MenuExit_Click"/>
+        </ContextMenu>
+    </Window.Resources>
+    <Grid Margin="5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition Height="35"></RowDefinition>
+        </Grid.RowDefinitions>
+        <ListView Grid.Row="0" Grid.Column="0" x:Name="LogList" local:ListBoxBehavior.ScrollOnNewItem="true" Width="1350" BorderThickness="1" BorderBrush="Gray">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}" />
+                    <GridViewColumn Header="Object" Width="50" DisplayMemberBinding="{Binding Object}" />
+                    <GridViewColumn Header="Action" Width="100" DisplayMemberBinding="{Binding Action}" />
+                    <GridViewColumn Header="Fichier" Width="700" DisplayMemberBinding="{Binding Fichier}" />
+                    <GridViewColumn Header="Resultat" Width="200" DisplayMemberBinding="{Binding Resultat}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal">
+            <Button x:Name="bt_ClearLog" Width="150" Margin="5" Click="bt_ClearLog_Click">Clear log</Button>
+            <Button x:Name="bt_ExportLog" Width="150" Margin="5" Click="bt_ExportLog_Click">Export log</Button>
+        </StackPanel>
+        
+    </Grid>
+    
+</Control:MetroWindow>

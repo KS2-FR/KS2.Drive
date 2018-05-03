@@ -1,6 +1,6 @@
 ﻿using Fsp;
-using KS2Drive.Debug;
 using KS2Drive.FS;
+using KS2Drive.Log;
 using System;
 using System.IO;
 using System.Threading;
@@ -52,15 +52,15 @@ namespace KS2Drive
             }
         }
 
+        /*
         public void ShowDebug()
         {
-            /*
             if (DebugTread != null && DebugTread.IsAlive) return;
 
             DebugWindow = new DebugView(davFs);
             DebugTread = new Thread(() => Application.Run(DebugWindow));
             DebugTread.Start();
-            */
         }
+        */
     }
 }

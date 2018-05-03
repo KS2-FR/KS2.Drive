@@ -18,7 +18,7 @@ namespace KS2Drive.FS
         AOS = 1
     }
 
-    //Windows Kernel Cache management
+    //From WinFPS documentation : Windows Kernel Cache management
     //An infinite FileInfoTimeout, which enables caching of metadata and data.
     //A FileInfoTimeout of 1s(second), which enables caching of metadata but disables caching of data.
     //A FileInfoTimeout of 0, which completely disables caching.

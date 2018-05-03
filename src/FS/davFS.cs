@@ -17,13 +17,14 @@ using System.Net.Http;
 using Newtonsoft.Json;
 using System.Text;
 using System.Diagnostics;
+using KS2Drive.Log;
 
 namespace KS2Drive.FS
 {
     public class DavFS : FileSystemBase
     {
-        public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
-        public event EventHandler DebugMessagePosted;
+        //public ConcurrentQueue<DebugMessage> DebugMessageQueue = new ConcurrentQueue<DebugMessage>();
+        //public event EventHandler DebugMessagePosted;
         public event EventHandler<LogListItem> RepositoryActionPerformed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -1634,24 +1635,30 @@ namespace KS2Drive.FS
 
         private void DebugStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
+            /*
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, FileNode = CFN, OperationId = OperationId, Path = CFN.LocalPath, Caller = Caller });
             DebugMessagePosted?.Invoke(null, null);
             //logger.Trace($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
+            */
         }
 
         private void DebugStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
+            /*
             DebugMessageQueue.Enqueue(new DebugMessage() { MessageType = 0, date = DateTime.Now, OperationId = OperationId, Path = FileName, Caller = Caller });
             DebugMessagePosted?.Invoke(null, null);
             //logger.Trace($"{OperationId}|{Caller}|Start|{FileName}");
+            */
         }
 
         private void DebugEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
+            /*
             DebugMessageQueue.Enqueue(new DebugMessage() { FileNode = CFN, MessageType = 1, date = DateTime.Now, OperationId = OperationId, Result = Result });
             DebugMessagePosted?.Invoke(null, null);
             //logger.Trace($"{OperationId}|{Caller}|End|{Result}"); /*|{JsonConvert.SerializeObject(CFN)}*/
         }
+
 
         //private void DebugMessagePostedEndAsync(IAsyncResult iar)
         //{

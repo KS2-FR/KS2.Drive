@@ -1,0 +1,185 @@
+﻿<Control:MetroWindow
+    xmlns:Control="http://metro.mahapps.com/winfx/xaml/controls" x:Class="KS2Drive.Config.ConfigurationUI"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:KS2Drive"
+        mc:Ignorable="d"
+        Title="Configuration" Height="500" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
+    <Window.Resources>
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <local:MultiBooleanConverter x:Key="MultiBooleanConverter" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition Height="35"></RowDefinition>
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0" Grid.ColumnSpan="2">
+            <TabItem Header="General">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100"></ColumnDefinition>
+                        <ColumnDefinition Width="*"></ColumnDefinition>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">URL</TextBlock>
+                    <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL" >
+                        <TextBox.Style>
+                            <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                                <Style.Resources>
+                                    <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                        <VisualBrush.Visual>
+                                            <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
+                                        </VisualBrush.Visual>
+                                    </VisualBrush>
+                                </Style.Resources>
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                                        <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                    </Trigger>
+                                    <Trigger Property="Text" Value="{x:Null}">
+                                        <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                    </Trigger>
+                                    <Trigger Property="IsKeyboardFocused" Value="True">
+                                        <Setter Property="Background" Value="White" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" >Type</TextBlock>
+                    <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" >Login</TextBlock>
+                    <TextBox Grid.Row="3" Grid.Column="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
+                    <PasswordBox Grid.Row="4" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
+
+                    <CheckBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}"/>
+
+                    <CheckBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" x:Name="chk_AutoStart" Content="Start with windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}"/>
+
+                </Grid>
+
+
+            </TabItem>
+            <TabItem Header="Advanced">
+                <Border BorderThickness="1" BorderBrush="Gainsboro">
+                    <Grid Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"></ColumnDefinition>
+                            <ColumnDefinition Width="*"></ColumnDefinition>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="35"></RowDefinition>
+                            <RowDefinition Height="35"></RowDefinition>
+                            <RowDefinition Height="35"></RowDefinition>
+                            <RowDefinition Height="35"></RowDefinition>
+                            <RowDefinition Height="35"></RowDefinition>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Kernel Cache</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Sync ops</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Pre-Loading</TextBlock>
+                        <TextBlock Grid.Row="3" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">FlushMode</TextBlock>
+
+                        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBKernelCache" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CBSyncOps" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CBPreloading"  HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CBFlush" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </TabItem>
+            <TabItem Header="Proxy">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="9*"/>
+                        <ColumnDefinition Width="191*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="180"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                    </Grid.RowDefinitions>
+
+                    <CheckBox Grid.Row="0" x:Name="checkBox" Content="Use HTTP Proxy" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" IsChecked="{Binding AppConfiguration.UseHTTPProxy, Mode=TwoWay}" Grid.ColumnSpan="2"/>
+
+                    <Border Grid.Row="1" BorderThickness="1" BorderBrush="#FF939090" Margin="11.76,0,20,0" Padding="10" IsEnabled="{Binding AppConfiguration.UseHTTPProxy}" Grid.Column="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="95"></RowDefinition>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"></ColumnDefinition>
+                                <ColumnDefinition Width="*"></ColumnDefinition>
+                            </Grid.ColumnDefinitions>
+
+                            <Label Grid.Row="0" Grid.Column="0" Content="Proxy URL" />
+                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="textBox" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyURL}"/>
+
+                            <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" IsChecked="{Binding AppConfiguration.UseProxyAuthentication, Mode=TwoWay}"/>
+
+                            <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
+                                <Border.IsEnabled>
+                                    <MultiBinding Converter="{StaticResource MultiBooleanConverter}">
+                                        <Binding Path="AppConfiguration.UseHTTPProxy" />
+                                        <Binding Path="AppConfiguration.UseProxyAuthentication" />
+                                    </MultiBinding>
+                                </Border.IsEnabled>
+
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="30"></RowDefinition>
+                                        <RowDefinition Height="30"></RowDefinition>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70"></ColumnDefinition>
+                                        <ColumnDefinition Width="*"></ColumnDefinition>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyLogin}" Margin="5"/>
+
+                                    <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
+                                    <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="PasswordBox_PasswordChanged"/>
+                                </Grid>
+
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+
+        <Button x:Name="bt_Save" Grid.Row="1" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,5,5" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click" Grid.Column="1"></Button>
+
+    </Grid>
+
+</Control:MetroWindow>
