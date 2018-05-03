@@ -97,6 +97,7 @@
     <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />
     <Compile Include="ListboxBehaviour.cs" />
+    <Compile Include="Log\LogListItem.cs" />
     <Compile Include="Tools.cs" />
     <Page Include="About\About.xaml">
       <SubType>Designer</SubType>
@@ -165,9 +166,7 @@
       <Name>WebDAVClient</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Log\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets" Condition="Exists('..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
