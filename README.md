@@ -16,10 +16,7 @@ Usage :
 - Hit "Mount"
 
 Important note:
-This a an alpha release, there is still lot of work to be done.<br/>
-Basic operations (open / read/ write / delete / move) are working<br/>
-Currently, the focus is made on speed improvement and reliability.
-Next will be the implementation of a better UI (including multi-drive mounting)
+This a a beta release with the implementation of a better UI and a "retry on error" mechanism.
 
 Note :
 AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
