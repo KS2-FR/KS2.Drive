@@ -4,6 +4,7 @@ This software allows you to mount a webDAV / AOS server as if it was a local HDD
 It is similar to what webdrive© or netdrive© do.
 
 The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.
+As every WebDAV implementation is different, should you encounter an issue with a specific webDAV server, please report here.
 
 Usage :
 -	Install the latest release of WinFSP (https://github.com/billziss-gh/winfsp/releases). Currently WinFsp 2017.2
@@ -18,10 +19,9 @@ Usage :
 
 Note :
 AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
-Master branch is based on the beta channel
-Next version will implement a retry-on-error mechanism.
+Master branch is based on the beta channel<br/>
+Next version will implement a retry-on-error mechanism.<br/>
 
-<br/>
 <br/>
 <br/>
 
