@@ -20,7 +20,10 @@ Usage :
 Note :
 AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
 Master branch is based on the beta channel<br/>
-Next version will implement a retry-on-error mechanism.<br/>
+
+Next steps :<br/>
+- implement a retry-on-error mechanism.<br/>
+- monitor writes and flushes so that closing the program alerts the user when writes count <> flush count. This can lead to data loss
 
 <br/>
 <br/>
