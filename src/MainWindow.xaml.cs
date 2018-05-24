@@ -99,7 +99,7 @@ namespace KS2Drive
 
             LogList.ItemsSource = ItemsToLog;
 
-            if (this.AppConfiguration.IsConfigured && AppConfiguration.AutoStart)
+            if (this.AppConfiguration.IsConfigured && AppConfiguration.AutoMount)
             {
                 MountDrive();
             }

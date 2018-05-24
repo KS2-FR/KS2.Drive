@@ -15,6 +15,3 @@ namespace KS2Drive.Log
         public String Resultat { get; set; } 
     }
 }
-
-
-
