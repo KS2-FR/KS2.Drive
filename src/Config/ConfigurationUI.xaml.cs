@@ -48,6 +48,7 @@ namespace KS2Drive.Config
             {
                 CBFreeDrives.Items.Add(drive); // add unused drive letters to the combo box
             }
+
             CBFreeDrives.SelectedIndex = 0;
 
             CBMode.SelectedValuePath = "Key";

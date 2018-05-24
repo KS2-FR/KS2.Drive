@@ -128,6 +128,7 @@ namespace KS2Drive
             ItemsToLog.Clear();
             ((MenuItem)AppMenu.Items[0]).Header = "_UNMOUNT";
             IsMounted = true;
+            ((MenuItem)AppMenu.Items[2]).IsEnabled = false;
             Process.Start($@"{this.AppConfiguration.DriveLetter}:\");
         }
 
@@ -136,6 +137,8 @@ namespace KS2Drive
             Service.Unmount();
             ((MenuItem)AppMenu.Items[0]).Header = "_MOUNT";
             IsMounted = false;
+            ((MenuItem)AppMenu.Items[2]).IsEnabled = true;
+            ((MenuItem)AppMenu.Items[2]).ToolTip = null;
         }
 
         protected override void OnStateChanged(EventArgs e)
