@@ -9,6 +9,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -20,8 +21,18 @@ namespace KS2Drive
         public String ConfigurationFolderPath { get; set; }
         public String ConfigurationFilePath { get; set; }
 
+        private Mutex UnicityMutex = null;
+
         public App()
         {
+            bool MutexAcquisitionSuccess = false;
+            UnicityMutex = new Mutex(true, "KS2.Drive", out MutexAcquisitionSuccess);
+            if (!MutexAcquisitionSuccess)
+            {
+                MessageBox.Show("Another instance of this program is already runnning.", "KS² Drive");
+                App.Current.Shutdown();
+            }
+
             #region Loading configuration
 
             this.ConfigurationFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KS2Drive");
@@ -46,6 +57,11 @@ namespace KS2Drive
             #endregion
 
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
+        }
+
+        private void Application_Exit(object sender, ExitEventArgs e)
+        {
+            UnicityMutex?.Dispose();
         }
     }
 }

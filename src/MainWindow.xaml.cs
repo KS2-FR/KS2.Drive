@@ -99,9 +99,15 @@ namespace KS2Drive
 
             LogList.ItemsSource = ItemsToLog;
 
+            Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"KS² Drive has started", System.Windows.Forms.ToolTipIcon.Info));
+
             if (this.AppConfiguration.IsConfigured && AppConfiguration.AutoMount)
             {
                 MountDrive();
+            }
+            else if (!this.AppConfiguration.IsConfigured)
+            {
+                MenuConfigure_Click(this, null);
             }
         }
 

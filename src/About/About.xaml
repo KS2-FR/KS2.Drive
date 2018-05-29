@@ -6,7 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="clr-namespace:KS2Drive.About"
     mc:Ignorable="d"
-    Title="About" Height="700" Width="700" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico" WindowStartupLocation="CenterScreen">
+    Title="KS² Drive - About" Height="700" Width="700" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico" WindowStartupLocation="CenterScreen">
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
