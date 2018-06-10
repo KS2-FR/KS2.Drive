@@ -13,12 +13,13 @@ using System.Windows.Controls;
 using KS2Drive.Config;
 using KS2Drive.Log;
 using MahApps.Metro.Controls;
+using KS2Drive.WinFSP;
 
 namespace KS2Drive
 {
     public partial class MainWindow : MetroWindow
     {
-        private FSPService Service = new FSPService();
+        private FSPService Service;
         private bool IsMounted = false;
         private Thread T;
         private Configuration AppConfiguration;
@@ -73,13 +74,16 @@ namespace KS2Drive
 
             try
             {
+                Service = new FSPService();
                 T = new Thread(() => Service.Run());
                 T.Start();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to start WinFSP Server. Please ensure you have installed version 2017.2. {ex.Message}");
-                this.Close();
+                var MB = new WinFSPUI();
+                MB.ShowDialog();
+                QuitApp();
+                return;
             }
 
             #endregion
@@ -157,7 +161,7 @@ namespace KS2Drive
         {
             AppNotificationIcon.Visible = false;
             AppNotificationIcon.Dispose();
-            Service.Stop();
+            Service?.Stop();
             Application.Current.Shutdown();
         }
 

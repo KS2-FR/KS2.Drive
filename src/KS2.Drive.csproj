@@ -102,6 +102,9 @@
     <Compile Include="ListboxBehaviour.cs" />
     <Compile Include="Log\LogListItem.cs" />
     <Compile Include="Tools.cs" />
+    <Compile Include="WinFSP\WinFSPUI.xaml.cs">
+      <DependentUpon>WinFSPUI.xaml</DependentUpon>
+    </Compile>
     <Page Include="About\About.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -122,6 +125,10 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="Config\ConfigurationUI.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="WinFSP\WinFSPUI.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

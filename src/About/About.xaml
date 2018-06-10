@@ -18,8 +18,7 @@
 
                 <List MarkerStyle="Box" >
                     <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">
-                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the latest release of WinFSP</Hyperlink>. Currently WinFsp 2017.2</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14"><Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the latest release of WinFSP</Hyperlink>. Currently WinFsp 2017.2</Paragraph>
                         
                     </ListItem>
                     <ListItem>
