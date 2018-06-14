@@ -24,12 +24,12 @@ namespace KS2Drive.Config
                 }
                 catch
                 {
-                    return new Configuration() { IsConfigured = false, UseHTTPProxy = false, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
+                    return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
                 }
             }
             else
             {
-                return new Configuration() { IsConfigured = false, UseHTTPProxy = false, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
+                return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
             }
         }
 
@@ -57,7 +57,7 @@ namespace KS2Drive.Config
         public bool? PreLoading { get; set; }
 
         //Proxy
-        public bool UseHTTPProxy { get; set; }
+        public Int16 HTTPProxyMode { get; set; } = 0; //0 = no proxy, 1 = default proxy, 2 = user defined proxy
         public String ProxyURL { get; set; }
         public bool UseProxyAuthentication { get; set; }
         public String ProxyLogin { get; set; }

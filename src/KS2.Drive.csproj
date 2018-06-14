@@ -93,8 +93,8 @@
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
     <Compile Include="Config\Configuration.cs" />
-    <Compile Include="Converters\BooleanToVisibilityConverter.cs" />
-    <Compile Include="Converters\MultiBindingConverter.cs" />
+    <Compile Include="Converters\ProxyCustomAuthActivator.cs" />
+    <Compile Include="Converters\ProxyActivator.cs" />
     <Compile Include="FS\CacheManager.cs" />
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />

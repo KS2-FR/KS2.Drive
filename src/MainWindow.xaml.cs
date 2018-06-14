@@ -78,7 +78,7 @@ namespace KS2Drive
                 T = new Thread(() => Service.Run());
                 T.Start();
             }
-            catch (Exception ex)
+            catch
             {
                 var MB = new WinFSPUI();
                 MB.ShowDialog();
