@@ -43,7 +43,7 @@ namespace KS2Drive.FS
         private String DocumentLibraryPath;
 
         public CacheManager Cache;
-
+        
         public const UInt16 MEMFS_SECTOR_SIZE = 4096;
         public const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
