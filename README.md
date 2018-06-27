@@ -10,10 +10,10 @@ Usage :
 -	Install the 2017.2 release of WinFSP (https://github.com/billziss-gh/winfsp/releases)
 -	Download the lastest build of KS² Drive (https://ci.appveyor.com/api/projects/FrKaram/ks2-drive/artifacts/src/bin/KS2Drive.zip)
 -	Run KS2Drive.exe
--	Configure the server :
-  -	Enter the Webdav/AOS URL of the server
-  -	Select the protocol (Webdav or AOS)
-  -	Enter your credentials
+-	Configure the server :<br/>
+  ->	Enter the Webdav/AOS URL of the server<br/>
+  ->	Select the protocol (Webdav or AOS)<br/>
+  ->	Enter your credentials<br/>
 -	Hit "SAVE"
 -	Right-click on the icon loaded in the notification area and select "MOUNT"
 
