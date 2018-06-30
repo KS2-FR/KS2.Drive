@@ -10,7 +10,7 @@
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
-                <Paragraph FontSize="30" Margin="0">KS² Drive - Beta 1</Paragraph>
+                <Paragraph FontSize="30" Margin="0">KS² Drive - Beta 2</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a webDAV / AOS server as a local drive.</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.</Paragraph>
 
@@ -18,7 +18,9 @@
 
                 <List MarkerStyle="Box" >
                     <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14"><Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the latest release of WinFSP</Hyperlink>. Currently WinFsp 2017.2</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14">
+                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the 2017.2 release of WinFSP</Hyperlink>
+                        </Paragraph>
                         
                     </ListItem>
                     <ListItem>
@@ -30,15 +32,15 @@
                         <Paragraph TextAlignment="Left" FontSize="14">Run KS2Drive.exe</Paragraph>
                     </ListItem>
                     <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">Right-click on the icon loaded in the notification area and select "CONFIGURE"</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14">Configure the server</Paragraph>
                     </ListItem>
-                    <ListItem>
+                    <ListItem Margin="20,0,0,0">
                         <Paragraph TextAlignment="Left" FontSize="14">Enter the Webdav/AOS URL of the server</Paragraph>
                     </ListItem>
-                    <ListItem>
+                    <ListItem Margin="20,0,0,0">
                         <Paragraph TextAlignment="Left" FontSize="14">Select the protocol (Webdav or AOS)</Paragraph>
                     </ListItem>
-                    <ListItem>
+                    <ListItem Margin="20,0,0,0">
                         <Paragraph TextAlignment="Left" FontSize="14">Enter your credentials</Paragraph>
                     </ListItem>
                     <ListItem>

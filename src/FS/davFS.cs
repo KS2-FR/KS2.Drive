@@ -101,6 +101,7 @@ namespace KS2Drive.FS
             Host.ReparsePointsAccessCheck = false;
             Host.NamedStreams = false;
             Host.PostCleanupWhenModifiedOnly = true; //Decide wheither to fire a cleanup message a every Create / open or only if the file was modified
+            //Host.FlushAndPurgeOnCleanup = true;
 
             return STATUS_SUCCESS;
         }
