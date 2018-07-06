@@ -670,6 +670,40 @@
             </param>
             <returns>STATUS_SUCCESS or error code.</returns>
         </member>
+        <member name="M:Fsp.FileSystemBase.Control(System.Object,System.Object,System.UInt32,System.IntPtr,System.UInt32,System.IntPtr,System.UInt32,System.UInt32@)">
+            <summary>
+            Processes a control code.
+            </summary>
+            <remarks>
+            This function is called when a program uses the DeviceIoControl API.
+            </remarks>
+            <param name="FileNode">
+            The file node of the file or directory to be controled.
+            </param>
+            <param name="FileDesc">
+            The file descriptor of the file or directory to be controled.
+            </param>
+            <param name="ControlCode">
+            The control code for the operation. This code must have a DeviceType with bit
+            0x8000 set and must have a TransferType of METHOD_BUFFERED.
+            </param>
+            <param name="InputBuffer">
+            Pointer to a buffer that contains the input data.
+            </param>
+            <param name="InputBufferLength">
+            Input data length.
+            </param>
+            <param name="OutputBuffer">
+             Pointer to a buffer that will receive the output data.
+            </param>
+            <param name="OutputBufferLength">
+            Output data length.
+            </param>
+            <param name="BytesTransferred">
+            Receives the actual number of bytes transferred.
+            </param>
+            <returns>STATUS_SUCCESS or error code.</returns>
+        </member>
         <member name="M:Fsp.FileSystemBase.NtStatusFromWin32(System.UInt32)">
             <summary>
             Converts a Win32 error code to a Windows kernel status code.
@@ -903,6 +937,11 @@
             The debug log file name. A value of "-" means standard error output.
             </param>
             <returns>STATUS_SUCCESS or error code.</returns>
+        </member>
+        <member name="M:Fsp.FileSystemHost.Version">
+            <summary>
+            Return the installed version of WinFsp.
+            </summary>
         </member>
         <member name="T:Fsp.Interop.VolumeInfo">
             <summary>
