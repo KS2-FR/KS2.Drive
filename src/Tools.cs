@@ -27,9 +27,14 @@ namespace KS2Drive
 
         public static void LoadProxy(Configuration C)
         {
-            if (C == null || !C.UseHTTPProxy)
+            if (C == null || C.HTTPProxyMode == 0)
             {
                 WebRequest.DefaultWebProxy = null;
+            }
+            else if (C.HTTPProxyMode == 1)
+            {
+                WebRequest.DefaultWebProxy = WebRequest.GetSystemWebProxy();
+                WebRequest.DefaultWebProxy.Credentials = System.Net.CredentialCache.DefaultCredentials;
             }
             else
             {

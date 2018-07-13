@@ -7,19 +7,15 @@ using System.Windows.Data;
 
 namespace KS2Drive
 {
-    public class MultiBooleanConverter : IMultiValueConverter
+    public class ProxyCustomAuthActivator : IMultiValueConverter
     {
         public object Convert(object[] values,
                                 Type targetType,
                                 object parameter,
                                 System.Globalization.CultureInfo culture)
         {
-            bool Enabled = true;
-            foreach (object value in values)
-                if (value is bool)
-                    Enabled = Enabled && (bool)value;
-
-            return Enabled;
+            if (System.Convert.ToInt32(values[0]) == 2 && (bool)values[1]) return true;
+            return false;
         }
 
         public object[] ConvertBack(object value,

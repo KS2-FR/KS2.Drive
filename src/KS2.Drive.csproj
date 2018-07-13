@@ -93,8 +93,8 @@
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
     <Compile Include="Config\Configuration.cs" />
-    <Compile Include="Converters\BooleanToVisibilityConverter.cs" />
-    <Compile Include="Converters\MultiBindingConverter.cs" />
+    <Compile Include="Converters\ProxyCustomAuthActivator.cs" />
+    <Compile Include="Converters\ProxyActivator.cs" />
     <Compile Include="FS\CacheManager.cs" />
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />
@@ -102,6 +102,9 @@
     <Compile Include="ListboxBehaviour.cs" />
     <Compile Include="Log\LogListItem.cs" />
     <Compile Include="Tools.cs" />
+    <Compile Include="WinFSP\WinFSPUI.xaml.cs">
+      <DependentUpon>WinFSPUI.xaml</DependentUpon>
+    </Compile>
     <Page Include="About\About.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -122,6 +125,10 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="Config\ConfigurationUI.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="WinFSP\WinFSPUI.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

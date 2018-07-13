@@ -5,12 +5,16 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
-        mc:Ignorable="d"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    mc:Ignorable="d"
         Title="KS² Drive - Configuration" Height="500" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
     <Window.Resources>
-        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <local:MultiBooleanConverter x:Key="MultiBooleanConverter" />
-    </Window.Resources>
+        <local:ProxyActivator x:Key="ProxyActivator" />
+        <sys:Int32 x:Key="IntZero">0</sys:Int32>
+        <sys:Int32 x:Key="IntOne">1</sys:Int32>
+        <sys:Int32 x:Key="IntTwo">2</sys:Int32>
+        <local:ProxyCustomAuthActivator x:Key="ProxyCustomAuthActivator" />
+     </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -115,19 +119,17 @@
             </TabItem>
             <TabItem Header="Proxy">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="9*"/>
-                        <ColumnDefinition Width="191*"/>
-                    </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="180"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="35"></RowDefinition>
                         <RowDefinition Height="*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <CheckBox Grid.Row="0" x:Name="checkBox" Content="Use HTTP Proxy" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" IsChecked="{Binding AppConfiguration.UseHTTPProxy, Mode=TwoWay}" Grid.ColumnSpan="2"/>
-
-                    <Border Grid.Row="1" BorderThickness="1" BorderBrush="#FF939090" Margin="11.76,0,20,0" Padding="10" IsEnabled="{Binding AppConfiguration.UseHTTPProxy}" Grid.Column="1">
+                    <RadioButton Grid.Row="0" GroupName="ProxySettings" x:Name="rb_NoProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntZero}, Mode=TwoWay}">No proxy</RadioButton>
+                    <RadioButton Grid.Row="1" GroupName="ProxySettings" x:Name="rb_DefaultProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntOne}, Mode=TwoWay}">Default proxy</RadioButton>
+                    <RadioButton Grid.Row="2" GroupName="ProxySettings" x:Name="rb_CustomProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">Custom proxy</RadioButton>
+                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="25,0,20,0" Padding="10" Grid.Column="1" IsEnabled="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="25"></RowDefinition>
@@ -146,12 +148,11 @@
 
                             <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
                                 <Border.IsEnabled>
-                                    <MultiBinding Converter="{StaticResource MultiBooleanConverter}">
-                                        <Binding Path="AppConfiguration.UseHTTPProxy" />
+                                    <MultiBinding Converter="{StaticResource ProxyCustomAuthActivator}">
+                                        <Binding Path="AppConfiguration.HTTPProxyMode" />
                                         <Binding Path="AppConfiguration.UseProxyAuthentication" />
                                     </MultiBinding>
                                 </Border.IsEnabled>
-
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="30"></RowDefinition>

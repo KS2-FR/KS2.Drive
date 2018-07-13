@@ -151,7 +151,7 @@ namespace KS2Drive.Config
                 return;
             }
 
-            //TODO : Add auto start : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+            //From : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
             RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
             if (chk_AutoStart.IsChecked == true)
             {

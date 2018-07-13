@@ -13,8 +13,6 @@ namespace KS2Drive
         private FileSystemHost Host;
         private DavFS davFs;
         public event EventHandler<LogListItem> RepositoryActionPerformed;
-        //private Thread DebugTread;
-        //private DebugView DebugWindow;
 
         public FSPService() : base("KS2DriveService")
         {
@@ -31,13 +29,6 @@ namespace KS2Drive
 
         public void Unmount()
         {
-            /*
-            if (DebugTread != null && (DebugTread.ThreadState & ThreadState.Running) == ThreadState.Running)
-            {
-                if (DebugWindow.InvokeRequired) DebugWindow.Invoke(new MethodInvoker(() => DebugWindow.Close()));
-                else DebugWindow.Close();
-            }
-            */
             davFs.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
 
             Host.Unmount();
@@ -51,16 +42,5 @@ namespace KS2Drive
                 Unmount();
             }
         }
-
-        /*
-        public void ShowDebug()
-        {
-            if (DebugTread != null && DebugTread.IsAlive) return;
-
-            DebugWindow = new DebugView(davFs);
-            DebugTread = new Thread(() => Application.Run(DebugWindow));
-            DebugTread.Start();
-        }
-        */
     }
 }
