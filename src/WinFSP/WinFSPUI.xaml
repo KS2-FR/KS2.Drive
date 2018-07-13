@@ -9,18 +9,20 @@
         Height="155" Width="500" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False" WindowStyle="None">
 	<StackPanel>
 		<RichTextBox Padding="10" IsReadOnly="True" IsDocumentEnabled="True" BorderThickness="0">
-			<FlowDocument>
-				<Paragraph TextAlignment="Center" FontSize="16">
-					KS² Drive
-				</Paragraph>
-				<Paragraph TextAlignment="Center" FontSize="12">
-					Failed to start WinFSP Service. Please ensure you have installed version 2017.2
-				</Paragraph>
-				<Paragraph TextAlignment="Center"  FontSize="12">
-					<Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases/download/v1.2POST1/winfsp-1.2.17346.msi" RequestNavigate="Hyperlink_RequestNavigate">Click here to download</Hyperlink>
-				</Paragraph>
-			</FlowDocument>
-		</RichTextBox>
+            <FlowDocument>
+                <Paragraph FontSize="16" TextAlignment="Center">
+                    <Run Text="KS² Drive"/>
+                </Paragraph>
+                <Paragraph FontSize="12" TextAlignment="Center">
+                    <Run Text="Failed to start WinFSP Service. Please ensure you have installed version 2018.2 B1"></Run>
+                </Paragraph>
+                <Paragraph FontSize="12" TextAlignment="Center">
+                    <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases/download/v1.2POST1/winfsp-1.2.17346.msi">
+                        <Run Text="Click here to download"/>
+                    </Hyperlink>
+                </Paragraph>
+            </FlowDocument>
+        </RichTextBox>
 
 		<Button Content="Close" Margin="10" Click="Button_Click"></Button>
 	</StackPanel>
