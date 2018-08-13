@@ -1,4 +1,4 @@
-# KS2.Drive - β
+# KS2.Drive
 This software allows you to mount a webDAV / AOS server as if it was a local HDD.<br/>
 
 It is similar to what webdrive© or netdrive© do.
@@ -25,4 +25,4 @@ Master branch is based on the beta channel<br/>
 <br/>
 
 Based on WinFSP by Bill Zissimopoulos (https://github.com/billziss-gh/winfsp)<br/>
-Based on the WebdavClient library by Itay Sagui (https://github.com/saguiitay/WebDAVClient)
+Based on the WebdavClient library by Sagui Itay (https://github.com/saguiitay/WebDAVClient)
