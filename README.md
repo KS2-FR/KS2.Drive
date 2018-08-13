@@ -1,4 +1,4 @@
-# KS2.Drive - β
+# KS2.Drive
 This software allows you to mount a webDAV / AOS server as if it was a local HDD.<br/>
 
 It is similar to what webdrive© or netdrive© do.
