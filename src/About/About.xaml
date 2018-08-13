@@ -29,7 +29,7 @@
                             </Paragraph>
                     </ListItem>
                     <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">Run KS2Drive.exe</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14">Click on the KS2 Drive icon on your desktop</Paragraph>
                     </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Configure the server</Paragraph>
