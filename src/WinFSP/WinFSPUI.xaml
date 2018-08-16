@@ -6,7 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive.WinFSP"
         mc:Ignorable="d" TitlebarHeight="0"
-        Height="155" Width="500" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False" WindowStyle="None">
+        Height="155" Width="530" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False" WindowStyle="None">
 	<StackPanel>
 		<RichTextBox Padding="10" IsReadOnly="True" IsDocumentEnabled="True" BorderThickness="0">
             <FlowDocument>
@@ -14,10 +14,10 @@
                     <Run Text="KS² Drive"/>
                 </Paragraph>
                 <Paragraph FontSize="12" TextAlignment="Center">
-                    <Run Text="Failed to start WinFSP Service. Please ensure you have installed version 2018.2 B1"></Run>
+                    <Run Text="Failed to start WinFSP Service. Please ensure you have installed version 2018.2 B1 or superior"></Run>
                 </Paragraph>
                 <Paragraph FontSize="12" TextAlignment="Center">
-                    <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases/download/v1.2POST1/winfsp-1.2.17346.msi">
+                    <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases">
                         <Run Text="Click here to download"/>
                     </Hyperlink>
                 </Paragraph>

@@ -9,54 +9,55 @@ using System.Threading.Tasks;
 
 namespace KS2Drive.FS
 {
+    /// <summary>
+    /// Handle the file system caching
+    /// </summary>
     public class CacheManager
     {
         public EventHandler CacheRefreshed;
 
-        private static Logger logger = LogManager.GetCurrentClassLogger();
-
-        private Int32 CacheDurationInSeconds = 15;
+        private Int32 CacheDurationInSeconds = 15; //Amount of seconds the information stored in the cache in considered as still valid
         private CacheMode _mode;
         private bool _PreLoadFoldersInCache;
 
-        private object CurrentRefreshLock = new object();
-        private List<String> CurrentRefresh = new List<string>();
-
-        private void AddRefreshTask(FileNode CFN)
-        {
-            lock (CurrentRefreshLock)
-            {
-                if (CurrentRefresh.Contains(CFN.LocalPath)) return;
-                CurrentRefresh.Add(CFN.LocalPath);
-                new Thread(() => InternalRefreshFolderCacheContent(CFN)).Start();
-            }
-        }
-
-        private void RemoveRefreshTask(FileNode CFN)
-        {
-            lock (CurrentRefreshLock)
-            {
-                CurrentRefresh.Remove(CFN.LocalPath);
-            }
-        }
-
-        private static object CacheLock = new object();
-        //TODO : Add periodic MissingFileCache cleanup
-        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(); //Store the files that we know for sure that they do not exist
-        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
-        public ReadOnlyDictionary<String, FileNode> CacheContent
-        {
-            get
-            {
-                return new ReadOnlyDictionary<String, FileNode>(FileNodeCache);
-            }
-        }
+        private object RunningRefreshActionListLock = new object();
+        private List<String> RunningRefreshActionList = new List<string>();
 
         public CacheManager(CacheMode mode, bool PreLoadFoldersInCache)
         {
             this._mode = mode;
             this._PreLoadFoldersInCache = PreLoadFoldersInCache;
         }
+
+        /// <summary>
+        /// Run a cache refresh action for a specific FileNode
+        /// </summary>
+        private void AddRefreshTask(FileNode CFN)
+        {
+            lock (RunningRefreshActionListLock)
+            {
+                if (RunningRefreshActionList.Contains(CFN.LocalPath)) return; //An action is already planned or in progress for this path
+                RunningRefreshActionList.Add(CFN.LocalPath);
+                new Thread(() => InternalRefreshFolderCacheContent(CFN)).Start();
+            }
+        }
+
+        /// <summary>
+        /// Remove the cache refresh action from the list
+        /// </summary>
+        private void RemoveRefreshTask(FileNode CFN)
+        {
+            lock (RunningRefreshActionListLock)
+            {
+                RunningRefreshActionList.Remove(CFN.LocalPath);
+            }
+        }
+
+        private static object CacheLock = new object();
+
+        //TODO : Add periodic MissingFileCache cleanup
+        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(); //Store the files that we know for sure that they do not exist
+        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
 
         /// <summary>
         /// Look in the cache for the FileNode matching the path
@@ -71,8 +72,7 @@ namespace KS2Drive.FS
                 //Is there a valid mising file entry for this file
                 if (MissingFileCache.ContainsKey(FileOrFolderLocalPath) && (DateTime.Now - MissingFileCache[FileOrFolderLocalPath]).TotalSeconds <= CacheDurationInSeconds)
                 {
-                    //Less than (CacheDurationInSeconds) seconds ago, the file was not existing
-                    //We send the same answer
+                    //Less than (CacheDurationInSeconds) seconds ago, the file was not existing. We send the same answer
                     return (null, true);
                 }
                 else
@@ -98,7 +98,7 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Renomme une clé du dictionnaire
+        /// Rename a key in the FileNode dictionnary
         /// </summary>
         public void RenameFileNodeKey(String PreviousKey, String NewKey)
         {
@@ -184,12 +184,9 @@ namespace KS2Drive.FS
 
             if (_mode == CacheMode.Disabled)
             {
-                //TODO
-                /*
                 var Result = ListRemoteServerFolderContent(CurrentFolder);
                 if (!Result.Success) return Result;
                 else return (true, Result.Content, null);
-                */
             }
 
             lock (CacheLock)
@@ -202,14 +199,13 @@ namespace KS2Drive.FS
                     CurrentFolder.IsParsed = true;
                     CurrentFolder.LastRefresh = DateTime.Now;
 
-                    //Mise en cache du contenu du répertoire
+                    //Caching the folder content
                     foreach (var Node in Result.Content)
                     {
                         this.AddFileNodeNoLock(Node.Item2);
                     }
 
-                    //Gestion de . et ..
-
+                    //Handling . & ..
                     if (!FileNode.IsRepositoryRootPath(CurrentFolder.RepositoryPath))
                     {
                         //if this is not the root directory add the dot entries

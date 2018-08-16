@@ -82,43 +82,37 @@ namespace KS2Drive.Config
             CBPreloading.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
             CBPreloading.SelectedIndex = 1;
 
+            CBMountAsNetworkDrive.SelectedValuePath = "Key";
+            CBMountAsNetworkDrive.DisplayMemberPath = "Value";
+            CBMountAsNetworkDrive.Items.Add(new KeyValuePair<int, string>(0, "No"));
+            CBMountAsNetworkDrive.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
+            CBMountAsNetworkDrive.SelectedIndex = 0;
+
             //Reload values from config
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
             if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]);
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerURL)) txtURL.Text = this.AppConfiguration.ServerURL;
 
-            if (this.AppConfiguration.ServerType.HasValue)
-            {
-                var SelectedMode = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType.Value));
-                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = SelectedMode;
-            }
+            var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType));
+            if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
 
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerLogin)) txtLogin.Text = this.AppConfiguration.ServerLogin;
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerPassword)) txtPassword.Password = this.AppConfiguration.ServerPassword;
 
-            if (this.AppConfiguration.KernelCacheMode.HasValue)
-            {
-                var SelectedMode = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode.Value));
-                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = SelectedMode;
-            }
+            var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode));
+            if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
 
-            if (this.AppConfiguration.FlushMode.HasValue)
-            {
-                var SelectedMode = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.FlushMode.Value));
-                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBFlush.SelectedItem = SelectedMode;
-            }
+            var FlushMatchingItem = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.FlushMode));
+            if (!FlushMatchingItem.Equals(default(KeyValuePair<int, string>))) CBFlush.SelectedItem = FlushMatchingItem;
 
-            if (this.AppConfiguration.SyncOps.HasValue)
-            {
-                var SelectedMode = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt16(this.AppConfiguration.SyncOps.Value)));
-                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SelectedMode;
-            }
+            var SyncOpsMatchingItem = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.SyncOps)));
+            if (!SyncOpsMatchingItem.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SyncOpsMatchingItem;
 
-            if (this.AppConfiguration.PreLoading.HasValue)
-            {
-                var SelectedMode = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt16(this.AppConfiguration.PreLoading.Value)));
-                if (!SelectedMode.Equals(default(KeyValuePair<int, string>))) CBPreloading.SelectedItem = SelectedMode;
-            }
+            var PreloadingMatchingItem = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.PreLoading)));
+            if (!PreloadingMatchingItem.Equals(default(KeyValuePair<int, string>))) CBPreloading.SelectedItem = PreloadingMatchingItem;
+
+            var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.MountAsNetworkDrive)));
+            if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
         }
 
         private void bt_Save_Click(object sender, RoutedEventArgs e)
@@ -151,7 +145,7 @@ namespace KS2Drive.Config
                 return;
             }
 
-            //From : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+            //From : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup
             RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
             if (chk_AutoStart.IsChecked == true)
             {
@@ -171,6 +165,7 @@ namespace KS2Drive.Config
             this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
             this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
             this.AppConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
+            this.AppConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
 
             try
             {

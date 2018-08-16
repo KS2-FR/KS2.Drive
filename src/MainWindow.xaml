@@ -7,6 +7,7 @@
     xmlns:local="clr-namespace:KS2Drive"
     mc:Ignorable="d" Height="430" Width="1370" ResizeMode="NoResize" Title="KS² Drive">
     <Window.Resources>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
             <MenuItem Header="_MOUNT" Click="MenuMount_Click"/>
             <MenuItem Header="_LOG" Click="MenuLog_Click" />
@@ -24,10 +25,19 @@
             <ListView.View>
                 <GridView>
                     <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}" />
-                    <GridViewColumn Header="Object" Width="50" DisplayMemberBinding="{Binding Object}" />
-                    <GridViewColumn Header="Action" Width="100" DisplayMemberBinding="{Binding Action}" />
-                    <GridViewColumn Header="Fichier" Width="700" DisplayMemberBinding="{Binding Fichier}" />
-                    <GridViewColumn Header="Resultat" Width="200" DisplayMemberBinding="{Binding Resultat}" />
+                    <GridViewColumn Header="ObjID" Width="50" DisplayMemberBinding="{Binding Object}" />
+                    <GridViewColumn Header="Method" Width="100" DisplayMemberBinding="{Binding Method}" />
+                    <GridViewColumn Header="File" Width="650" DisplayMemberBinding="{Binding File}" />
+                    <GridViewColumn Header="Result" Width="200" DisplayMemberBinding="{Binding Result}" />
+                    <GridViewColumn Header="Action" Width="120">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="bt_FileRecover" Tag="{Binding}" Click="bt_FileRecover_Click" Visibility="{Binding AllowRetryOrRecover, Converter={StaticResource BoolToVisibilityConverter}}" IsEnabled="{Binding AllowRetryOrRecover}">Save File Locally</Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>

@@ -108,7 +108,7 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Retrieve a file or folder from the remote repo
+        /// Retrieve a file or folder from the remote repository
         /// Return either a RepositoryElement or a FileSystem Error Message
         /// </summary>
         public WebDAVClient.Model.Item GetRepositoryElement(String LocalFileName)

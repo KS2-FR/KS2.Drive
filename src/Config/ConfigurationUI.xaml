@@ -94,10 +94,11 @@
                 <Border BorderThickness="1" BorderBrush="Gainsboro">
                     <Grid Margin="10">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="100"></ColumnDefinition>
+                            <ColumnDefinition Width="150"></ColumnDefinition>
                             <ColumnDefinition Width="*"></ColumnDefinition>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="35"></RowDefinition>
                             <RowDefinition Height="35"></RowDefinition>
                             <RowDefinition Height="35"></RowDefinition>
                             <RowDefinition Height="35"></RowDefinition>
@@ -109,11 +110,13 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Sync ops</TextBlock>
                         <TextBlock Grid.Row="2" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Pre-Loading</TextBlock>
                         <TextBlock Grid.Row="3" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">FlushMode</TextBlock>
+                        <TextBlock Grid.Row="4" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Mount as network drive</TextBlock>
 
                         <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBKernelCache" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
                         <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CBSyncOps" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
                         <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CBPreloading"  HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
                         <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CBFlush" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CBMountAsNetworkDrive" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
             </TabItem>

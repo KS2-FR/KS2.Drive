@@ -24,12 +24,12 @@ namespace KS2Drive.Config
                 }
                 catch
                 {
-                    return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
+                    return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, Path = ConfigurationFilePath };
                 }
             }
             else
             {
-                return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, UseProxyAuthentication = false, ProxyLogin = "", ProxyPassword = "", ProxyURL = "", Path = ConfigurationFilePath };
+                return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, Path = ConfigurationFilePath };
             }
         }
 
@@ -48,19 +48,20 @@ namespace KS2Drive.Config
         //Drive Parameter
         public String DriveLetter { get; set; }
         public String ServerURL { get; set; }
-        public Int32? ServerType { get; set; }
+        public Int32 ServerType { get; set; } = 0;
         public String ServerLogin { get; set; }
         public String ServerPassword { get; set; }
-        public Int32? KernelCacheMode { get; set; }
-        public Int32? FlushMode { get; set; }
-        public bool? SyncOps { get; set; }
-        public bool? PreLoading { get; set; }
+        public Int32 KernelCacheMode { get; set; } = -1;
+        public Int32 FlushMode { get; set; } = 0;
+        public bool SyncOps { get; set; } = false;
+        public bool PreLoading { get; set; } = true;
+        public bool MountAsNetworkDrive { get; set; } = false;
 
         //Proxy
         public Int16 HTTPProxyMode { get; set; } = 0; //0 = no proxy, 1 = default proxy, 2 = user defined proxy
-        public String ProxyURL { get; set; }
-        public bool UseProxyAuthentication { get; set; }
-        public String ProxyLogin { get; set; }
-        public String ProxyPassword { get; set; }
+        public String ProxyURL { get; set; } = "";
+        public bool UseProxyAuthentication { get; set; } = false;
+        public String ProxyLogin { get; set; } = "";
+        public String ProxyPassword { get; set; } = "";
     }
 }

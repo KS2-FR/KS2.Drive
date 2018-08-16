@@ -31,7 +31,7 @@
     <ProductName>KS2 Drive</ProductName>
     <PublisherName>KS2</PublisherName>
     <OpenBrowserOnPublish>false</OpenBrowserOnPublish>
-    <ApplicationRevision>3</ApplicationRevision>
+    <ApplicationRevision>4</ApplicationRevision>
     <ApplicationVersion>0.8.1.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <CreateDesktopShortcut>true</CreateDesktopShortcut>
@@ -133,6 +133,7 @@
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
     <Compile Include="Config\Configuration.cs" />
+    <Compile Include="Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Converters\ProxyCustomAuthActivator.cs" />
     <Compile Include="Converters\ProxyActivator.cs" />
     <Compile Include="FS\CacheManager.cs" />

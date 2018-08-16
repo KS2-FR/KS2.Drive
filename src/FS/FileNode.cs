@@ -1,12 +1,7 @@
 ﻿using Fsp.Interop;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.AccessControl;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Web;
 
 namespace KS2Drive.FS
@@ -16,7 +11,7 @@ namespace KS2Drive.FS
         public object OperationLock = new object();
 
         [JsonIgnore]
-        private static Int32 _handle = 0;
+        private static Int32 ObjetIdSequence = 0;
         [JsonIgnore]
         private static object _handlelock = new object();
 
@@ -34,6 +29,7 @@ namespace KS2Drive.FS
 
         public bool HasUnflushedData { get; set; } = false;
         public DateTime LastRefresh { get; set; }
+        public string TemporaryLocalCopyPath { get; internal set; } = ""; //Path to the temporary local file containing the binary information of this FileNode (used in case of error in order not to lose data)
 
         public bool IsParsed = false;
         public bool IsDeleted = false;
@@ -53,10 +49,10 @@ namespace KS2Drive.FS
         public FileNode(WebDAVClient.Model.Item WebDavObject)
         {
             if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
-            
-            lock(_handlelock)
+
+            lock (_handlelock)
             {
-                this.ObjectId = (++_handle).ToString();
+                this.ObjectId = (++ObjetIdSequence).ToString();
             }
 
             this.LastRefresh = DateTime.Now;
@@ -189,6 +185,20 @@ namespace KS2Drive.FS
             if (DocumentPath.Equals(_DocumentLibraryPath)) return null;
             if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
+        }
+
+        //Generate a local copy of the FileNode
+        internal void GenerateLocalCopy()
+        {
+            if (String.IsNullOrEmpty(TemporaryLocalCopyPath)) TemporaryLocalCopyPath = System.IO.Path.GetTempFileName();
+            try
+            {
+                System.IO.File.WriteAllBytes(TemporaryLocalCopyPath, FileData);
+            }
+            catch
+            {
+                TemporaryLocalCopyPath = null; //Cannot generate a local copy of the file. Disable the option allowing the user to save the file locally
+            }
         }
     }
 }

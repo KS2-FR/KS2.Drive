@@ -10,11 +10,10 @@ using System.Windows.Controls;
 
 namespace KS2Drive
 {
-    //https://stackoverflow.com/questions/2006729/how-can-i-have-a-listbox-auto-scroll-when-a-new-item-is-added
+    //From : https://stackoverflow.com/questions/2006729/how-can-i-have-a-listbox-auto-scroll-when-a-new-item-is-added
     public class ListBoxBehavior
     {
-        static readonly Dictionary<ListBox, Capture> Associations =
-               new Dictionary<ListBox, Capture>();
+        static readonly Dictionary<ListBox, Capture> Associations = new Dictionary<ListBox, Capture>();
 
         public static bool GetScrollOnNewItem(DependencyObject obj)
         {
