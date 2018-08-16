@@ -8,7 +8,7 @@ As every WebDAV implementation is different, should you encounter an issue with 
 
 Usage :
 -	Install WinFSP 2018.2 B1 or superior (https://github.com/billziss-gh/winfsp/releases)
--	Download the setup program for KS² Drive (https://github.com/FrKaram/KS2.Drive/releases/download/0.8/setup.exe)
+-	Download the setup program for KS² Drive (https://github.com/FrKaram/KS2.Drive/releases/download/AllVersions/setup.exe)
 -	Run KS2Drive.exe
 -	Configure the server :<br/>
   ->	Enter the Webdav/AOS URL of the server<br/>
