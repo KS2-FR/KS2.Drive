@@ -7,7 +7,7 @@ The software is intented to be used in conjunction with Alfresco ECM (and tested
 As every WebDAV implementation is different, should you encounter an issue with a specific webDAV server, please report here.
 
 Usage :
--	Install WinFSP 2018.2 B1 or superior (https://github.com/billziss-gh/winfsp/releases)
+-	Install WinFSP 2018.2 B2 or superior (https://github.com/billziss-gh/winfsp/releases)
 -	Download the setup program for KS² Drive (https://github.com/FrKaram/KS2.Drive/releases/download/AllVersions/setup.exe)
 -	Run KS2Drive.exe
 -	Configure the server :<br/>
