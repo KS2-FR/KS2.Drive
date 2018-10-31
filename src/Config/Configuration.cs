@@ -52,7 +52,7 @@ namespace KS2Drive.Config
         public String ServerLogin { get; set; }
         public String ServerPassword { get; set; }
         public Int32 KernelCacheMode { get; set; } = -1;
-        public Int32 FlushMode { get; set; } = 0;
+        public Int32 FlushMode { get; set; } = 1;
         public bool SyncOps { get; set; } = false;
         public bool PreLoading { get; set; } = true;
         public bool MountAsNetworkDrive { get; set; } = false;
@@ -63,5 +63,11 @@ namespace KS2Drive.Config
         public bool UseProxyAuthentication { get; set; } = false;
         public String ProxyLogin { get; set; } = "";
         public String ProxyPassword { get; set; } = "";
+
+        //Client cert
+        public bool UseClientCertForAuthentication { get; set; } = false;
+        public String CertStoreName { get; set; }
+        public String CertStoreLocation { get; set; }
+        public String CertSerial { get; set; }
     }
 }

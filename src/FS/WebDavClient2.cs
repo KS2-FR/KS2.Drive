@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
@@ -20,8 +21,9 @@ namespace KS2Drive.FS
         private static String _Login;
         private static String _Password;
         private static bool _IsInited = false;
+        private static X509Certificate2 _ClientCert;
 
-        public static void Init(WebDAVMode mode, String Server, String BasePath, String Login, String Password)
+        public static void Init(WebDAVMode mode, String Server, String BasePath, String Login, String Password, X509Certificate2 ClientCert)
         {
             WebDavClient2._Mode = mode;
             WebDavClient2._RootPath = BasePath;
@@ -29,10 +31,11 @@ namespace KS2Drive.FS
             WebDavClient2._Login = Login;
             WebDavClient2._Password = Password;
             WebDavClient2._IsInited = true;
+            WebDavClient2._ClientCert = ClientCert;
         }
 
         public WebDavClient2(TimeSpan? uploadTimeout = null) :
-            base(new NetworkCredential { UserName = WebDavClient2._Login, Password = WebDavClient2._Password }, uploadTimeout, null)
+            base(new NetworkCredential { UserName = WebDavClient2._Login, Password = WebDavClient2._Password }, uploadTimeout, null, WebDavClient2._ClientCert)
         {
             if (!WebDavClient2._IsInited) throw new InvalidOperationException("Please Call Init First");
             base.Server = WebDavClient2._Server;

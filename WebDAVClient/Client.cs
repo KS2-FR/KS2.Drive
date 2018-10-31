@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
@@ -100,9 +101,9 @@ namespace WebDAVClient
         #endregion
 
 
-        public Client(NetworkCredential credential = null, TimeSpan? uploadTimeout = null, IWebProxy proxy = null)
+        public Client(NetworkCredential credential = null, TimeSpan? uploadTimeout = null, IWebProxy proxy = null, X509Certificate clientCert = null)
         {
-            var handler = new HttpClientHandler();
+            var handler = new WebRequestHandler();
             if (proxy != null && handler.SupportsProxy)
                 handler.Proxy = proxy;
             if (handler.SupportsAutomaticDecompression)
@@ -111,6 +112,12 @@ namespace WebDAVClient
             {
                 handler.Credentials = credential;
                 handler.PreAuthenticate = true;
+            }
+
+            if (clientCert != null)
+            {
+                handler.ClientCertificateOptions = ClientCertificateOption.Manual;
+                handler.ClientCertificates.Add(clientCert);
             }
 
             _client = new HttpClient(handler);

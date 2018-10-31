@@ -3,6 +3,7 @@ using System;
 using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace KS2Drive
@@ -47,6 +48,23 @@ namespace KS2Drive
                     WebRequest.DefaultWebProxy = new WebProxy(C.ProxyURL, false);
                 }
             }
+        }
+
+        public static X509Certificate2 FindCertificate(String CertStoreName, String CertStoreLocation, String Serial)
+        {
+            if (Enum.TryParse(CertStoreName, out StoreName StoreNameParsed) && Enum.TryParse(CertStoreLocation, out StoreLocation StoreLocationParsed))
+            {
+                X509Store store = new X509Store(StoreNameParsed, StoreLocationParsed);
+                store.Open(OpenFlags.ReadOnly);
+                var CertificateCollection = store.Certificates.Find(X509FindType.FindBySerialNumber, Serial, false);
+                store.Close();
+                if (CertificateCollection.Count > 0)
+                {
+                    return CertificateCollection[0];
+                }
+            }
+
+            return null;
         }
     }
 }

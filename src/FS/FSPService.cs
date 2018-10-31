@@ -1,4 +1,5 @@
 ﻿using Fsp;
+using KS2Drive.Config;
 using KS2Drive.FS;
 using KS2Drive.Log;
 using System;
@@ -18,13 +19,13 @@ namespace KS2Drive
         {
         }
 
-        public void Mount(String DriveName, String URL, Int32 Mode, String Login, String Password, FlushMode FlushMode, KernelCacheMode KernelMode, bool SyncOps, bool PreLoadFolders, bool MountAsNetworkDrive)
+        public void Mount(Configuration config)
         {
-            davFs = new DavFS((WebDAVMode)Mode, URL, FlushMode, KernelMode, Login, Password, PreLoadFolders, MountAsNetworkDrive);
+            davFs = new DavFS(config);
             davFs.RepositoryActionPerformed += (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
 
             Host = new FileSystemHost(davFs);
-            if (Host.Mount($"{DriveName}:", null, SyncOps, 0) < 0) throw new IOException("cannot mount file system");
+            if (Host.Mount($"{config.DriveLetter}:", null, config.SyncOps, 0) < 0) throw new IOException("cannot mount file system");
         }
 
         public void Unmount()

@@ -6,6 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:extToolkit="http://schemas.xceed.com/wpf/xaml/toolkit"
     mc:Ignorable="d"
         Title="KS² Drive - Configuration" Height="500" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
     <Window.Resources>
@@ -28,64 +29,118 @@
 
         <TabControl Grid.Row="0" Grid.ColumnSpan="2">
             <TabItem Header="General">
-                <Grid Margin="10">
+                <Grid Margin="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="100"></ColumnDefinition>
                         <ColumnDefinition Width="*"></ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
-                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"></ColumnDefinition>
+                                <ColumnDefinition Width="*"></ColumnDefinition>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="35"></RowDefinition>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">URL</TextBlock>
-                    <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL" >
-                        <TextBox.Style>
-                            <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
-                                <Style.Resources>
-                                    <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
-                                        <VisualBrush.Visual>
-                                            <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
-                                        </VisualBrush.Visual>
-                                    </VisualBrush>
-                                </Style.Resources>
-                                <Style.Triggers>
-                                    <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
-                                        <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
-                                    </Trigger>
-                                    <Trigger Property="Text" Value="{x:Null}">
-                                        <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
-                                    </Trigger>
-                                    <Trigger Property="IsKeyboardFocused" Value="True">
-                                        <Setter Property="Background" Value="White" />
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBox.Style>
-                    </TextBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">URL</TextBlock>
+                            <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL" >
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                                        <Style.Resources>
+                                            <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                                <VisualBrush.Visual>
+                                                    <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
+                                                </VisualBrush.Visual>
+                                            </VisualBrush>
+                                        </Style.Resources>
+                                        <Style.Triggers>
+                                            <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="Text" Value="{x:Null}">
+                                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter Property="Background" Value="White" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" >Type</TextBlock>
-                    <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" >Type</TextBlock>
+                            <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
 
-                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" >Login</TextBlock>
-                    <TextBox Grid.Row="3" Grid.Column="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"></ColumnDefinition>
+                                <ColumnDefinition Width="*"></ColumnDefinition>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="35"></RowDefinition>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Login</TextBlock>
+                            <TextBox Grid.Row="0" Grid.Column="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
 
-                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
-                    <PasswordBox Grid.Row="4" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
+                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
 
-                    <CheckBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}"/>
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal">
+                                <CheckBox x:Name="Chk_UserClientCert">Additional client certificate</CheckBox>
+                                <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True"></TextBox>
+                                <extToolkit:DropDownButton Content="Select" Margin="0,5,0,5" Width="100" IsEnabled="{Binding Path=IsChecked,ElementName=Chk_UserClientCert}" x:Name="bt_UserClientCertSelect">
+                                    <extToolkit:DropDownButton.DropDownContent>
+                                        <StackPanel Width="200" Orientation="Vertical">
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.My</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.AddressBook</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.AuthRoot</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.CertificateAuthority</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.Root</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.TrustedPeople</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.TrustedPublisher</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.My</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.AddressBook</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.AuthRoot</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.CertificateAuthority</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.Root</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.TrustedPeople</Button>
+                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.TrustedPublisher</Button>
+                                        </StackPanel>
+                                    </extToolkit:DropDownButton.DropDownContent>
+                                </extToolkit:DropDownButton>
+                            </StackPanel>
+                            
+                        </Grid>
+                    </Border>
 
-                    <CheckBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" x:Name="chk_AutoStart" Content="Start with windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}"/>
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="35"></RowDefinition>
+                            </Grid.RowDefinitions>
 
+                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}"/>
+                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}"/>
+                        </Grid>
+                    </Border>
                 </Grid>
 
 

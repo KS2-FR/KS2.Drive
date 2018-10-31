@@ -109,17 +109,7 @@ namespace KS2Drive
         {
             try
             {
-                Service.Mount(this.AppConfiguration.DriveLetter,
-                    this.AppConfiguration.ServerURL,
-                    this.AppConfiguration.ServerType,
-                    this.AppConfiguration.ServerLogin,
-                    this.AppConfiguration.ServerPassword,
-                    (FlushMode)Enum.ToObject(typeof(FlushMode), this.AppConfiguration.FlushMode),
-                    (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), this.AppConfiguration.KernelCacheMode),
-                    this.AppConfiguration.SyncOps,
-                    this.AppConfiguration.PreLoading,
-                    this.AppConfiguration.MountAsNetworkDrive
-                    );
+                Service.Mount(this.AppConfiguration);
             }
             catch (Exception ex)
             {

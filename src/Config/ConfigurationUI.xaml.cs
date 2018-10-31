@@ -1,24 +1,14 @@
-﻿using KS2Drive.Config;
-using KS2Drive.FS;
+﻿using KS2Drive.FS;
 using MahApps.Metro.Controls;
 using Microsoft.Win32;
-using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Security.Cryptography.X509Certificates;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace KS2Drive.Config
 {
@@ -113,6 +103,18 @@ namespace KS2Drive.Config
 
             var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.MountAsNetworkDrive)));
             if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
+
+            //Look for certificate
+            if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
+            if (!String.IsNullOrEmpty(this.AppConfiguration.CertSerial) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreName))
+            {
+                var FoundCertificate = Tools.FindCertificate(this.AppConfiguration.CertStoreName, this.AppConfiguration.CertStoreLocation, this.AppConfiguration.CertSerial);
+                if (FoundCertificate != null)
+                {
+                    txt_ClientCertSubject.Text = FoundCertificate.Subject;
+                    if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
+                }
+            }
         }
 
         private void bt_Save_Click(object sender, RoutedEventArgs e)
@@ -166,6 +168,7 @@ namespace KS2Drive.Config
             this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
             this.AppConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
             this.AppConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
+            this.AppConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
 
             try
             {
@@ -185,6 +188,33 @@ namespace KS2Drive.Config
         private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
         {
             this.AppConfiguration.ProxyPassword = ProxyPassword.Password;
+        }
+
+        private void bt_UserClientCertSelect_Click(object sender, RoutedEventArgs e)
+        {
+            var SeachScope = ((Button)sender).Content.ToString();
+
+            String StoreLocationAsString = SeachScope.Substring(0, SeachScope.IndexOf("."));
+            String StoreNameAsString = SeachScope.Substring(SeachScope.IndexOf(".") + 1);
+
+            StoreName StoreNameParsed;
+            StoreLocation StoreLocationParsed;
+
+            if (Enum.TryParse(StoreNameAsString, out StoreNameParsed) && Enum.TryParse(StoreLocationAsString, out StoreLocationParsed))
+            {
+                X509Store store = new X509Store(StoreNameParsed, StoreLocationParsed);
+                store.Open(OpenFlags.ReadOnly);
+                X509Certificate2Collection sel = X509Certificate2UI.SelectFromCollection(store.Certificates, null, null, X509SelectionFlag.SingleSelection);
+                store.Close();
+
+                if (sel.Count > 0)
+                {
+                    this.AppConfiguration.CertStoreName = StoreNameAsString;
+                    this.AppConfiguration.CertStoreLocation = StoreLocationAsString;
+                    this.AppConfiguration.CertSerial = sel[0].SerialNumber;
+                    txt_ClientCertSubject.Text = sel[0].Subject;
+                }
+            }
         }
     }
 }

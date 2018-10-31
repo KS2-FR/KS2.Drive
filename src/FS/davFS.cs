@@ -1,19 +1,20 @@
-﻿using System;
+﻿using Fsp;
+using KS2Drive.Config;
+using KS2Drive.Log;
+using Newtonsoft.Json;
+using NLog;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Threading;
-using Fsp;
-using System.Linq;
-using NLog;
-using System.Runtime.CompilerServices;
 using WebDAVClient.Helpers;
-using System.Net.Http;
-using Newtonsoft.Json;
-using KS2Drive.Log;
-using VolumeInfo = Fsp.Interop.VolumeInfo;
 using FileInfo = Fsp.Interop.FileInfo;
+using VolumeInfo = Fsp.Interop.VolumeInfo;
 
 namespace KS2Drive.FS
 {
@@ -40,26 +41,30 @@ namespace KS2Drive.FS
         private const UInt16 MEMFS_SECTOR_SIZE = 4096;
         private const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
-        public DavFS(WebDAVMode webDAVMode, String DavServerURL, FlushMode flushMode, KernelCacheMode kernelCacheMode, String DAVLogin, String DAVPassword, bool PreloadCache, bool MountAsNetworkDrive)
+        public DavFS(Configuration config)
         {
+            WebDAVMode webDAVMode = (WebDAVMode)config.ServerType;
+            FlushMode flushMode = (FlushMode)Enum.ToObject(typeof(FlushMode), config.FlushMode);
+            KernelCacheMode kernelCacheMode = (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), config.KernelCacheMode);
+
             this.MaxFileNodes = 500000;
             this.MaxFileSize = UInt32.MaxValue;
             this.FlushMode = flushMode;
             this.WebDAVMode = webDAVMode;
             this.kernelCacheMode = kernelCacheMode;
-            this.MountAsNetworkDrive = MountAsNetworkDrive;
+            this.MountAsNetworkDrive = config.MountAsNetworkDrive;
 
-            var DavServerURI = new Uri(DavServerURL);
+            var DavServerURI = new Uri(config.ServerURL);
             this.DAVServer = DavServerURI.GetLeftPart(UriPartial.Authority);
             this.DAVServeurAuthority = DavServerURI.DnsSafeHost;
             this.DocumentLibraryPath = DavServerURI.PathAndQuery;
 
-            this.DAVLogin = DAVLogin;
-            this.DAVPassword = DAVPassword;
+            this.DAVLogin = config.ServerLogin;
+            this.DAVPassword = config.ServerPassword;
 
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
-            WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword);
-            Cache = new CacheManager(CacheMode.Enabled, PreloadCache);
+            WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
+            Cache = new CacheManager(CacheMode.Enabled, config.PreLoading);
 
             //Test connection to server with the parameters entered in the configuration screen
             var Proxy = new WebDavClient2();
