@@ -21,6 +21,7 @@ namespace KS2Drive.FS
     public class DavFS : FileSystemBase
     {
         public event EventHandler<LogListItem> RepositoryActionPerformed;
+        public event EventHandler RepositoryAuthenticationFailed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private UInt32 MaxFileNodes;
@@ -71,6 +72,10 @@ namespace KS2Drive.FS
             try
             {
                 var LisTest = Proxy.List("/").GetAwaiter().GetResult();
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                throw new Exception($"Cannot connect to server : Invalid credentials");
             }
             catch (Exception ex)
             {
@@ -165,6 +170,12 @@ namespace KS2Drive.FS
                         var Proxy = new WebDavClient2();
                         FoundElement = Proxy.GetRepositoryElement(FileName);
                     }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                    {
+                        RepositoryAuthenticationFailed?.Invoke(this, null);
+                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
+                    }
                     catch (WebDAVException ex)
                     {
                         Cache.AddMissingFileNoLock(FileName);
@@ -254,6 +265,11 @@ namespace KS2Drive.FS
                     {
                         var Proxy = new WebDavClient2();
                         RepositoryObject = Proxy.GetRepositoryElement(FileName);
+                    }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                    {
+                        RepositoryAuthenticationFailed?.Invoke(this, null);
+                        return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
                     catch (WebDAVException ex)
                     {
@@ -442,6 +458,11 @@ namespace KS2Drive.FS
                     return STATUS_OBJECT_NAME_COLLISION;
                 }
             }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                RepositoryAuthenticationFailed?.Invoke(this, null);
+                return STATUS_NETWORK_UNREACHABLE;
+            }
             catch (HttpRequestException)
             {
                 FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
@@ -496,6 +517,11 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, null, "STATUS_NETWORK_UNREACHABLE");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                {
+                    RepositoryAuthenticationFailed?.Invoke(this, null);
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
                 catch (WebDAVException)
                 {
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_CANNOT_MAKE" };
@@ -536,6 +562,11 @@ namespace KS2Drive.FS
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
                     return STATUS_ACCESS_DENIED;
+                }
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                {
+                    RepositoryAuthenticationFailed?.Invoke(this, null);
+                    return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException)
                 {
@@ -912,6 +943,11 @@ namespace KS2Drive.FS
                     {
                         CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
                     }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                    {
+                        RepositoryAuthenticationFailed?.Invoke(this, null);
+                        return STATUS_NETWORK_UNREACHABLE;
+                    }
                     catch (HttpRequestException ex)
                     {
                         CFN.FileData = null;
@@ -1235,6 +1271,11 @@ namespace KS2Drive.FS
                             return STATUS_ACCESS_DENIED;
                         }
                     }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                    {
+                        RepositoryAuthenticationFailed?.Invoke(this, null);
+                        return STATUS_NETWORK_UNREACHABLE;
+                    }
                     catch (HttpRequestException)
                     {
                         L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_NETWORK_UNREACHABLE" };
@@ -1262,6 +1303,11 @@ namespace KS2Drive.FS
                             DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
                             return STATUS_ACCESS_DENIED;
                         }
+                    }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                    {
+                        RepositoryAuthenticationFailed?.Invoke(this, null);
+                        return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (HttpRequestException)
                     {

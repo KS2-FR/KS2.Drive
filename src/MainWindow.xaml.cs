@@ -1,5 +1,4 @@
 ﻿using KS2Drive.Config;
-using KS2Drive.FS;
 using KS2Drive.Log;
 using KS2Drive.WinFSP;
 using MahApps.Metro.Controls;
@@ -74,6 +73,15 @@ namespace KS2Drive
                         if (!e1.AllowRetryOrRecover) Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed", System.Windows.Forms.ToolTipIcon.Warning));
                         else Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed. You can recover this file via the LOG menu", System.Windows.Forms.ToolTipIcon.Warning));
                     };
+                };
+
+                Service.RepositoryAuthenticationFailed += (s2, e2) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"Your credentials are invalid", System.Windows.Forms.ToolTipIcon.Warning);
+                        UnmountDrive();
+                    });
                 };
 
                 #endregion

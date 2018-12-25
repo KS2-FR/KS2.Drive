@@ -14,6 +14,7 @@ namespace KS2Drive
         private FileSystemHost Host;
         private DavFS davFs;
         public event EventHandler<LogListItem> RepositoryActionPerformed;
+        public event EventHandler RepositoryAuthenticationFailed;
 
         public FSPService() : base("KS2DriveService")
         {
@@ -23,6 +24,7 @@ namespace KS2Drive
         {
             davFs = new DavFS(config);
             davFs.RepositoryActionPerformed += (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
+            davFs.RepositoryAuthenticationFailed += (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
 
             Host = new FileSystemHost(davFs);
             if (Host.Mount($"{config.DriveLetter}:", null, config.SyncOps, 0) < 0) throw new IOException("cannot mount file system");
