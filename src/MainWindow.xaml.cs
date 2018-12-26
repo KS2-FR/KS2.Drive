@@ -79,8 +79,7 @@ namespace KS2Drive
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"Your credentials are invalid", System.Windows.Forms.ToolTipIcon.Warning);
-                        UnmountDrive();
+                        AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"Your credentials are invalid. Please update them in the Configuration panel", System.Windows.Forms.ToolTipIcon.Error);
                     });
                 };
 
@@ -134,7 +133,15 @@ namespace KS2Drive
 
         private void UnmountDrive()
         {
-            Service.Unmount();
+            try
+            {
+                Service.Unmount();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+
             ((MenuItem)AppMenu.Items[0]).Header = "_MOUNT";
             IsMounted = false;
             ((MenuItem)AppMenu.Items[2]).IsEnabled = true;

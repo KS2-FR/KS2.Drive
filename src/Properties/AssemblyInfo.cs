@@ -51,5 +51,7 @@ using System.Windows;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
+
+//DO NOT CHANGE ASSEMBLY VERSION AS IT IS USED AS ENTROPY FOR DPADPI. CHANGING VERSION WOULD RESULT IN CONFIGURATION RESET
 [assembly: AssemblyVersion("0.8.4.0")]
 [assembly: AssemblyFileVersion("0.8.4.0")]

@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using WebDAVClient.Helpers;
 
 namespace KS2Drive.FS
 {
@@ -336,6 +337,10 @@ namespace KS2Drive.FS
             try
             {
                 ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                return (false, null, "401");
             }
             catch (Exception ex)
             {

@@ -33,6 +33,7 @@ namespace KS2Drive
         public void Unmount()
         {
             davFs.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
+            davFs.RepositoryAuthenticationFailed -= (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
 
             Host.Unmount();
             Host = null;

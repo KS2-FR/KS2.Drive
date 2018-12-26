@@ -58,7 +58,7 @@ namespace KS2Drive.FS
             var DavServerURI = new Uri(config.ServerURL);
             this.DAVServer = DavServerURI.GetLeftPart(UriPartial.Authority);
             this.DAVServeurAuthority = DavServerURI.DnsSafeHost;
-            this.DocumentLibraryPath = DavServerURI.PathAndQuery;
+            this.DocumentLibraryPath = DavServerURI.PathAndQuery.EndsWith("/") ? DavServerURI.PathAndQuery.Remove(DavServerURI.PathAndQuery.Length - 1) : DavServerURI.PathAndQuery;
 
             this.DAVLogin = config.ServerLogin;
             this.DAVPassword = config.ServerPassword;
@@ -173,6 +173,7 @@ namespace KS2Drive.FS
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
                         RepositoryAuthenticationFailed?.Invoke(this, null);
+                        Cache.Clear();
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
@@ -269,6 +270,7 @@ namespace KS2Drive.FS
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
                         RepositoryAuthenticationFailed?.Invoke(this, null);
+                        Cache.Clear();
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
                     catch (WebDAVException ex)
@@ -381,6 +383,11 @@ namespace KS2Drive.FS
                 var Result = Cache.GetFolderContent(CFN, Marker);
                 if (!Result.Success)
                 {
+                    if (Result.ErrorMessage == "401")
+                    {
+                        RepositoryAuthenticationFailed?.Invoke(this, null);
+                        Cache.Clear();
+                    }
                     DebugEnd(OperationId.ToString(), CFN, $"Exception : {Result.ErrorMessage}");
                     FileName = default(String);
                     FileInfo = default(FileInfo);
@@ -461,6 +468,7 @@ namespace KS2Drive.FS
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
                 RepositoryAuthenticationFailed?.Invoke(this, null);
+                Cache.Clear();
                 return STATUS_NETWORK_UNREACHABLE;
             }
             catch (HttpRequestException)
@@ -520,6 +528,7 @@ namespace KS2Drive.FS
                 catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                 {
                     RepositoryAuthenticationFailed?.Invoke(this, null);
+                    Cache.Clear();
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException)
@@ -566,6 +575,7 @@ namespace KS2Drive.FS
                 catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                 {
                     RepositoryAuthenticationFailed?.Invoke(this, null);
+                    Cache.Clear();
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException)
@@ -946,6 +956,7 @@ namespace KS2Drive.FS
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
                         RepositoryAuthenticationFailed?.Invoke(this, null);
+                        Cache.Clear();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (HttpRequestException ex)
@@ -1274,6 +1285,7 @@ namespace KS2Drive.FS
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
                         RepositoryAuthenticationFailed?.Invoke(this, null);
+                        Cache.Clear();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (HttpRequestException)
@@ -1307,6 +1319,7 @@ namespace KS2Drive.FS
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
                         RepositoryAuthenticationFailed?.Invoke(this, null);
+                        Cache.Clear();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (HttpRequestException)

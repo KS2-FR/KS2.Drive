@@ -84,7 +84,8 @@ namespace KS2Drive.FS
             }
             else //Webdav
             {
-                if (WebDavObject.Etag == null && WebDavObject.ContentLength == 0)
+                //Note : Detecting a webDAV directory from properties can change from one implementation to another. The folowing test is subject to evolve when testing new webDAV servers
+                if ((WebDavObject.Etag == null && WebDavObject.ContentLength == 0) || (WebDavObject.ContentLength == null))
                 {
                     this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
                 }
