@@ -235,6 +235,7 @@
             These flags determine whether the file was modified and whether to delete the file.
             </param>
             <seealso cref="M:Fsp.FileSystemBase.CanDelete(System.Object,System.Object,System.String)"/>
+            <seealso cref="M:Fsp.FileSystemBase.SetDelete(System.Object,System.Object,System.String,System.Boolean)"/>
             <seealso cref="M:Fsp.FileSystemBase.Close(System.Object,System.Object)"/>
         </member>
         <member name="M:Fsp.FileSystemBase.Close(System.Object,System.Object)">
@@ -428,6 +429,22 @@
             <summary>
             Determines whether a file or directory can be deleted.
             </summary>
+            <remarks>
+            <para>
+            This function tests whether a file or directory can be safely deleted. This function does
+            not need to perform access checks, but may performs tasks such as check for empty
+            directories, etc.
+            </para><para>
+            This function should <b>NEVER</b> delete the file or directory in question. Deletion should
+            happen during Cleanup with the FspCleanupDelete flag set.
+            </para><para>
+            This function gets called when Win32 API's such as DeleteFile or RemoveDirectory are used.
+            It does not get called when a file or directory is opened with FILE_DELETE_ON_CLOSE.
+            </para><para>
+            NOTE: If both CanDelete and SetDelete are defined, SetDelete takes precedence. However
+            most file systems need only implement the CanDelete operation.
+            </para>
+            </remarks>
             <param name="FileNode">
             The file node of the file or directory to test for deletion.
             </param>
@@ -439,6 +456,7 @@
             </param>
             <returns>STATUS_SUCCESS or error code.</returns>
             <seealso cref="M:Fsp.FileSystemBase.Cleanup(System.Object,System.Object,System.String,System.UInt32)"/>
+            <seealso cref="M:Fsp.FileSystemBase.SetDelete(System.Object,System.Object,System.String,System.Boolean)"/>
         </member>
         <member name="M:Fsp.FileSystemBase.Rename(System.Object,System.Object,System.String,System.String,System.Boolean)">
             <summary>
@@ -505,7 +523,7 @@
             Describes the modifications to apply to the file or directory security descriptor.
             </param>
             <returns>STATUS_SUCCESS or error code.</returns>
-            <seealso cref="M:Fsp.FileSystemBase.ModifySecurityDescriptor(System.Byte[],System.Security.AccessControl.AccessControlSections,System.Byte[])"/>
+            <seealso cref="M:Fsp.FileSystemBase.ModifySecurityDescriptorEx(System.Byte[],System.Security.AccessControl.AccessControlSections,System.Byte[],System.Byte[]@)"/>
         </member>
         <member name="M:Fsp.FileSystemBase.ReadDirectory(System.Object,System.Object,System.String,System.String,System.IntPtr,System.UInt32,System.UInt32@)">
             <summary>
@@ -704,6 +722,44 @@
             </param>
             <returns>STATUS_SUCCESS or error code.</returns>
         </member>
+        <member name="M:Fsp.FileSystemBase.SetDelete(System.Object,System.Object,System.String,System.Boolean)">
+            <summary>
+            Sets the file delete flag.
+            </summary>
+            <remarks>
+            <para>
+            This function sets a flag to indicates whether the FSD file should delete a file
+            when it is closed. This function does not need to perform access checks, but may
+            performs tasks such as check for empty directories, etc.
+            </para><para>
+            This function should <b>NEVER</b> delete the file or directory in question. Deletion should
+            happen during Cleanup with the FspCleanupDelete flag set.
+            </para><para>
+            This function gets called when Win32 API's such as DeleteFile or RemoveDirectory are used.
+            It does not get called when a file or directory is opened with FILE_DELETE_ON_CLOSE.
+            </para><para>
+            NOTE: If both CanDelete and SetDelete are defined, SetDelete takes precedence. However
+            most file systems need only implement the CanDelete operation.
+            </para>
+            </remarks>
+            <param name="FileNode">
+            The file node of the file or directory to set the delete flag for.
+            </param>
+            <param name="FileDesc">
+            The file descriptor of the file or directory to set the delete flag for.
+            </param>
+            <param name="FileName">
+            The name of the file or directory to set the delete flag for.
+            </param>
+            <param name="DeleteFile">
+            If set to TRUE the FSD indicates that the file will be deleted on Cleanup; otherwise
+            it will not be deleted. It is legal to receive multiple SetDelete calls for the same
+            file with different DeleteFile parameters.
+            </param>
+            <returns>STATUS_SUCCESS or error code.</returns>
+            <seealso cref="M:Fsp.FileSystemBase.Cleanup(System.Object,System.Object,System.String,System.UInt32)"/>
+            <seealso cref="M:Fsp.FileSystemBase.CanDelete(System.Object,System.Object,System.String)"/>
+        </member>
         <member name="M:Fsp.FileSystemBase.NtStatusFromWin32(System.UInt32)">
             <summary>
             Converts a Win32 error code to a Windows kernel status code.
@@ -724,7 +780,7 @@
         </member>
         <member name="M:Fsp.FileSystemBase.ModifySecurityDescriptor(System.Byte[],System.Security.AccessControl.AccessControlSections,System.Byte[])">
             <summary>
-            Modifies a security descriptor.
+            Modifies a security descriptor. [OBSOLETE]
             </summary>
             <remarks>
             This is a helper for implementing the SetSecurity operation.
@@ -739,6 +795,28 @@
             Describes the modifications to apply to the file or directory security descriptor.
             </param>
             <returns>The modified security descriptor.</returns>
+            <seealso cref="M:Fsp.FileSystemBase.SetSecurity(System.Object,System.Object,System.Security.AccessControl.AccessControlSections,System.Byte[])"/>
+        </member>
+        <member name="M:Fsp.FileSystemBase.ModifySecurityDescriptorEx(System.Byte[],System.Security.AccessControl.AccessControlSections,System.Byte[],System.Byte[]@)">
+            <summary>
+            Modifies a security descriptor.
+            </summary>
+            <remarks>
+            This is a helper for implementing the SetSecurity operation.
+            </remarks>
+            <param name="SecurityDescriptor">
+            The original security descriptor.
+            </param>
+            <param name="Sections">
+            Describes what parts of the file or directory security descriptor should be modified.
+            </param>
+            <param name="ModificationDescriptor">
+            Describes the modifications to apply to the file or directory security descriptor.
+            </param>
+            <param name="ModifiedDescriptor">
+            The modified security descriptor. This parameter is modified only on success.
+            </param>
+            <returns>STATUS_SUCCESS or error code.</returns>
             <seealso cref="M:Fsp.FileSystemBase.SetSecurity(System.Object,System.Object,System.Security.AccessControl.AccessControlSections,System.Byte[])"/>
         </member>
         <member name="M:Fsp.FileSystemBase.FindReparsePoint(System.String,System.UInt32@)">
