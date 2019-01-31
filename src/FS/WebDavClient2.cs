@@ -32,7 +32,7 @@ namespace KS2Drive.FS
         }
 
         public WebDavClient2(TimeSpan? uploadTimeout = null) :
-            base(new NetworkCredential { UserName = WebDavClient2._Login, Password = WebDavClient2._Password }, uploadTimeout, null, WebDavClient2._ClientCert)
+            base(new NetworkCredential { UserName = WebDavClient2._Login, Password = WebDavClient2._Password }, uploadTimeout, null)
         {
             if (!WebDavClient2._IsInited) throw new InvalidOperationException("Please Call Init First");
             base.Server = WebDavClient2._Server;
@@ -63,7 +63,7 @@ namespace KS2Drive.FS
             return base.DeleteFolder(remotePath);
         }
 
-        public new Task<Byte[]> Download(string remotePath)
+        public new Task<System.IO.Stream> Download(string remotePath)
         {
             remotePath = ParameterConvert(remotePath);
             return base.Download(remotePath);

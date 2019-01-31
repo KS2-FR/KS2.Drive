@@ -951,7 +951,9 @@ namespace KS2Drive.FS
                     var Proxy = new WebDavClient2();
                     try
                     {
-                        CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                        System.IO.Stream paramFile = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                        CFN.FileData = new byte[paramFile.Length];
+                        paramFile.Read(CFN.FileData, 0, (int)paramFile.Length);
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
