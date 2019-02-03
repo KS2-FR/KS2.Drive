@@ -548,7 +548,6 @@ namespace WebDAVClient
 
             return new UriBuilder(URL);
 
-            //TODO : Avoid server call for resolving URI
             /*
             logger.Trace($"WEBDAVCLIENT GetServerUrl {path}");
 

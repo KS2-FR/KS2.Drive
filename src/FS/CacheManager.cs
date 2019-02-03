@@ -308,7 +308,7 @@ namespace KS2Drive.FS
                     else
                     {
                         //Refresh node with updated properties
-                        //TODO : Should moire properties be updated
+                        //TODO : Should more properties be updated ?
                         var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
                         if (!KnownCachedItem.HasUnflushedData) KnownCachedItem.FileInfo = Node.Item2.FileInfo;
                     }
