@@ -406,7 +406,16 @@ namespace WebDAVClient
             // Should not have a trailing slash.
             var uploadUri = /*await*/ GetServerUrl(remoteFilePath.TrimEnd('/') + "/" + name.TrimStart('/'), false)/*.ConfigureAwait(false)*/;
 
-            HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content, null, startBytes, endBytes).ConfigureAwait(false);
+            IDictionary<string, string> headers = new Dictionary<string, string>();
+            if (CustomHeaders != null)
+            {
+                foreach (var keyValuePair in CustomHeaders)
+                {
+                    headers.Add(keyValuePair);
+                }
+            }
+
+            HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content, headers, startBytes, endBytes).ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.Conflict)
                 throw new WebDAVConflictException((int)response.StatusCode, "Failed uploading file.");
