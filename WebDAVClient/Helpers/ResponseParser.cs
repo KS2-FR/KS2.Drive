@@ -137,11 +137,6 @@ namespace WebDAVClient.Helpers
                             case "version-controlled-configuration":
                                 reader.Skip();
                                 break;
-                            default:
-                            {
-                                //int a = 0;
-                                break;
-                            }
                         }
                     }
                     else if (reader.NodeType == XmlNodeType.EndElement && reader.LocalName.ToLower() == "response")
