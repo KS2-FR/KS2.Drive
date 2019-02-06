@@ -5,12 +5,12 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="clr-namespace:KS2Drive"
-    mc:Ignorable="d" Height="430" Width="1370" ResizeMode="NoResize" Title="KS² Drive">
+    mc:Ignorable="d" Height="430" Width="1370" ResizeMode="NoResize" Title="Yoda Drive">
     <Window.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
             <MenuItem Header="_MOUNT" Click="MenuMount_Click"/>
-            <MenuItem Header="_LOG" Click="MenuLog_Click" />
+            <MenuItem Header="_LOG" Click="MenuLog_Click" Visibility="Collapsed"/>
             <MenuItem Header="_CONFIGURE" Click="MenuConfigure_Click" />
             <MenuItem Header="_ABOUT" Click="MenuAbout_Click" />
             <MenuItem Header="_EXIT" Click="MenuExit_Click"/>

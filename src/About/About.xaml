@@ -6,20 +6,20 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="clr-namespace:KS2Drive.About"
     mc:Ignorable="d"
-    Title="KS² Drive - About" Height="700" Width="700" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico" WindowStartupLocation="CenterScreen">
+    Title="Yoda Drive - About" Height="550" Width="700" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico" WindowStartupLocation="CenterScreen">
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
-                <Paragraph FontSize="30" Margin="0">KS² Drive - 0.8.5</Paragraph>
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a webDAV / AOS server as a local drive.</Paragraph>
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.</Paragraph>
+                <Paragraph FontSize="30" Margin="0">Yoda Drive - 0.8.5</Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a Yoda drive as a local drive.</Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Yoda but should work with any webDAV server.</Paragraph>
 
-                <Paragraph FontSize="24" Margin="0,30,0,0">Usage</Paragraph>
+                <Paragraph FontSize="24" Margin="0,0,0,0">Usage</Paragraph>
 
                 <List MarkerStyle="Box" >
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">
-                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the 2018.2 B2 release of WinFSP or superior</Hyperlink>
+                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the 2019.1 release of WinFSP or superior</Hyperlink>
                         </Paragraph>
                         
                     </ListItem>
@@ -29,16 +29,13 @@
                             </Paragraph>
                     </ListItem>
                     <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">Click on the KS2 Drive icon on your desktop</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14">Click on the Yoda Drive icon on your desktop</Paragraph>
                     </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Configure the server</Paragraph>
                     </ListItem>
                     <ListItem Margin="20,0,0,0">
-                        <Paragraph TextAlignment="Left" FontSize="14">Enter the Webdav/AOS URL of the server</Paragraph>
-                    </ListItem>
-                    <ListItem Margin="20,0,0,0">
-                        <Paragraph TextAlignment="Left" FontSize="14">Select the protocol (Webdav or AOS)</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14">Enter the Yoda drive URL of the server</Paragraph>
                     </ListItem>
                     <ListItem Margin="20,0,0,0">
                         <Paragraph TextAlignment="Left" FontSize="14">Enter your credentials</Paragraph>
@@ -51,14 +48,16 @@
                     </ListItem>
                 </List>
 
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray" Margin="0,60,0,0">Based on WinFSP by Bill Zissimopoulos :
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray" Margin="0,0,0,0">Based on WinFSP by Bill Zissimopoulos :
                     <Hyperlink NavigateUri="http://www.secfs.net/winfsp" RequestNavigate="Hyperlink_RequestNavigate">http://www.secfs.net/winfsp</Hyperlink></Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">Based on the WebdavClient library by Sagui Itay:
-                    <Hyperlink NavigateUri="https://github.com/saguiitay/WebDAVClient" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/saguiitay/WebDAVClient</Hyperlink></Paragraph>
+                    <Hyperlink NavigateUri="https://github.com/saguiitay/WebDAVClient" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/saguiitay/WebDAVClient</Hyperlink>
+                </Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">Based on KS2.Drive.
+                    <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/FrKaram/KS2.Drive</Hyperlink>
+                </Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">This software is under GPLV3.
-                    <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink></Paragraph>
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12">More information on KS² : 
-                    <Hyperlink NavigateUri="http://www.ks2.fr" IsEnabled="True" RequestNavigate="Hyperlink_RequestNavigate">http://www.ks2.fr</Hyperlink>
+                    <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink>
                 </Paragraph>
             </FlowDocument>
         </RichTextBox>

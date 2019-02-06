@@ -8,14 +8,14 @@
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:extToolkit="http://schemas.xceed.com/wpf/xaml/toolkit"
     mc:Ignorable="d"
-        Title="KS² Drive - Configuration" Height="500" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
+        Title="Yoda Drive - Configuration" Height="300" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
     <Window.Resources>
         <local:ProxyActivator x:Key="ProxyActivator" />
         <sys:Int32 x:Key="IntZero">0</sys:Int32>
         <sys:Int32 x:Key="IntOne">1</sys:Int32>
         <sys:Int32 x:Key="IntTwo">2</sys:Int32>
         <local:ProxyCustomAuthActivator x:Key="ProxyCustomAuthActivator" />
-     </Window.Resources>
+    </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -28,7 +28,7 @@
         </Grid.RowDefinitions>
 
         <TabControl Grid.Row="0" Grid.ColumnSpan="2">
-            <TabItem Header="General">
+            <TabItem Header="Configuration" >
                 <Grid Margin="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="100"></ColumnDefinition>
@@ -37,7 +37,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"></RowDefinition>
                         <RowDefinition Height="*"></RowDefinition>
-                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="0"></RowDefinition>
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
@@ -80,8 +80,8 @@
                                 </TextBox.Style>
                             </TextBox>
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" >Type</TextBlock>
-                            <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Visibility="Collapsed">Type</TextBlock>
+                            <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                         </Grid>
                     </Border>
 
@@ -102,7 +102,7 @@
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
                             <PasswordBox Grid.Row="1" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
 
-                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal">
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Visibility="Collapsed">
                                 <CheckBox x:Name="Chk_UserClientCert">Additional client certificate</CheckBox>
                                 <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True"></TextBox>
                                 <extToolkit:DropDownButton Content="Select" Margin="0,5,0,5" Width="100" IsEnabled="{Binding Path=IsChecked,ElementName=Chk_UserClientCert}" x:Name="bt_UserClientCertSelect">
@@ -126,26 +126,30 @@
                                     </extToolkit:DropDownButton.DropDownContent>
                                 </extToolkit:DropDownButton>
                             </StackPanel>
-                            
+
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5" Visibility="Collapsed">
                         <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="61*"/>
+                                <ColumnDefinition Width="93*"/>
+                            </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="35"></RowDefinition>
                                 <RowDefinition Height="35"></RowDefinition>
                             </Grid.RowDefinitions>
 
-                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}"/>
-                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}"/>
+                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}" Grid.ColumnSpan="2"/>
+                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}" Grid.ColumnSpan="2"/>
                         </Grid>
                     </Border>
                 </Grid>
 
 
             </TabItem>
-            <TabItem Header="Advanced">
+            <TabItem Header="Advanced" Visibility="Collapsed">
                 <Border BorderThickness="1" BorderBrush="Gainsboro">
                     <Grid Margin="10">
                         <Grid.ColumnDefinitions>
@@ -175,7 +179,7 @@
                     </Grid>
                 </Border>
             </TabItem>
-            <TabItem Header="Proxy">
+            <TabItem Header="Proxy" Visibility="Collapsed">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="35"></RowDefinition>
