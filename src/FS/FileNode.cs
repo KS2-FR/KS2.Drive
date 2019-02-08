@@ -66,6 +66,7 @@ namespace KS2Drive.FS
             {
                 this.RepositoryPath = WebDavObject.Href;
             }
+            this.RepositoryPath = this.RepositoryPath.Replace("//", "/");
 
             this.LocalPath = HttpUtility.UrlDecode(ConvertRepositoryPathToLocalPath(this.RepositoryPath));
 
@@ -109,7 +110,8 @@ namespace KS2Drive.FS
         {
             if (CMISPath.EndsWith("/")) CMISPath = CMISPath.Substring(0, CMISPath.Length - 1);
 
-            String ReworkdPath = CMISPath.Replace(_DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
+            if (!_DocumentLibraryPath.Equals("")) CMISPath = CMISPath.Replace(_DocumentLibraryPath, "");
+            String ReworkdPath = CMISPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
         }
@@ -183,7 +185,7 @@ namespace KS2Drive.FS
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (DocumentPath.Equals(_DocumentLibraryPath)) return null;
+            if (DocumentPath.Equals(_DocumentLibraryPath)) return "";
             if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
         }
