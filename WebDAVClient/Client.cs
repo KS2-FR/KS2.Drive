@@ -739,7 +739,7 @@ namespace WebDAVClient
 
             if (path == "/") URL = _server + _basePath;
             else if (path.StartsWith(_server)) URL = path;
-            else if (path.StartsWith(_basePath)) URL = _server + _basePath + path.Replace(_basePath, "");
+            else if (path.StartsWith(_basePath)) URL = _server + path;
             else URL = _server + _basePath + (path.StartsWith("/") ? path.Substring(1) : path);
 
             if (appendTrailingSlash && !URL.EndsWith("/")) URL += "/";
