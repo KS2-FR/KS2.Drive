@@ -69,6 +69,12 @@ namespace KS2Drive.FS
             return base.Download(remotePath);
         }
 
+        public new Task<Byte[]> DownloadPartial(string remotePath, long startBytes, long endBytes)
+        {
+            remotePath = ParameterConvert(remotePath);
+            return base.DownloadPartial(remotePath, startBytes, endBytes);
+        }
+
         public new Task<WebDAVClient.Model.Item> GetFile(string remotePath = "/")
         {
             remotePath = ParameterConvert(remotePath);
@@ -105,6 +111,12 @@ namespace KS2Drive.FS
         {
             remoteFilePath = ParameterConvert(remoteFilePath);
             return base.Upload(remoteFilePath, content, name);
+        }
+
+        public new Task<bool> UploadPartial(string remoteFilePath, Stream content, string name, long startBytes, long endBytes)
+        {
+            remoteFilePath = ParameterConvert(remoteFilePath);
+            return base.UploadPartial(remoteFilePath, content, name, startBytes, endBytes);
         }
 
         /// <summary>
