@@ -15,21 +15,21 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
-    <IsWebBootstrapper>true</IsWebBootstrapper>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
     <PublishUrl>D:\OutputKS2Drive\</PublishUrl>
     <Install>true</Install>
-    <InstallFrom>Web</InstallFrom>
-    <UpdateEnabled>true</UpdateEnabled>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
     <UpdateMode>Foreground</UpdateMode>
     <UpdateInterval>7</UpdateInterval>
     <UpdateIntervalUnits>Days</UpdateIntervalUnits>
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <InstallUrl>https://distrib.ks2.fr/de8e8d88-43ab-45fd-89ba-7c868ceb107c/</InstallUrl>
-    <UpdateUrl>https://distrib.ks2.fr/de8e8d88-43ab-45fd-89ba-7c868ceb107c/</UpdateUrl>
-    <ProductName>KS2 Drive</ProductName>
-    <PublisherName>KS2</PublisherName>
+    <SupportUrl>https://yoda.uu.nl</SupportUrl>
+    <ProductName>Yoda Drive</ProductName>
+    <PublisherName>Utrecht University</PublisherName>
+    <MinimumRequiredVersion>0.8.5.0</MinimumRequiredVersion>
     <OpenBrowserOnPublish>false</OpenBrowserOnPublish>
     <ApplicationRevision>0</ApplicationRevision>
     <ApplicationVersion>0.8.5.%2a</ApplicationVersion>
