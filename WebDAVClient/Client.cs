@@ -693,6 +693,7 @@ namespace WebDAVClient
                         request.Headers.Add(key, headers[key]);
                     }
                 }
+                request.Headers.TransferEncodingChunked = true;
 
                 // Need to send along content?
                 if (content != null)

@@ -1,6 +1,7 @@
 ﻿using Fsp.Interop;
 using Newtonsoft.Json;
 using System;
+using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Web;
 
@@ -26,6 +27,8 @@ namespace KS2Drive.FS
         public Byte[] FileSecurity;
         [JsonIgnore]
         public Byte[] FileData;
+        [JsonIgnore]
+        public AnonymousPipeServerStream UploadStream = null;
 
         public bool HasUnflushedData { get; set; } = false;
         public DateTime LastRefresh { get; set; }

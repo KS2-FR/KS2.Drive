@@ -6,6 +6,7 @@ using NLog;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -882,6 +883,12 @@ namespace KS2Drive.FS
                     }
                 }
 
+                if (CFN.UploadStream != null)
+                {
+                    CFN.UploadStream.Close();
+                    CFN.UploadStream = null;
+                }
+
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
 
@@ -1116,15 +1123,17 @@ namespace KS2Drive.FS
 
                 if (this.FlushMode == FlushMode.FlushAtWrite)
                 {
-                    var Proxy = new WebDavClient2();
                     try
                     {
-                        if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                        if (CFN.UploadStream == null)
                         {
-                            throw new Exception();
+                            CFN.UploadStream = new AnonymousPipeServerStream();
+                            var Proxy = new WebDavClient2();
+                            Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new AnonymousPipeClientStream(PipeDirection.In, CFN.UploadStream.ClientSafePipeHandle), CFN.Name);
                         }
+                        CFN.UploadStream.Write(CFN.FileData, (int)Offset, (int)BytesTransferred);
                     }
-                    catch (WebDAVConflictException)
+                    catch (WebDAVConflictException) //XXX not every exception will now occur
                     {
                         Cache.InvalidateFileNode(CFN);
                         L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_ACCESS_DENIED" };
