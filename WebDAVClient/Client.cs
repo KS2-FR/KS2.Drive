@@ -318,7 +318,7 @@ namespace WebDAVClient
         /// Download a file from the server
         /// </summary>
         /// <param name="remoteFilePath">Source path and filename of the file on the server</param>
-        public Task<Byte[]> Download(string remoteFilePath)
+        public Task<Stream> Download(string remoteFilePath)
         {
             var headers = new Dictionary<string, string> { { "translate", "f" } };
             if (CustomHeaders != null)
@@ -338,7 +338,7 @@ namespace WebDAVClient
         /// <param name="remoteFilePath">Source path and filename of the file on the server</param>
         /// <param name="startBytes">Start bytes of content</param>
         /// <param name="endBytes">End bytes of content</param>
-        public Task<Byte[]> DownloadPartial(string remoteFilePath, long startBytes, long endBytes)
+        public Task<Stream> DownloadPartial(string remoteFilePath, long startBytes, long endBytes)
         {
             var headers = new Dictionary<string, string> { { "translate", "f" }, { "Range", "bytes=" + startBytes + "-" + endBytes } };
             if (CustomHeaders != null)
@@ -605,34 +605,25 @@ namespace WebDAVClient
             return response.IsSuccessStatusCode;
         }
 
-        private async Task<Byte[]> DownloadFile(String remoteFilePath, Dictionary<string, string> header)
+        private async Task<Stream> DownloadFile(String remoteFilePath, Dictionary<string, string> header)
         {
             //logger.Trace($"WEBDAVCLIENT Download {remoteFilePath}");
 
             // Should not have a trailing slash.
             var downloadUri = /*await*/ GetServerUrl(remoteFilePath, false)/*.ConfigureAwait(false)*/;
 
-            HttpResponseMessage response = null;
-
             try
             {
-                response = await HttpRequest(downloadUri.Uri, HttpMethod.Get, header).ConfigureAwait(false);
-                if (response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.PartialContent) throw new WebDAVException((int)response.StatusCode, "Failed retrieving file.");
-                Stream s = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                using (MemoryStream MS = new MemoryStream())
+                var response = await HttpRequest(downloadUri.Uri, HttpMethod.Get, header).ConfigureAwait(false);
+                if (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.PartialContent)
                 {
-                    await s.CopyToAsync(MS);
-                    return MS.ToArray();
+                    return await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
                 }
+                throw new WebDAVException((int)response.StatusCode, "Failed retrieving file.");
             }
             catch (Exception ex)
             {
                 throw ex;
-            }
-            finally
-            {
-                if (response != null)
-                    response.Dispose();
             }
         }
 
@@ -702,6 +693,7 @@ namespace WebDAVClient
                         request.Headers.Add(key, headers[key]);
                     }
                 }
+                request.Headers.TransferEncodingChunked = true;
 
                 // Need to send along content?
                 if (content != null)
