@@ -1509,8 +1509,6 @@ namespace KS2Drive.FS
                 {
                     if (FileNode.FileInfo.AllocationSize != NewSize)
                     {
-                        if (NewSize > MaxFileSize) return STATUS_DISK_FULL;
-
                         byte[] FileData = null;
                         if (NewSize != 0)
                         {
