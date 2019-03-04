@@ -1108,9 +1108,17 @@ namespace KS2Drive.FS
                 }
 
                 BytesTransferred = (UInt32)(EndOffset - Offset);
+                var FileData = CFN.FileData;
+                if (this.FlushMode == FlushMode.FlushAtWrite)
+                {
+                    FileData = new byte[BytesTransferred];
+                    CFN.FileData = (Offset == 0 && BytesTransferred == CFN.FileInfo.FileSize) ? FileData : null;
+                    Offset = 0;
+                }
+
                 try
                 {
-                    Marshal.Copy(Buffer, CFN.FileData, (int)Offset, (int)BytesTransferred);
+                    Marshal.Copy(Buffer, FileData, (int)Offset, (int)BytesTransferred);
                 }
                 catch (Exception ex)
                 {
@@ -1128,10 +1136,10 @@ namespace KS2Drive.FS
                         if (CFN.UploadStream == null)
                         {
                             CFN.UploadStream = new AnonymousPipeServerStream();
-                            var Proxy = new WebDavClient2();
+                            var Proxy = new WebDavClient2(Timeout.InfiniteTimeSpan);
                             Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new AnonymousPipeClientStream(PipeDirection.In, CFN.UploadStream.ClientSafePipeHandle), CFN.Name);
                         }
-                        CFN.UploadStream.Write(CFN.FileData, (int)Offset, (int)BytesTransferred);
+                        CFN.UploadStream.Write(FileData, 0, (int)BytesTransferred);
                     }
                     catch (WebDAVConflictException) //XXX not every exception will now occur
                     {
@@ -1510,7 +1518,7 @@ namespace KS2Drive.FS
                     if (FileNode.FileInfo.AllocationSize != NewSize)
                     {
                         byte[] FileData = null;
-                        if (NewSize != 0)
+                        if (this.FlushMode == FlushMode.FlushAtCleanup && NewSize != 0)
                         {
                             try
                             {
@@ -1541,7 +1549,7 @@ namespace KS2Drive.FS
                             if (Result < 0) return Result;
                         }
 
-                        if (NewSize > FileNode.FileInfo.FileSize)
+                        if (this.FlushMode == FlushMode.FlushAtCleanup && NewSize > FileNode.FileInfo.FileSize)
                         {
                             int CopyLength = (int)(NewSize - FileNode.FileInfo.FileSize);
                             if (CopyLength != 0) Array.Clear(FileNode.FileData, (int)FileNode.FileInfo.FileSize, CopyLength);
