@@ -953,12 +953,13 @@ namespace KS2Drive.FS
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
+                byte[] FileData = null;
                 if (CFN.FileData == null)
                 {
                     var Proxy = new WebDavClient2();
                     try
                     {
-                        CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                        FileData = Proxy.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1).GetAwaiter().GetResult();
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
@@ -966,40 +967,54 @@ namespace KS2Drive.FS
                         Cache.Clear();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 416)
+                    {
+                        DebugEnd(OperationId, CFN, $"STATUS_END_OF_FILE - {ex.Message}");
+                        return STATUS_END_OF_FILE;
+                    }
                     catch (HttpRequestException ex)
                     {
-                        CFN.FileData = null;
                         DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (Exception ex)
                     {
-                        CFN.FileData = null;
                         DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
+
+                    if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
+                    {
+                        CFN.FileData = FileData;
+                    }
+                    Offset = 0;
+                    BytesTransferred = (uint)FileData.Length;
+                }
+                else
+                {
+                    FileData = CFN.FileData;
+                    UInt64 FileSize = (UInt64)FileData.LongLength;
+
+                    if (Offset >= FileSize)
+                    {
+                        BytesTransferred = default(UInt32);
+                        DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
+                        return STATUS_END_OF_FILE;
+                    }
+
+                    UInt64 EndOffset = Offset + Length;
+                    if (EndOffset > FileSize) EndOffset = FileSize;
+
+                    BytesTransferred = (UInt32)(EndOffset - Offset);
                 }
 
-                if (CFN.FileData == null)
+                if (FileData == null)
                 {
                     DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
                     return STATUS_OBJECT_NAME_NOT_FOUND;
                 }
 
-                UInt64 FileSize = (UInt64)CFN.FileData.LongLength;
-
-                if (Offset >= FileSize)
-                {
-                    BytesTransferred = default(UInt32);
-                    DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
-                    return STATUS_END_OF_FILE;
-                }
-
-                UInt64 EndOffset = Offset + Length;
-                if (EndOffset > FileSize) EndOffset = FileSize;
-
-                BytesTransferred = (UInt32)(EndOffset - Offset);
-                Marshal.Copy(CFN.FileData, (int)Offset, Buffer, (int)BytesTransferred);
+                Marshal.Copy(FileData, (int)Offset, Buffer, (int)BytesTransferred);
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
