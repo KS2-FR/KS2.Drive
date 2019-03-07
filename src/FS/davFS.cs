@@ -65,7 +65,7 @@ namespace KS2Drive.FS
             this.DAVPassword = config.ServerPassword;
 
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
-            WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
+            WebDavClient2.Init(this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
             Cache = new CacheManager(CacheMode.Enabled, config.PreLoading);
 
             //Test connection to server with the parameters entered in the configuration screen
