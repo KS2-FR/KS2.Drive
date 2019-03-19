@@ -6,8 +6,6 @@ using NLog;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Pipes;
-using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -776,6 +774,8 @@ namespace KS2Drive.FS
                     }
                 }
 
+                CFN.FlushUpload();
+
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
                 if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
                 DebugEnd(OperationId, CFN, $"STATUS_SUCCESS  - Handle {HandleCount}");
@@ -883,11 +883,7 @@ namespace KS2Drive.FS
                     }
                 }
 
-                if (CFN.UploadStream != null)
-                {
-                    CFN.UploadStream.Close();
-                    CFN.UploadStream = null;
-                }
+                CFN.FlushUpload();
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
@@ -952,6 +948,11 @@ namespace KS2Drive.FS
             {
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
+
+                if (CFN.PendingUpload(Offset)) {
+                    DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
+                    return STATUS_END_OF_FILE;
+                }
 
                 byte[] FileData = null;
                 if (CFN.FileData == null)
@@ -1124,16 +1125,17 @@ namespace KS2Drive.FS
 
                 BytesTransferred = (UInt32)(EndOffset - Offset);
                 var FileData = CFN.FileData;
+                var FileDataOffset = Offset;
                 if (this.FlushMode == FlushMode.FlushAtWrite)
                 {
                     FileData = new byte[BytesTransferred];
                     CFN.FileData = (Offset == 0 && BytesTransferred == CFN.FileInfo.FileSize) ? FileData : null;
-                    Offset = 0;
+                    FileDataOffset = 0;
                 }
 
                 try
                 {
-                    Marshal.Copy(Buffer, FileData, (int)Offset, (int)BytesTransferred);
+                    Marshal.Copy(Buffer, FileData, (int)FileDataOffset, (int)BytesTransferred);
                 }
                 catch (Exception ex)
                 {
@@ -1148,13 +1150,7 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        if (CFN.UploadStream == null)
-                        {
-                            CFN.UploadStream = new AnonymousPipeServerStream();
-                            var Proxy = new WebDavClient2(Timeout.InfiniteTimeSpan);
-                            Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new AnonymousPipeClientStream(PipeDirection.In, CFN.UploadStream.ClientSafePipeHandle), CFN.Name);
-                        }
-                        CFN.UploadStream.Write(FileData, 0, (int)BytesTransferred);
+                        CFN.Upload(FileData, Offset, BytesTransferred);
                     }
                     catch (WebDAVConflictException) //XXX not every exception will now occur
                     {

@@ -3,6 +3,8 @@ using Newtonsoft.Json;
 using System;
 using System.IO.Pipes;
 using System.Security.AccessControl;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
 
 namespace KS2Drive.FS
@@ -27,8 +29,6 @@ namespace KS2Drive.FS
         public Byte[] FileSecurity;
         [JsonIgnore]
         public Byte[] FileData;
-        [JsonIgnore]
-        public AnonymousPipeServerStream UploadStream = null;
 
         public bool HasUnflushedData { get; set; } = false;
         public DateTime LastRefresh { get; set; }
@@ -39,6 +39,10 @@ namespace KS2Drive.FS
 
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
+
+        private AnonymousPipeServerStream UploadStream = null;
+        private UInt64 UploadOffset;
+        private Task<bool> UploadTask = null;
 
         private static bool _IsInited = false;
 
@@ -107,6 +111,52 @@ namespace KS2Drive.FS
             this.FileInfo.FileSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
             //CFN.FileInfo.IndexNumber = CFN.GetIndex(); //TEMP
             this.FileSecurity = GetDefaultSecurity();
+        }
+
+        public bool PendingUpload(UInt64 Offset)
+        {
+            return (UploadStream != null && UploadOffset < Offset);
+        }
+
+        public bool FlushUpload()
+        {
+            if (UploadStream != null)
+            {
+                UploadStream.Close();
+                bool result = UploadTask.GetAwaiter().GetResult();
+                UploadStream = null;
+                UploadTask = null;
+                return result;
+            }
+            return false;
+        }
+
+        public void Upload(byte[] Data, UInt64 Offset, UInt32 Length)
+        {
+            if (UploadStream != null && UploadOffset != Offset)
+            {
+                FlushUpload();
+            }
+            if (UploadStream == null)
+            {
+                UploadStream = new AnonymousPipeServerStream();
+                UploadOffset = Offset;
+                var Proxy = new WebDavClient2(Timeout.InfiniteTimeSpan);
+                var PipeStream = new AnonymousPipeClientStream(PipeDirection.In, UploadStream.ClientSafePipeHandle);
+                if (UploadOffset == 0)
+                {
+                    UploadTask = Proxy.Upload(GetRepositoryParentPath(RepositoryPath), PipeStream, Name);
+                }
+                else
+                {
+                    throw new Exception("Partial upload not yet implemented");
+                }
+            }
+            if (Data != null)
+            {
+                UploadStream.Write(Data, 0, (int)Length);
+                UploadOffset += Length;
+            }
         }
 
         public static String ConvertRepositoryPathToLocalPath(String CMISPath)
