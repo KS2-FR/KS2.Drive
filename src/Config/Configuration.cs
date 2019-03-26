@@ -52,7 +52,7 @@ namespace KS2Drive.Config
         public String ServerLogin { get; set; }
         public String ServerPassword { get; set; }
         public Int32 KernelCacheMode { get; set; } = -1;
-        public Int32 FlushMode { get; set; } = 1;
+        public Int32 FlushMode { get; set; } = 0;
         public bool SyncOps { get; set; } = false;
         public bool PreLoading { get; set; } = true;
         public bool MountAsNetworkDrive { get; set; } = false;
