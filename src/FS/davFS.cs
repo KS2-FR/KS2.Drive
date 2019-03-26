@@ -6,8 +6,6 @@ using NLog;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Pipes;
-using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -65,7 +63,7 @@ namespace KS2Drive.FS
             this.DAVPassword = config.ServerPassword;
 
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
-            WebDavClient2.Init(this.WebDAVMode, this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
+            WebDavClient2.Init(this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
             Cache = new CacheManager(CacheMode.Enabled, config.PreLoading);
 
             //Test connection to server with the parameters entered in the configuration screen
@@ -776,6 +774,8 @@ namespace KS2Drive.FS
                     }
                 }
 
+                CFN.FlushUpload();
+
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
                 if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
                 DebugEnd(OperationId, CFN, $"STATUS_SUCCESS  - Handle {HandleCount}");
@@ -883,11 +883,7 @@ namespace KS2Drive.FS
                     }
                 }
 
-                if (CFN.UploadStream != null)
-                {
-                    CFN.UploadStream.Close();
-                    CFN.UploadStream = null;
-                }
+                CFN.FlushUpload();
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
@@ -953,12 +949,18 @@ namespace KS2Drive.FS
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
+                if (CFN.PendingUpload(Offset)) {
+                    DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
+                    return STATUS_END_OF_FILE;
+                }
+
+                byte[] FileData = null;
                 if (CFN.FileData == null)
                 {
                     var Proxy = new WebDavClient2();
                     try
                     {
-                        CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                        FileData = Proxy.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1).GetAwaiter().GetResult();
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
@@ -966,40 +968,54 @@ namespace KS2Drive.FS
                         Cache.Clear();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 416)
+                    {
+                        DebugEnd(OperationId, CFN, $"STATUS_END_OF_FILE - {ex.Message}");
+                        return STATUS_END_OF_FILE;
+                    }
                     catch (HttpRequestException ex)
                     {
-                        CFN.FileData = null;
                         DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (Exception ex)
                     {
-                        CFN.FileData = null;
                         DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                         return STATUS_NETWORK_UNREACHABLE;
                     }
+
+                    if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
+                    {
+                        CFN.FileData = FileData;
+                    }
+                    Offset = 0;
+                    BytesTransferred = (uint)FileData.Length;
+                }
+                else
+                {
+                    FileData = CFN.FileData;
+                    UInt64 FileSize = (UInt64)FileData.LongLength;
+
+                    if (Offset >= FileSize)
+                    {
+                        BytesTransferred = default(UInt32);
+                        DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
+                        return STATUS_END_OF_FILE;
+                    }
+
+                    UInt64 EndOffset = Offset + Length;
+                    if (EndOffset > FileSize) EndOffset = FileSize;
+
+                    BytesTransferred = (UInt32)(EndOffset - Offset);
                 }
 
-                if (CFN.FileData == null)
+                if (FileData == null)
                 {
                     DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
                     return STATUS_OBJECT_NAME_NOT_FOUND;
                 }
 
-                UInt64 FileSize = (UInt64)CFN.FileData.LongLength;
-
-                if (Offset >= FileSize)
-                {
-                    BytesTransferred = default(UInt32);
-                    DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
-                    return STATUS_END_OF_FILE;
-                }
-
-                UInt64 EndOffset = Offset + Length;
-                if (EndOffset > FileSize) EndOffset = FileSize;
-
-                BytesTransferred = (UInt32)(EndOffset - Offset);
-                Marshal.Copy(CFN.FileData, (int)Offset, Buffer, (int)BytesTransferred);
+                Marshal.Copy(FileData, (int)Offset, Buffer, (int)BytesTransferred);
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
@@ -1108,9 +1124,18 @@ namespace KS2Drive.FS
                 }
 
                 BytesTransferred = (UInt32)(EndOffset - Offset);
+                var FileData = CFN.FileData;
+                var FileDataOffset = Offset;
+                if (this.FlushMode == FlushMode.FlushAtWrite)
+                {
+                    FileData = new byte[BytesTransferred];
+                    CFN.FileData = (Offset == 0 && BytesTransferred == CFN.FileInfo.FileSize) ? FileData : null;
+                    FileDataOffset = 0;
+                }
+
                 try
                 {
-                    Marshal.Copy(Buffer, CFN.FileData, (int)Offset, (int)BytesTransferred);
+                    Marshal.Copy(Buffer, FileData, (int)FileDataOffset, (int)BytesTransferred);
                 }
                 catch (Exception ex)
                 {
@@ -1125,13 +1150,7 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        if (CFN.UploadStream == null)
-                        {
-                            CFN.UploadStream = new AnonymousPipeServerStream();
-                            var Proxy = new WebDavClient2();
-                            Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new AnonymousPipeClientStream(PipeDirection.In, CFN.UploadStream.ClientSafePipeHandle), CFN.Name);
-                        }
-                        CFN.UploadStream.Write(CFN.FileData, (int)Offset, (int)BytesTransferred);
+                        CFN.Upload(FileData, Offset, BytesTransferred);
                     }
                     catch (WebDAVConflictException) //XXX not every exception will now occur
                     {
@@ -1509,10 +1528,8 @@ namespace KS2Drive.FS
                 {
                     if (FileNode.FileInfo.AllocationSize != NewSize)
                     {
-                        if (NewSize > MaxFileSize) return STATUS_DISK_FULL;
-
                         byte[] FileData = null;
-                        if (NewSize != 0)
+                        if (this.FlushMode == FlushMode.FlushAtCleanup && NewSize != 0)
                         {
                             try
                             {
@@ -1543,7 +1560,7 @@ namespace KS2Drive.FS
                             if (Result < 0) return Result;
                         }
 
-                        if (NewSize > FileNode.FileInfo.FileSize)
+                        if (this.FlushMode == FlushMode.FlushAtCleanup && NewSize > FileNode.FileInfo.FileSize)
                         {
                             int CopyLength = (int)(NewSize - FileNode.FileInfo.FileSize);
                             if (CopyLength != 0) Array.Clear(FileNode.FileData, (int)FileNode.FileInfo.FileSize, CopyLength);

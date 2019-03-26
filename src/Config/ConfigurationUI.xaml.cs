@@ -4,6 +4,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Deployment.Application;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
@@ -151,12 +152,20 @@ namespace KS2Drive.Config
             RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
             if (chk_AutoStart.IsChecked == true)
             {
-                rkApp.SetValue("KS2Drive", System.Reflection.Assembly.GetEntryAssembly().Location);
+                if (ApplicationDeployment.IsNetworkDeployed) //If running from Click-Once link, autostart the Click-Once bootstrap
+                {
+                    rkApp.SetValue("KS2Drive", Environment.GetFolderPath(Environment.SpecialFolder.Programs) + @"\KS2\KS2.WorkflowClient.appref-ms");
+                }
+                else //If portable, autostart the program itself
+                {
+                    rkApp.SetValue("KS2Drive", System.Reflection.Assembly.GetEntryAssembly().Location);
+                }
             }
             else
             {
                 rkApp.DeleteValue("KS2Drive", false);
             }
+            rkApp.Close();
 
             this.AppConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
             this.AppConfiguration.ServerURL = txtURL.Text;

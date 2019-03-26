@@ -12,7 +12,6 @@ namespace KS2Drive.FS
     public class WebDavClient2 : WebDAVClient.Client
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
-        private static WebDAVMode _Mode;
         private static String _RootPath;
         private static String _Server;
         private static String _Login;
@@ -20,9 +19,8 @@ namespace KS2Drive.FS
         private static bool _IsInited = false;
         private static X509Certificate2 _ClientCert;
 
-        public static void Init(WebDAVMode mode, String Server, String BasePath, String Login, String Password, X509Certificate2 ClientCert)
+        public static void Init(String Server, String BasePath, String Login, String Password, X509Certificate2 ClientCert)
         {
-            WebDavClient2._Mode = mode;
             WebDavClient2._RootPath = BasePath;
             WebDavClient2._Server = Server;
             WebDavClient2._Login = Login;
@@ -74,10 +72,15 @@ namespace KS2Drive.FS
             }
         }
 
-        public new Task<Stream> DownloadPartial(string remotePath, long startBytes, long endBytes)
+        public new async Task<byte[]> DownloadPartial(string remotePath, long startBytes, long endBytes)
         {
             remotePath = ParameterConvert(remotePath);
-            return base.DownloadPartial(remotePath, startBytes, endBytes);
+            Stream s = await base.DownloadPartial(remotePath, startBytes, endBytes);
+            using (MemoryStream MS = new MemoryStream())
+            {
+                await s.CopyToAsync(MS);
+                return MS.ToArray();
+            }
         }
 
         public new Task<WebDAVClient.Model.Item> GetFile(string remotePath = "/")
