@@ -25,7 +25,7 @@
                     </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">
-                            <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive/releases/download/0.8/setup.exe" RequestNavigate="Hyperlink_RequestNavigate">Download the setup program</Hyperlink>
+                            <Hyperlink NavigateUri="https://github.com/UtrechtUniversity/YodaDrive/releases" RequestNavigate="Hyperlink_RequestNavigate">Download the setup program</Hyperlink>
                             </Paragraph>
                     </ListItem>
                     <ListItem>
@@ -57,7 +57,7 @@
                     <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/FrKaram/KS2.Drive</Hyperlink>
                 </Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">This software is under GPLV3.
-                    <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink>
+                    <Hyperlink NavigateUri="https://github.com/UtrechtUniversity/YodaDrive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink>
                 </Paragraph>
             </FlowDocument>
         </RichTextBox>
