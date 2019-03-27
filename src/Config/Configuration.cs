@@ -42,8 +42,8 @@ namespace KS2Drive.Config
         public bool IsConfigured { get; set; } = true;
 
         //Startup
-        public bool AutoMount { get; set; }
-        public bool AutoStart { get; set; }
+        public bool AutoMount { get; set; } = true;
+        public bool AutoStart { get; set; } = true;
 
         //Drive Parameter
         public String DriveLetter { get; set; }
