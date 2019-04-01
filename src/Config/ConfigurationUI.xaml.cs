@@ -59,7 +59,7 @@ namespace KS2Drive.Config
             CBFlush.DisplayMemberPath = "Value";
             CBFlush.Items.Add(new KeyValuePair<int, string>((Int32)FlushMode.FlushAtCleanup, FlushMode.FlushAtCleanup.ToString()));
             CBFlush.Items.Add(new KeyValuePair<int, string>((Int32)FlushMode.FlushAtWrite, FlushMode.FlushAtWrite.ToString()));
-            CBFlush.SelectedIndex = 0;
+            CBFlush.SelectedIndex = 1;
 
             CBSyncOps.SelectedValuePath = "Key";
             CBSyncOps.DisplayMemberPath = "Value";
