@@ -14,7 +14,7 @@
                     <Run Text="KS² Drive"/>
                 </Paragraph>
                 <Paragraph FontSize="12" TextAlignment="Center">
-                    <Run Text="Failed to start WinFSP Service. Please ensure you have installed version 2019.2 or superior"></Run>
+                    <Run Text="Failed to start WinFSP Service. Please ensure you have installed version 2019.3 B1 or superior"></Run>
                 </Paragraph>
                 <Paragraph FontSize="12" TextAlignment="Center">
                     <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">
