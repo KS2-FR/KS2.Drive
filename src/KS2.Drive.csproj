@@ -16,7 +16,7 @@
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <IsWebBootstrapper>false</IsWebBootstrapper>
-    <PublishUrl>D:\OutputKS2Drive\</PublishUrl>
+    <PublishUrl>C:\OutputKS2Drive\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
     <UpdateEnabled>false</UpdateEnabled>
@@ -29,10 +29,10 @@
     <SupportUrl>https://yoda.uu.nl</SupportUrl>
     <ProductName>Yoda Drive</ProductName>
     <PublisherName>Utrecht University</PublisherName>
-    <MinimumRequiredVersion>0.8.5.0</MinimumRequiredVersion>
+    <MinimumRequiredVersion>0.1.0.0</MinimumRequiredVersion>
     <OpenBrowserOnPublish>false</OpenBrowserOnPublish>
-    <ApplicationRevision>1</ApplicationRevision>
-    <ApplicationVersion>0.8.5.%2a</ApplicationVersion>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>0.1.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <CreateDesktopShortcut>true</CreateDesktopShortcut>
     <PublishWizardCompleted>true</PublishWizardCompleted>
