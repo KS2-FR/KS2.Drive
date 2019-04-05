@@ -495,18 +495,9 @@ namespace KS2Drive.FS
             {
                 try
                 {
-                    if (Proxy.Upload(RepositoryNewDocumentParentPath, new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
-                    {
-                        CFN = new FileNode(Proxy.GetRepositoryElement(FileName));
-                        CFN.HasUnflushedData = true;
-                    }
-                    else
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_CANNOT_MAKE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
-                        return STATUS_CANNOT_MAKE;
-                    }
+                    CFN = new FileNode(FileName);
+                    CFN.Upload(null, 0, 0);
+                    CFN.HasUnflushedData = true;
                 }
                 catch (WebDAVConflictException)
                 {
