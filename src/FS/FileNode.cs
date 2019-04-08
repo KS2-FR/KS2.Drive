@@ -113,6 +113,26 @@ namespace KS2Drive.FS
             this.FileSecurity = GetDefaultSecurity();
         }
 
+        public FileNode(String Path)
+        {
+            if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
+
+            lock (_handlelock)
+            {
+                this.ObjectId = (++ObjetIdSequence).ToString();
+            }
+
+            this.LastRefresh = DateTime.Now;
+
+            this.LocalPath = Path;
+            this.RepositoryPath = ConvertLocalPathToRepositoryPath(Path);
+            this.Name = GetRepositoryDocumentName(this.RepositoryPath);
+
+            this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+
+            this.FileSecurity = GetDefaultSecurity();
+        }
+
         public bool PendingUpload(UInt64 Offset)
         {
             return (UploadStream != null && UploadOffset < Offset);
