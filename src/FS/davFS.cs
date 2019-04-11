@@ -1143,7 +1143,7 @@ namespace KS2Drive.FS
                     {
                         CFN.Upload(FileData, Offset, BytesTransferred);
                     }
-                    catch (WebDAVConflictException) //XXX not every exception will now occur
+                    catch (WebDAVConflictException)
                     {
                         Cache.InvalidateFileNode(CFN);
                         L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_ACCESS_DENIED" };
