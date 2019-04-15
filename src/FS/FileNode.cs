@@ -169,7 +169,7 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    throw new Exception("Partial upload not yet implemented");
+                    UploadTask = Proxy.UploadPartial(GetRepositoryParentPath(RepositoryPath), PipeStream, Name, (long)UploadOffset);
                 }
             }
             if (Data != null)
