@@ -61,10 +61,26 @@ namespace KS2Drive.FS
             return base.DeleteFolder(remotePath);
         }
 
-        public new Task<Byte[]> Download(string remotePath)
+        public new async Task<byte[]> Download(string remotePath)
         {
             remotePath = ParameterConvert(remotePath);
-            return base.Download(remotePath);
+            Stream s = await base.Download(remotePath);
+            using (MemoryStream MS = new MemoryStream())
+            {
+                await s.CopyToAsync(MS);
+                return MS.ToArray();
+            }
+        }
+
+        public new async Task<byte[]> DownloadPartial(string remotePath, long startBytes, long endBytes)
+        {
+            remotePath = ParameterConvert(remotePath);
+            Stream s = await base.DownloadPartial(remotePath, startBytes, endBytes);
+            using (MemoryStream MS = new MemoryStream())
+            {
+                await s.CopyToAsync(MS);
+                return MS.ToArray();
+            }
         }
 
         public new Task<WebDAVClient.Model.Item> GetFile(string remotePath = "/")
@@ -103,6 +119,12 @@ namespace KS2Drive.FS
         {
             remoteFilePath = ParameterConvert(remoteFilePath);
             return base.Upload(remoteFilePath, content, name);
+        }
+
+        public new Task<bool> UploadPartial(string remoteFilePath, Stream content, string name, long startBytes, long? endBytes = null)
+        {
+            remoteFilePath = ParameterConvert(remoteFilePath);
+            return base.UploadPartial(remoteFilePath, content, name, startBytes, endBytes);
         }
 
         /// <summary>

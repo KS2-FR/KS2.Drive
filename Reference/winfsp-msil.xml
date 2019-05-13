@@ -946,6 +946,11 @@
             Gets or sets a value that determines whether the file system supports named streams.
             </summary>
         </member>
+        <member name="P:Fsp.FileSystemHost.ExtendedAttributes">
+            <summary>
+            Gets or sets a value that determines whether the file system supports extended attributes.
+            </summary>
+        </member>
         <member name="P:Fsp.FileSystemHost.Prefix">
             <summary>
             Gets or sets the prefix for a network file system.
@@ -1097,6 +1102,11 @@
             <summary>
             The number of hard links.
             Not currently implemented. Set to 0.
+            </summary>
+        </member>
+        <member name="P:Fsp.Interop.FileInfo.EaSize">
+            <summary>
+            The extended attribute size of the file.
             </summary>
         </member>
         <member name="T:Fsp.Service">

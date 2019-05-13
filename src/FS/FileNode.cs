@@ -1,7 +1,10 @@
 ﻿using Fsp.Interop;
 using Newtonsoft.Json;
 using System;
+using System.IO.Pipes;
 using System.Security.AccessControl;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
 
 namespace KS2Drive.FS
@@ -37,6 +40,10 @@ namespace KS2Drive.FS
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
 
+        private AnonymousPipeServerStream UploadStream = null;
+        private UInt64 UploadOffset;
+        private Task<bool> UploadTask = null;
+
         private static bool _IsInited = false;
 
         public static void Init(String DocumentLibraryPath, WebDAVMode webDavMode)
@@ -66,6 +73,7 @@ namespace KS2Drive.FS
             {
                 this.RepositoryPath = WebDavObject.Href;
             }
+            this.RepositoryPath = this.RepositoryPath.Replace("//", "/");
 
             this.LocalPath = HttpUtility.UrlDecode(ConvertRepositoryPathToLocalPath(this.RepositoryPath));
 
@@ -105,11 +113,78 @@ namespace KS2Drive.FS
             this.FileSecurity = GetDefaultSecurity();
         }
 
+        public FileNode(String Path)
+        {
+            if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
+
+            lock (_handlelock)
+            {
+                this.ObjectId = (++ObjetIdSequence).ToString();
+            }
+
+            this.LastRefresh = DateTime.Now;
+
+            this.LocalPath = Path;
+            this.RepositoryPath = ConvertLocalPathToRepositoryPath(Path);
+            this.Name = GetRepositoryDocumentName(this.RepositoryPath);
+
+            this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+
+            this.FileSecurity = GetDefaultSecurity();
+        }
+
+        public bool PendingUpload(UInt64 Offset)
+        {
+            return (UploadStream != null && UploadOffset < Offset);
+        }
+
+        public bool FlushUpload()
+        {
+            if (UploadStream != null)
+            {
+                UploadStream.Close();
+                bool result = UploadTask.GetAwaiter().GetResult();
+                UploadStream = null;
+                UploadTask = null;
+                return result;
+            }
+            return false;
+        }
+
+        public void Upload(byte[] Data, UInt64 Offset, UInt32 Length)
+        {
+            if (UploadStream != null && UploadOffset != Offset)
+            {
+                FlushUpload();
+            }
+            if (UploadStream == null)
+            {
+                UploadStream = new AnonymousPipeServerStream();
+                UploadOffset = Offset;
+                var Proxy = new WebDavClient2(Timeout.InfiniteTimeSpan);
+                var PipeStream = new AnonymousPipeClientStream(PipeDirection.In, UploadStream.ClientSafePipeHandle);
+                if (UploadOffset == 0)
+                {
+                    UploadTask = Proxy.Upload(GetRepositoryParentPath(RepositoryPath), PipeStream, Name);
+                }
+                else
+                {
+                    UploadTask = Proxy.UploadPartial(GetRepositoryParentPath(RepositoryPath), PipeStream, Name, (long)UploadOffset);
+                }
+            }
+            if (Data != null)
+            {
+                UploadStream.Write(Data, 0, (int)Length);
+                UploadOffset += Length;
+            }
+        }
+
         public static String ConvertRepositoryPathToLocalPath(String CMISPath)
         {
             if (CMISPath.EndsWith("/")) CMISPath = CMISPath.Substring(0, CMISPath.Length - 1);
 
-            String ReworkdPath = CMISPath.Replace(_DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
+            if (!_DocumentLibraryPath.Equals("")) CMISPath = CMISPath.Replace(_DocumentLibraryPath, "");
+            String ReworkdPath = CMISPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
         }
@@ -183,7 +258,7 @@ namespace KS2Drive.FS
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (DocumentPath.Equals(_DocumentLibraryPath)) return null;
+            if (DocumentPath.Equals(_DocumentLibraryPath)) return "";
             if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
         }
