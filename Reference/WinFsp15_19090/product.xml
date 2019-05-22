@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Product
+  xmlns="http://schemas.microsoft.com/developer/2004/01/bootstrapper"
+  ProductCode="YodaWinFsp.Bootstrapper.Package">
+
+  <PackageFiles>
+    <PackageFile Name="winfsp-1.5.19090.msi" HomeSite="WinFspRedistMsi" Hash="25ceb7ecb3b760936f8e2e76307a499d234c0789"/>
+  </PackageFiles>
+
+  <InstallChecks>
+    <MsiProductCheck Product="IsMsiInstalled"
+      Property="{5B06D123-8C45-45C9-AE48-F15894CED16F}"/>
+  </InstallChecks>
+
+  <Commands>
+    <Command PackageFile="winfsp-1.5.19090.msi" Arguments="">
+
+      <InstallConditions>
+        <BypassIf Property="IsMsiInstalled"
+          Compare="ValueGreaterThan" Value="0"/>
+        <FailIf Property="AdminUser"
+          Compare="ValueNotEqualTo" Value="True"
+         String="NotAnAdmin"/>
+      </InstallConditions>
+
+      <ExitCodes>
+        <ExitCode Value="0" Result="Success"/>
+        <ExitCode Value="1641" Result="SuccessReboot"/>
+        <ExitCode Value="3010" Result="SuccessReboot"/>
+        <DefaultExitCode Result="Fail" String="GeneralFailure"/>
+      </ExitCodes>
+    </Command>
+  </Commands>
+</Product>
