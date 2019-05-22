@@ -1026,6 +1026,56 @@
             Return the installed version of WinFsp.
             </summary>
         </member>
+        <member name="M:Fsp.FileSystemHost.GetOperationRequestHint">
+            <summary>
+            Returns a RequestHint to reference the current operation asynchronously.
+            </summary>
+        </member>
+        <member name="M:Fsp.FileSystemHost.SendWriteResponse(System.UInt64,System.Int32,System.UInt32,Fsp.Interop.FileInfo@)">
+            <summary>
+            Asynchronously complete a Write operation.
+            </summary>
+            <param name="RequestHint">
+            A reference to the operation to complete.
+            </param>
+            <param name="Status">
+            STATUS_SUCCESS or error code.
+            </param>
+            <param name="BytesTransferred">
+            The number of bytes written.
+            </param>
+            <param name="FileInfo">
+            Updated file information.
+            </param>
+        </member>
+        <member name="M:Fsp.FileSystemHost.SendReadResponse(System.UInt64,System.Int32,System.UInt32)">
+            <summary>
+            Asynchronously complete a Read operation.
+            </summary>
+            <param name="RequestHint">
+            A reference to the operation to complete.
+            </param>
+            <param name="Status">
+            STATUS_SUCCESS or error code.
+            </param>
+            <param name="BytesTransferred">
+            Number of bytes read.
+            </param>
+        </member>
+        <member name="M:Fsp.FileSystemHost.SendReadDirectoryResponse(System.UInt64,System.Int32,System.UInt32)">
+            <summary>
+            Asynchronously complete a ReadDirectory operation.
+            </summary>
+            <param name="RequestHint">
+            A reference to the operation to complete.
+            </param>
+            <param name="Status">
+            STATUS_SUCCESS or error code.
+            </param>
+            <param name="BytesTransferred">
+            Number of bytes read.
+            </param>
+        </member>
         <member name="T:Fsp.Interop.VolumeInfo">
             <summary>
             Contains volume information about a file system.

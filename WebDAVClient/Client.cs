@@ -17,6 +17,18 @@ using WebDAVClient.Model;
 
 namespace WebDAVClient
 {
+    class PartialRange : ContentRangeHeaderValue
+    {
+        public PartialRange(Int64 from) : base(from, from)
+        {
+        }
+
+        public override string ToString()
+        {
+            return $"bytes {From}-/*";
+        }
+    }
+
     public class Client : IClient
     {
         private static readonly HttpMethod PropFind = new HttpMethod("PROPFIND");
@@ -396,9 +408,9 @@ namespace WebDAVClient
         /// <param name="name">Name of the file to update</param>
         /// <param name="startBytes">Start byte position of the target content</param>
         /// <param name="endBytes">End bytes of the target content. Must match the length of <paramref name="content"/> plus <paramref name="startBytes"/></param>
-        public async Task<bool> UploadPartial(string remoteFilePath, Stream content, string name, long startBytes, long endBytes)
+        public async Task<bool> UploadPartial(string remoteFilePath, Stream content, string name, long startBytes, long? endBytes)
         {
-            if (startBytes + content.Length != endBytes)
+            if (endBytes.HasValue && startBytes + content.Length != endBytes)
             {
                 throw new InvalidOperationException("The length of the given content plus the startBytes must match the endBytes.");
             }
@@ -699,10 +711,17 @@ namespace WebDAVClient
                 if (content != null)
                 {
                     request.Content = new StreamContent(content);
-                    if (startbytes.HasValue && endbytes.HasValue)
+                    if (startbytes.HasValue)
                     {
-                        request.Content.Headers.ContentRange = ContentRangeHeaderValue.Parse($"bytes {startbytes}-{endbytes}/*");
-                        request.Content.Headers.ContentLength = endbytes - startbytes;
+                        if (endbytes.HasValue)
+                        {
+                            request.Content.Headers.ContentRange = ContentRangeHeaderValue.Parse($"bytes {startbytes}-{endbytes}/*");
+                            request.Content.Headers.ContentLength = endbytes - startbytes;
+                        }
+                        else
+                        {
+                            request.Content.Headers.ContentRange = new PartialRange(startbytes.Value);
+                        }
                     }
                 }
 

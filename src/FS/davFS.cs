@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Threading;
+using System.Threading.Tasks;
 using WebDAVClient.Helpers;
 using FileInfo = Fsp.Interop.FileInfo;
 using VolumeInfo = Fsp.Interop.VolumeInfo;
@@ -23,6 +24,7 @@ namespace KS2Drive.FS
         public event EventHandler RepositoryAuthenticationFailed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
+        private FileSystemHost Host;
         private UInt32 MaxFileNodes;
         private UInt32 MaxFileSize;
         private String VolumeLabel;
@@ -37,6 +39,10 @@ namespace KS2Drive.FS
         private String DocumentLibraryPath;
 
         private CacheManager Cache;
+        private WebDavClient2 UploadClient;
+        private WebDavClient2 DownloadClient;
+        private Task<bool> UploadTask;
+        private Task DownloadTask;
 
         private const UInt16 MEMFS_SECTOR_SIZE = 4096;
         private const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
@@ -65,12 +71,13 @@ namespace KS2Drive.FS
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
             WebDavClient2.Init(this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
             Cache = new CacheManager(CacheMode.Enabled, config.PreLoading);
+            this.UploadClient = new WebDavClient2(Timeout.InfiniteTimeSpan);
 
             //Test connection to server with the parameters entered in the configuration screen
-            var Proxy = new WebDavClient2();
+            this.DownloadClient = new WebDavClient2();
             try
             {
-                var LisTest = Proxy.List("/").GetAwaiter().GetResult();
+                var LisTest = this.DownloadClient.List("/").GetAwaiter().GetResult();
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
@@ -80,6 +87,9 @@ namespace KS2Drive.FS
             {
                 throw new Exception($"Cannot connect to server : {ex.Message}");
             }
+
+            this.UploadTask = null;
+            this.DownloadTask = null;
         }
 
         /// <summary>
@@ -87,7 +97,7 @@ namespace KS2Drive.FS
         /// </summary>
         public override Int32 Init(Object Host0)
         {
-            FileSystemHost Host = (FileSystemHost)Host0;
+            Host = (FileSystemHost)Host0;
 
             Host.FileInfoTimeout = unchecked((UInt32)(Int32)(this.kernelCacheMode));
             Host.FileSystemName = "davFS";
@@ -430,6 +440,16 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        private async Task<bool> AsyncWrite(Task<bool> Task, FileNode CFN, WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
+        {
+            if (Task != null)
+            {
+                await Task;
+            }
+
+            return await CFN.Upload(Proxy, Data, Offset, Length);
+        }
+
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -496,7 +516,7 @@ namespace KS2Drive.FS
                 try
                 {
                     CFN = new FileNode(FileName);
-                    CFN.Upload(null, 0, 0);
+                    UploadTask = AsyncWrite(UploadTask, CFN, UploadClient, null, 0, 0);
                     CFN.HasUnflushedData = true;
                 }
                 catch (WebDAVConflictException)
@@ -924,6 +944,63 @@ namespace KS2Drive.FS
             }
         }
 
+        private async Task AsyncRead(Task Task, String OperationId, FileNode CFN, IntPtr Buffer, UInt64 Offset, UInt32 Length, UInt64 RequestHint)
+        {
+            UInt32 BytesTransferred;
+            byte[] FileData = null;
+
+            if (Task != null)
+            {
+                await Task;
+            }
+
+            try
+            {
+                FileData = await DownloadClient.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1);
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                RepositoryAuthenticationFailed?.Invoke(this, null);
+                Cache.Clear();
+                Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
+                return;
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 416)
+            {
+                DebugEnd(OperationId, CFN, $"STATUS_END_OF_FILE - {ex.Message}");
+                Host.SendReadResponse(RequestHint, STATUS_END_OF_FILE, 0);
+                return;
+            }
+            catch (HttpRequestException ex)
+            {
+                DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
+                return;
+            }
+            catch (Exception ex)
+            {
+                DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
+                Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
+                return;
+            }
+
+            if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
+            {
+                CFN.FileData = FileData;
+            }
+            BytesTransferred = (uint)FileData.Length;
+            if (FileData == null)
+            {
+                DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
+                Host.SendReadResponse(RequestHint, STATUS_OBJECT_NAME_NOT_FOUND, BytesTransferred);
+                return;
+            }
+            Marshal.Copy(FileData, 0, Buffer, (int)BytesTransferred);
+
+            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+            Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
+        }
+
         public override Int32 Read(
             Object FileNode0,
             Object FileDesc,
@@ -948,39 +1025,8 @@ namespace KS2Drive.FS
                 byte[] FileData = null;
                 if (CFN.FileData == null)
                 {
-                    var Proxy = new WebDavClient2();
-                    try
-                    {
-                        FileData = Proxy.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1).GetAwaiter().GetResult();
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 416)
-                    {
-                        DebugEnd(OperationId, CFN, $"STATUS_END_OF_FILE - {ex.Message}");
-                        return STATUS_END_OF_FILE;
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-
-                    if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
-                    {
-                        CFN.FileData = FileData;
-                    }
-                    Offset = 0;
-                    BytesTransferred = (uint)FileData.Length;
+                    DownloadTask = AsyncRead(DownloadTask, OperationId, CFN, Buffer, Offset, Length, Host.GetOperationRequestHint());
+                    return STATUS_PENDING;
                 }
                 else
                 {
@@ -998,12 +1044,6 @@ namespace KS2Drive.FS
                     if (EndOffset > FileSize) EndOffset = FileSize;
 
                     BytesTransferred = (UInt32)(EndOffset - Offset);
-                }
-
-                if (FileData == null)
-                {
-                    DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
-                    return STATUS_OBJECT_NAME_NOT_FOUND;
                 }
 
                 Marshal.Copy(FileData, (int)Offset, Buffer, (int)BytesTransferred);
@@ -1141,9 +1181,12 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        CFN.Upload(FileData, Offset, BytesTransferred);
+                        if (!CFN.ContinueUpload(FileData, Offset, BytesTransferred))
+                        {
+                            UploadTask = AsyncWrite(UploadTask, CFN, UploadClient, FileData, Offset, BytesTransferred);
+                        }
                     }
-                    catch (WebDAVConflictException) //XXX not every exception will now occur
+                    catch (WebDAVConflictException)
                     {
                         Cache.InvalidateFileNode(CFN);
                         L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_ACCESS_DENIED" };

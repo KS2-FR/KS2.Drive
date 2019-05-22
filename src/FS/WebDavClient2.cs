@@ -121,7 +121,7 @@ namespace KS2Drive.FS
             return base.Upload(remoteFilePath, content, name);
         }
 
-        public new Task<bool> UploadPartial(string remoteFilePath, Stream content, string name, long startBytes, long endBytes)
+        public new Task<bool> UploadPartial(string remoteFilePath, Stream content, string name, long startBytes, long? endBytes = null)
         {
             remoteFilePath = ParameterConvert(remoteFilePath);
             return base.UploadPartial(remoteFilePath, content, name, startBytes, endBytes);
