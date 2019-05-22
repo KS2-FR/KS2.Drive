@@ -29,10 +29,10 @@
     <SupportUrl>https://yoda.uu.nl</SupportUrl>
     <ProductName>Yoda Drive</ProductName>
     <PublisherName>Utrecht University</PublisherName>
-    <MinimumRequiredVersion>0.1.0.0</MinimumRequiredVersion>
+    <MinimumRequiredVersion>0.2.0.0</MinimumRequiredVersion>
     <OpenBrowserOnPublish>false</OpenBrowserOnPublish>
-    <ApplicationRevision>1</ApplicationRevision>
-    <ApplicationVersion>0.1.0.%2a</ApplicationVersion>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>0.2.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <CreateDesktopShortcut>true</CreateDesktopShortcut>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -73,10 +73,10 @@
     <SignManifests>true</SignManifests>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestCertificateThumbprint>0B0C5B79F25568D245CCD0C777F23D4F1DCD3AB9</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint>7F54B0AD4D65A4EECD4F5AFB7AB9009972E6FA55</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestKeyFile>COMODO_Code_Signing_2022.p12</ManifestKeyFile>
+    <ManifestKeyFile>universiteit_utrecht_protected.pfx</ManifestKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="ControlzEx, Version=3.0.2.4, Culture=neutral, processorArchitecture=MSIL">
@@ -211,6 +211,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <None Include="universiteit_utrecht_protected.pfx" />
     <Resource Include="Resources\Main.ico" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
