@@ -516,7 +516,7 @@ namespace KS2Drive.FS
                 try
                 {
                     CFN = new FileNode(FileName);
-                    UploadTask = AsyncWrite(UploadTask, CFN, UploadClient, null, 0, 0);
+                    UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), null, 0, 0);
                     CFN.HasUnflushedData = true;
                 }
                 catch (WebDAVConflictException)
@@ -1183,7 +1183,7 @@ namespace KS2Drive.FS
                     {
                         if (!CFN.ContinueUpload(FileData, Offset, BytesTransferred))
                         {
-                            UploadTask = AsyncWrite(UploadTask, CFN, UploadClient, FileData, Offset, BytesTransferred);
+                            UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), FileData, Offset, BytesTransferred);
                         }
                     }
                     catch (WebDAVConflictException)
