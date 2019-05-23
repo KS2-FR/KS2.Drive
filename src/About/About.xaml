@@ -19,12 +19,6 @@
                 <List MarkerStyle="Box" >
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">
-                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the 2019.3 B1 release of WinFSP or superior</Hyperlink>
-                        </Paragraph>
-                        
-                    </ListItem>
-                    <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">
                             <Hyperlink NavigateUri="https://github.com/UtrechtUniversity/YodaDrive/releases" RequestNavigate="Hyperlink_RequestNavigate">Download the setup program</Hyperlink>
                             </Paragraph>
                     </ListItem>
