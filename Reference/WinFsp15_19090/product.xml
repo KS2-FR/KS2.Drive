@@ -8,8 +8,8 @@
   </PackageFiles>
 
   <InstallChecks>
-    <MsiProductCheck Product="IsMsiInstalled"
-      Property="{5B06D123-8C45-45C9-AE48-F15894CED16F}"/>
+    <MsiProductCheck Property="IsMsiInstalled"
+      Product="{124CF745-BED1-42C9-8D33-CAE2DB87D05A}"/>
   </InstallChecks>
 
   <Commands>
@@ -20,7 +20,7 @@
           Compare="ValueGreaterThan" Value="0"/>
         <FailIf Property="AdminUser"
           Compare="ValueNotEqualTo" Value="True"
-         String="NotAnAdmin"/>
+          String="NotAnAdmin"/>
       </InstallConditions>
 
       <ExitCodes>
