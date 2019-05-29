@@ -19,6 +19,7 @@ namespace KS2Drive.Config
                 try
                 {
                     var C = JsonConvert.DeserializeObject<Configuration>(Tools.Unprotect(File.ReadAllText(ConfigurationFilePath)));
+                    C.MountAsNetworkDrive = true;
                     C.Path = ConfigurationFilePath;
                     return C;
                 }
@@ -55,7 +56,7 @@ namespace KS2Drive.Config
         public Int32 FlushMode { get; set; } = 0;
         public bool SyncOps { get; set; } = false;
         public bool PreLoading { get; set; } = true;
-        public bool MountAsNetworkDrive { get; set; } = false;
+        public bool MountAsNetworkDrive { get; set; } = true;
 
         //Proxy
         public Int16 HTTPProxyMode { get; set; } = 0; //0 = no proxy, 1 = default proxy, 2 = user defined proxy
