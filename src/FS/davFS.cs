@@ -1573,9 +1573,9 @@ namespace KS2Drive.FS
                             {
                                 return STATUS_INSUFFICIENT_RESOURCES;
                             }
+                            int CopyLength = (int)Math.Min(FileNode.FileInfo.AllocationSize, NewSize);
+                            if (CopyLength != 0) Array.Copy(FileNode.FileData, FileData, CopyLength);
                         }
-                        int CopyLength = (int)Math.Min(FileNode.FileInfo.AllocationSize, NewSize);
-                        if (CopyLength != 0) Array.Copy(FileNode.FileData, FileData, CopyLength);
 
                         FileNode.FileData = FileData;
                         FileNode.FileInfo.AllocationSize = NewSize;
