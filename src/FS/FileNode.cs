@@ -145,20 +145,20 @@ namespace KS2Drive.FS
             }
         }
 
-        public bool ContinueUpload(byte[] Data, UInt64 Offset, UInt32 Length)
+        public bool ContinueUpload(UInt64 Offset, UInt32 Length)
         {
             if (UploadStream == null || UploadOffset != Offset)
             {
                 return false;
             }
 
-            if (Data != null)
-            {
-                UploadStream.Write(Data, 0, (int)Length);
-                UploadOffset += Length;
-            }
-
+            UploadOffset += Length;
             return true;
+        }
+
+        public void Upload(byte[] Data, UInt32 Length)
+        {
+            UploadStream.Write(Data, 0, (int)Length);
         }
 
         public Task<bool> Upload(WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)

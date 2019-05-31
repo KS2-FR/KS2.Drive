@@ -440,16 +440,6 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
-        private async Task<bool> AsyncWrite(Task<bool> Task, FileNode CFN, WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
-        {
-            if (Task != null)
-            {
-                await Task;
-            }
-
-            return await CFN.Upload(Proxy, Data, Offset, Length);
-        }
-
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -1181,7 +1171,11 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        if (!CFN.ContinueUpload(FileData, Offset, BytesTransferred))
+                        if (CFN.ContinueUpload(Offset, BytesTransferred))
+                        {
+                            CFN.Upload(FileData, BytesTransferred);
+                        }
+                        else
                         {
                             UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), FileData, Offset, BytesTransferred);
                         }
