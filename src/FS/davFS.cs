@@ -20,6 +20,50 @@ namespace KS2Drive.FS
 {
     public class DavFS : FileSystemBase
     {
+        private class UploadPool
+        {
+            private WebDavClient2[] Clients;
+            private Task<int>[] Tasks;
+
+            public UploadPool(int Capacity)
+            {
+                Clients = new WebDavClient2[Capacity];
+                Tasks = new Task<int>[Capacity];
+                for (int i = 0; i < Capacity; i++)
+                {
+                    int n = i;
+                    Tasks[i] = Task.Run(() =>
+                    {
+                        Clients[n] = new WebDavClient2(Timeout.InfiniteTimeSpan);
+                        return n;
+                    });
+                }
+            }
+
+            private void UploadTask(FileNode CFN, byte[] Data, UInt64 Offset, UInt32 Length)
+            {
+                lock (this)
+                {
+                    int i = Task.WhenAny(Tasks).GetAwaiter().GetResult().GetAwaiter().GetResult();
+                    var UploadTask = CFN.Upload(Clients[i], Data, Offset, Length);
+                    Tasks[i] = Task.Run(() =>
+                    {
+                        try
+                        {
+                            UploadTask.Wait();
+                        }
+                        catch (Exception) { }
+                        return i;
+                    });
+                }
+            }
+
+            public Task Upload(FileNode CFN, byte[] Data, UInt64 Offset, UInt32 Length)
+            {
+                return Task.Run(() => UploadTask(CFN, Data, Offset, Length));
+            }
+        }
+
         public event EventHandler<LogListItem> RepositoryActionPerformed;
         public event EventHandler RepositoryAuthenticationFailed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
@@ -39,11 +83,9 @@ namespace KS2Drive.FS
         private String DocumentLibraryPath;
 
         private CacheManager Cache;
-        private WebDavClient2 UploadClient;
         private WebDavClient2 DownloadClient;
-        private Task<bool> UploadTask;
-        private Task ContinuedTask;
         private Task DownloadTask;
+        private UploadPool Pool;
 
         private const UInt16 MEMFS_SECTOR_SIZE = 4096;
         private const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
@@ -72,7 +114,6 @@ namespace KS2Drive.FS
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
             WebDavClient2.Init(this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
             Cache = new CacheManager(CacheMode.Enabled, config.PreLoading);
-            this.UploadClient = new WebDavClient2(Timeout.InfiniteTimeSpan);
 
             //Test connection to server with the parameters entered in the configuration screen
             this.DownloadClient = new WebDavClient2();
@@ -89,9 +130,8 @@ namespace KS2Drive.FS
                 throw new Exception($"Cannot connect to server : {ex.Message}");
             }
 
-            this.UploadTask = null;
-            this.ContinuedTask = null;
             this.DownloadTask = null;
+            this.Pool = new UploadPool(10);
         }
 
         /// <summary>
@@ -442,6 +482,15 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        private async Task AsyncCreate(Task Task, FileNode CFN, byte[] Data, UInt64 Offset, UInt32 Length)
+        {
+            if (Task != null)
+            {
+                await Task;
+            }
+            await Pool.Upload(CFN, Data, Offset, Length);
+        }
+
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -508,8 +557,8 @@ namespace KS2Drive.FS
                 try
                 {
                     CFN = new FileNode(FileName);
-                    UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), null, 0, 0);
-                    ContinuedTask = null;
+                    CFN.StartUpload(0);
+                    CFN.ContinuedTask = AsyncCreate(null, CFN, null, 0, 0);
                     CFN.HasUnflushedData = true;
                 }
                 catch (WebDAVConflictException)
@@ -1065,7 +1114,7 @@ namespace KS2Drive.FS
             }
         }
 
-        async Task AsyncWrite(Task Task, String OperationId, FileNode CFN, byte[] Data, UInt32 Length, UInt64 RequestHint)
+        private async Task AsyncWrite(Task Task, String OperationId, FileNode CFN, byte[] Data, UInt32 Length, UInt64 RequestHint)
         {
             LogListItem L;
 
@@ -1203,14 +1252,14 @@ namespace KS2Drive.FS
                     {
                         if (CFN.ContinueUpload(Offset, BytesTransferred))
                         {
-                            ContinuedTask = AsyncWrite(ContinuedTask, OperationId, CFN, FileData, BytesTransferred, Host.GetOperationRequestHint());
-                            return STATUS_PENDING;
+                            CFN.ContinuedTask = AsyncWrite(CFN.ContinuedTask, OperationId, CFN, FileData, BytesTransferred, Host.GetOperationRequestHint());
                         }
                         else
                         {
-                            UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), FileData, Offset, BytesTransferred);
-                            ContinuedTask = null;
+                            CFN.StartUpload(BytesTransferred);
+                            CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, FileData, Offset, BytesTransferred);
                         }
+                        return STATUS_PENDING;
                     }
                     catch (WebDAVConflictException)
                     {
