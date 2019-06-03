@@ -42,6 +42,7 @@ namespace KS2Drive.FS
         private WebDavClient2 UploadClient;
         private WebDavClient2 DownloadClient;
         private Task<bool> UploadTask;
+        private Task ContinuedTask;
         private Task DownloadTask;
 
         private const UInt16 MEMFS_SECTOR_SIZE = 4096;
@@ -89,6 +90,7 @@ namespace KS2Drive.FS
             }
 
             this.UploadTask = null;
+            this.ContinuedTask = null;
             this.DownloadTask = null;
         }
 
@@ -440,16 +442,6 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
-        private async Task<bool> AsyncWrite(Task<bool> Task, FileNode CFN, WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
-        {
-            if (Task != null)
-            {
-                await Task;
-            }
-
-            return await CFN.Upload(Proxy, Data, Offset, Length);
-        }
-
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -517,6 +509,7 @@ namespace KS2Drive.FS
                 {
                     CFN = new FileNode(FileName);
                     UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), null, 0, 0);
+                    ContinuedTask = null;
                     CFN.HasUnflushedData = true;
                 }
                 catch (WebDAVConflictException)
@@ -1072,6 +1065,33 @@ namespace KS2Drive.FS
             }
         }
 
+        async Task AsyncWrite(Task Task, String OperationId, FileNode CFN, byte[] Data, UInt32 Length, UInt64 RequestHint)
+        {
+            LogListItem L;
+
+            if (Task != null)
+            {
+                await Task;
+            }
+
+            try
+            {
+                await Task.Run(() => CFN.Upload(Data, Length));
+                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
+                RepositoryActionPerformed?.Invoke(this, L);
+                DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+                Host.SendWriteResponse(RequestHint, STATUS_SUCCESS, Length, ref CFN.FileInfo);
+            }
+            catch (Exception)
+            {
+                Cache.InvalidateFileNode(CFN);
+                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_UNEXPECTED_IO_ERROR" };
+                RepositoryActionPerformed?.Invoke(this, L);
+                DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
+                Host.SendWriteResponse(RequestHint, STATUS_UNEXPECTED_IO_ERROR, Length, ref CFN.FileInfo);
+            }
+        }
+
         public override Int32 Write(
             Object FileNode0,
             Object FileDesc,
@@ -1181,9 +1201,15 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        if (!CFN.ContinueUpload(FileData, Offset, BytesTransferred))
+                        if (CFN.ContinueUpload(Offset, BytesTransferred))
+                        {
+                            ContinuedTask = AsyncWrite(ContinuedTask, OperationId, CFN, FileData, BytesTransferred, Host.GetOperationRequestHint());
+                            return STATUS_PENDING;
+                        }
+                        else
                         {
                             UploadTask = CFN.Upload(new WebDavClient2(Timeout.InfiniteTimeSpan), FileData, Offset, BytesTransferred);
+                            ContinuedTask = null;
                         }
                     }
                     catch (WebDAVConflictException)
@@ -1573,9 +1599,9 @@ namespace KS2Drive.FS
                             {
                                 return STATUS_INSUFFICIENT_RESOURCES;
                             }
+                            int CopyLength = (int)Math.Min(FileNode.FileInfo.AllocationSize, NewSize);
+                            if (CopyLength != 0) Array.Copy(FileNode.FileData, FileData, CopyLength);
                         }
-                        int CopyLength = (int)Math.Min(FileNode.FileInfo.AllocationSize, NewSize);
-                        if (CopyLength != 0) Array.Copy(FileNode.FileData, FileData, CopyLength);
 
                         FileNode.FileData = FileData;
                         FileNode.FileInfo.AllocationSize = NewSize;
