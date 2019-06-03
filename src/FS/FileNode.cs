@@ -41,6 +41,10 @@ namespace KS2Drive.FS
 
         private AnonymousPipeServerStream UploadStream = null;
         private UInt64 UploadOffset;
+        [JsonIgnore]
+        public Task<bool> UploadTask;
+        [JsonIgnore]
+        public Task ContinuedTask;
 
         private static bool _IsInited = false;
 
@@ -161,26 +165,29 @@ namespace KS2Drive.FS
             UploadStream.Write(Data, 0, (int)Length);
         }
 
+        public void StartUpload(UInt32 Length)
+        {
+            UploadOffset = Length;
+        }
+
         public Task<bool> Upload(WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
         {
-            Task<bool> UploadTask;
+            FlushUpload();
 
             UploadStream = new AnonymousPipeServerStream();
-            UploadOffset = Offset;
             var PipeStream = new AnonymousPipeClientStream(PipeDirection.In, UploadStream.ClientSafePipeHandle);
-            if (UploadOffset == 0)
+            if (Offset == 0)
             {
                 UploadTask = Proxy.Upload(GetRepositoryParentPath(RepositoryPath), PipeStream, Name);
             }
             else
             {
-                UploadTask = Proxy.UploadPartial(GetRepositoryParentPath(RepositoryPath), PipeStream, Name, (long)UploadOffset);
+                UploadTask = Proxy.UploadPartial(GetRepositoryParentPath(RepositoryPath), PipeStream, Name, (long)Offset);
             }
 
             if (Data != null)
             {
                 UploadStream.Write(Data, 0, (int)Length);
-                UploadOffset += Length;
             }
 
             return UploadTask;
