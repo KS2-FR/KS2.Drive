@@ -52,6 +52,7 @@ namespace KS2Drive.Config
         public Int32 ServerType { get; set; } = 0;
         public String ServerLogin { get; set; }
         public String ServerPassword { get; set; }
+        public bool SavePassword { get; set; } = true;
         public Int32 KernelCacheMode { get; set; } = -1;
         public Int32 FlushMode { get; set; } = 0;
         public bool SyncOps { get; set; } = false;

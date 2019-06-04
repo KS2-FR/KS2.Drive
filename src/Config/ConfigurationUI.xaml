@@ -100,7 +100,8 @@
                             <TextBox Grid.Row="0" Grid.Column="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
-                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
+                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalAlignment="Left" x:Name="txtPassword" Width="364"></PasswordBox>
+                            <CheckBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" x:Name="Chk_Password" Margin="0,0,10,0">Save Password</CheckBox>
 
                             <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Visibility="Collapsed">
                                 <CheckBox x:Name="Chk_UserClientCert">Additional client certificate</CheckBox>

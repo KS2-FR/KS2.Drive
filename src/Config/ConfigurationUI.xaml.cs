@@ -89,6 +89,7 @@ namespace KS2Drive.Config
 
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerLogin)) txtLogin.Text = this.AppConfiguration.ServerLogin;
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerPassword)) txtPassword.Password = this.AppConfiguration.ServerPassword;
+            Chk_Password.IsChecked = this.AppConfiguration.SavePassword;
 
             var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode));
             if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
@@ -171,7 +172,15 @@ namespace KS2Drive.Config
             this.AppConfiguration.ServerURL = txtURL.Text;
             this.AppConfiguration.ServerType = (Int32)CBMode.SelectedValue;
             this.AppConfiguration.ServerLogin = txtLogin.Text;
-            this.AppConfiguration.ServerPassword = txtPassword.Password;
+            if (Chk_Password.IsChecked == true)
+            {
+                this.AppConfiguration.ServerPassword = txtPassword.Password;
+            }
+            else
+            {
+                this.AppConfiguration.ServerPassword = null;
+            }
+            this.AppConfiguration.SavePassword = Chk_Password.IsChecked.Value;
             this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
             this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
             this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
@@ -189,6 +198,7 @@ namespace KS2Drive.Config
                 MessageBox.Show($"Cannot save configuration : {ex.Message}");
             }
 
+            this.AppConfiguration.ServerPassword = txtPassword.Password;
             this.AppConfiguration.IsConfigured = true;
 
             Tools.LoadProxy(this.AppConfiguration);
