@@ -46,11 +46,11 @@ namespace KS2Drive.FS
                 {
                     int i = Task.WhenAny(Tasks).GetAwaiter().GetResult().GetAwaiter().GetResult();
                     var UploadTask = CFN.Upload(Clients[i], Data, Offset, Length);
-                    Tasks[i] = Task.Run(() =>
+                    Tasks[i] = Task.Run(async () =>
                     {
                         try
                         {
-                            UploadTask.Wait();
+                            await UploadTask;
                         }
                         catch (Exception) { }
                         return i;
