@@ -46,11 +46,11 @@ namespace KS2Drive.FS
                 {
                     int i = Task.WhenAny(Tasks).GetAwaiter().GetResult().GetAwaiter().GetResult();
                     var UploadTask = CFN.Upload(Clients[i], Data, Offset, Length);
-                    Tasks[i] = Task.Run(() =>
+                    Tasks[i] = Task.Run(async () =>
                     {
                         try
                         {
-                            UploadTask.Wait();
+                            await UploadTask;
                         }
                         catch (Exception) { }
                         return i;
@@ -1285,10 +1285,6 @@ namespace KS2Drive.FS
                         DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
                         return STATUS_UNEXPECTED_IO_ERROR;
                     }
-
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                 }
                 else
                 {
