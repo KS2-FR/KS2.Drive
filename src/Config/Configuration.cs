@@ -20,6 +20,10 @@ namespace KS2Drive.Config
                 {
                     var C = JsonConvert.DeserializeObject<Configuration>(Tools.Unprotect(File.ReadAllText(ConfigurationFilePath)));
                     C.MountAsNetworkDrive = true;
+                    if (C.ServerPassword == null)
+                    {
+                        C.IsConfigured = false;
+                    }
                     C.Path = ConfigurationFilePath;
                     return C;
                 }
