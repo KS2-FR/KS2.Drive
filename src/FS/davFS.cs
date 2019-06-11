@@ -1273,6 +1273,7 @@ namespace KS2Drive.FS
                         }
                         else
                         {
+                            CFN.FlushUpload();
                             CFN.StartUpload(BytesTransferred);
                             CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, FileData, Offset, BytesTransferred);
                         }

@@ -175,8 +175,6 @@ namespace KS2Drive.FS
 
         public Task<bool> Upload(WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
         {
-            FlushUpload();
-
             UploadStream = new AnonymousPipeServerStream();
             var PipeStream = new AnonymousPipeClientStream(PipeDirection.In, UploadStream.ClientSafePipeHandle);
             if (Offset == 0)
