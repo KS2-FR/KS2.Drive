@@ -1007,48 +1007,46 @@ namespace KS2Drive.FS
             try
             {
                 FileData = await DownloadClient.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1);
+
+                if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
+                {
+                    CFN.FileData = FileData;
+                }
+                BytesTransferred = (uint)FileData.Length;
+                if (FileData == null)
+                {
+                    DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
+                    Host.SendReadResponse(RequestHint, STATUS_OBJECT_NAME_NOT_FOUND, BytesTransferred);
+                }
+                else
+                {
+                    Marshal.Copy(FileData, 0, Buffer, (int)BytesTransferred);
+
+                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+                    Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
+                }
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
                 RepositoryAuthenticationFailed?.Invoke(this, null);
                 Cache.Clear();
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
-                return;
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 416)
             {
                 DebugEnd(OperationId, CFN, $"STATUS_END_OF_FILE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_END_OF_FILE, 0);
-                return;
             }
             catch (HttpRequestException ex)
             {
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
-                return;
             }
             catch (Exception ex)
             {
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
-                return;
             }
-
-            if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
-            {
-                CFN.FileData = FileData;
-            }
-            BytesTransferred = (uint)FileData.Length;
-            if (FileData == null)
-            {
-                DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
-                Host.SendReadResponse(RequestHint, STATUS_OBJECT_NAME_NOT_FOUND, BytesTransferred);
-                return;
-            }
-            Marshal.Copy(FileData, 0, Buffer, (int)BytesTransferred);
-
-            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
-            Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
         }
 
         public override Int32 Read(
