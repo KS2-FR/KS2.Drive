@@ -831,7 +831,17 @@ namespace KS2Drive.FS
                     }
                 }
 
-                CFN.FlushUpload();
+                try
+                {
+                    CFN.FlushUpload();
+                }
+                catch (Exception)
+                {
+                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Close Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
+                    RepositoryActionPerformed?.Invoke(this, L);
+                    DebugEnd(OperationId, null, "STATUS_FAILED");
+                    return;
+                }
 
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
                 if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
@@ -940,7 +950,16 @@ namespace KS2Drive.FS
                     }
                 }
 
-                CFN.FlushUpload();
+                try
+                {
+                    CFN.FlushUpload();
+                }
+                catch (Exception)
+                {
+                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
+                    RepositoryActionPerformed?.Invoke(this, L);
+                    DebugEnd(OperationId, null, "STATUS_FAILED");
+                }
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;

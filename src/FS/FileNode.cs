@@ -44,7 +44,7 @@ namespace KS2Drive.FS
         [JsonIgnore]
         private UInt64 UploadOffset;
         [JsonIgnore]
-        public Task<bool> UploadTask;
+        private Task<bool> UploadTask;
         [JsonIgnore]
         public Task ContinuedTask;
 
@@ -164,6 +164,7 @@ namespace KS2Drive.FS
             {
                 UploadStream.Close();
                 UploadStream = null;
+                UploadTask.GetAwaiter().GetResult();
             }
         }
 
