@@ -486,7 +486,11 @@ namespace KS2Drive.FS
         {
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task;
+                }
+                catch (Exception) { }
             }
             await Pool.Upload(CFN, Data, Offset, Length);
         }
@@ -993,7 +997,11 @@ namespace KS2Drive.FS
 
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task;
+                }
+                catch (Exception) { }
             }
 
             try
@@ -1120,7 +1128,11 @@ namespace KS2Drive.FS
 
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task;
+                }
+                catch (Exception) { }
             }
 
             try
