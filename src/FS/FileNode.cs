@@ -142,9 +142,9 @@ namespace KS2Drive.FS
             UploadOffset = Length;
         }
 
-        public bool PendingUpload(UInt64 Offset)
+        public bool PendingUpload()
         {
-            return (UploadStream != null && UploadOffset < Offset);
+            return (UploadStream != null);
         }
 
         public bool ContinueUpload(UInt64 Offset, UInt32 Length)

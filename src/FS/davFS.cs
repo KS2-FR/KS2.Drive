@@ -1084,7 +1084,7 @@ namespace KS2Drive.FS
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
-                if (CFN.PendingUpload(Offset)) {
+                if (CFN.PendingUpload()) {
                     DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
                     return STATUS_END_OF_FILE;
                 }
