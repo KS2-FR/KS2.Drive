@@ -208,34 +208,36 @@ namespace WebDAVClient
 
                 using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
                 {
-                    var items = ResponseParser.ParseItems(stream);
-
-                    if (items == null)
+                    try
                     {
-                        throw new WebDAVException("Failed deserializing data returned from server.");
-                    }
+                        var items = ResponseParser.ParseItems(stream);
 
-                    var listUrl = listUri.ToString();
+                        var listUrl = listUri.ToString();
 
-                    var result = new List<Item>(items.Count());
-                    foreach (var item in items)
-                    {
-                        // If it's not a collection, add it to the result
-                        if (!item.IsCollection)
+                        var result = new List<Item>(items.Count());
+                        foreach (var item in items)
                         {
-                            result.Add(item);
-                        }
-                        else
-                        {
-                            // If it's not the requested parent folder, add it to the result
-                            var fullHref = /*await*/ GetServerUrl(item.Href, true)/*.ConfigureAwait(false)*/;
-                            if (!string.Equals(fullHref.ToString(), listUrl, StringComparison.CurrentCultureIgnoreCase))
+                            // If it's not a collection, add it to the result
+                            if (!item.IsCollection)
                             {
                                 result.Add(item);
                             }
+                            else
+                            {
+                                // If it's not the requested parent folder, add it to the result
+                                var fullHref = /*await*/ GetServerUrl(item.Href, true)/*.ConfigureAwait(false)*/;
+                                if (!string.Equals(fullHref.ToString(), listUrl, StringComparison.CurrentCultureIgnoreCase))
+                                {
+                                    result.Add(item);
+                                }
+                            }
                         }
+                        return result;
                     }
-                    return result;
+                    catch (Exception ex)
+                    {
+                        throw new WebDAVException("Failed deserializing data returned from server.", ex);
+                    }
                 }
 
             }
@@ -305,14 +307,14 @@ namespace WebDAVClient
 
                 using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
                 {
-                    var result = ResponseParser.ParseItem(stream);
-
-                    if (result == null)
+                    try
                     {
-                        throw new WebDAVException("Failed deserializing data returned from server.");
+                        return ResponseParser.ParseItem(stream);
                     }
-
-                    return result;
+                    catch (Exception ex)
+                    {
+                        throw new WebDAVException("Failed deserializing data returned from server.", ex);
+                    }
                 }
             }
             catch (Exception ex)
