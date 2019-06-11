@@ -39,7 +39,9 @@ namespace KS2Drive.FS
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
 
+        [JsonIgnore]
         private AnonymousPipeServerStream UploadStream = null;
+        [JsonIgnore]
         private UInt64 UploadOffset;
         [JsonIgnore]
         public Task<bool> UploadTask;
@@ -135,18 +137,14 @@ namespace KS2Drive.FS
             this.FileSecurity = GetDefaultSecurity();
         }
 
+        public void StartUpload(UInt32 Length)
+        {
+            UploadOffset = Length;
+        }
+
         public bool PendingUpload(UInt64 Offset)
         {
             return (UploadStream != null && UploadOffset < Offset);
-        }
-
-        public void FlushUpload()
-        {
-            if (UploadStream != null)
-            {
-                UploadStream.Close();
-                UploadStream = null;
-            }
         }
 
         public bool ContinueUpload(UInt64 Offset, UInt32 Length)
@@ -160,14 +158,18 @@ namespace KS2Drive.FS
             return true;
         }
 
+        public void FlushUpload()
+        {
+            if (UploadStream != null)
+            {
+                UploadStream.Close();
+                UploadStream = null;
+            }
+        }
+
         public void Upload(byte[] Data, UInt32 Length)
         {
             UploadStream.Write(Data, 0, (int)Length);
-        }
-
-        public void StartUpload(UInt32 Length)
-        {
-            UploadOffset = Length;
         }
 
         public Task<bool> Upload(WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
