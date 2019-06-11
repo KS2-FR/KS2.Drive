@@ -39,10 +39,12 @@ namespace KS2Drive.FS
         private static String _DocumentLibraryPath;
         private static WebDAVMode _WebDAVMode;
 
+        [JsonIgnore]
         private AnonymousPipeServerStream UploadStream = null;
+        [JsonIgnore]
         private UInt64 UploadOffset;
         [JsonIgnore]
-        public Task<bool> UploadTask;
+        private Task<bool> UploadTask;
         [JsonIgnore]
         public Task ContinuedTask;
 
@@ -135,18 +137,14 @@ namespace KS2Drive.FS
             this.FileSecurity = GetDefaultSecurity();
         }
 
-        public bool PendingUpload(UInt64 Offset)
+        public void StartUpload(UInt32 Length)
         {
-            return (UploadStream != null && UploadOffset < Offset);
+            UploadOffset = Length;
         }
 
-        public void FlushUpload()
+        public bool PendingUpload()
         {
-            if (UploadStream != null)
-            {
-                UploadStream.Close();
-                UploadStream = null;
-            }
+            return (UploadStream != null);
         }
 
         public bool ContinueUpload(UInt64 Offset, UInt32 Length)
@@ -160,20 +158,23 @@ namespace KS2Drive.FS
             return true;
         }
 
+        public void FlushUpload()
+        {
+            if (UploadStream != null)
+            {
+                UploadStream.Close();
+                UploadStream = null;
+                UploadTask.GetAwaiter().GetResult();
+            }
+        }
+
         public void Upload(byte[] Data, UInt32 Length)
         {
             UploadStream.Write(Data, 0, (int)Length);
         }
 
-        public void StartUpload(UInt32 Length)
-        {
-            UploadOffset = Length;
-        }
-
         public Task<bool> Upload(WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
         {
-            FlushUpload();
-
             UploadStream = new AnonymousPipeServerStream();
             var PipeStream = new AnonymousPipeClientStream(PipeDirection.In, UploadStream.ClientSafePipeHandle);
             if (Offset == 0)

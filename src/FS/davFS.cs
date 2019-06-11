@@ -131,7 +131,7 @@ namespace KS2Drive.FS
             }
 
             this.DownloadTask = null;
-            this.Pool = new UploadPool(10);
+            this.Pool = new UploadPool(4);
         }
 
         /// <summary>
@@ -486,7 +486,11 @@ namespace KS2Drive.FS
         {
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task;
+                }
+                catch (Exception) { }
             }
             await Pool.Upload(CFN, Data, Offset, Length);
         }
@@ -827,8 +831,6 @@ namespace KS2Drive.FS
                     }
                 }
 
-                CFN.FlushUpload();
-
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
                 if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
                 DebugEnd(OperationId, CFN, $"STATUS_SUCCESS  - Handle {HandleCount}");
@@ -936,7 +938,16 @@ namespace KS2Drive.FS
                     }
                 }
 
-                CFN.FlushUpload();
+                try
+                {
+                    CFN.FlushUpload();
+                }
+                catch (Exception)
+                {
+                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
+                    RepositoryActionPerformed?.Invoke(this, L);
+                    DebugEnd(OperationId, null, "STATUS_FAILED");
+                }
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
@@ -993,54 +1004,56 @@ namespace KS2Drive.FS
 
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task;
+                }
+                catch (Exception) { }
             }
 
             try
             {
                 FileData = await DownloadClient.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1);
+
+                if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
+                {
+                    CFN.FileData = FileData;
+                }
+                BytesTransferred = (uint)FileData.Length;
+                if (FileData == null)
+                {
+                    DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
+                    Host.SendReadResponse(RequestHint, STATUS_OBJECT_NAME_NOT_FOUND, BytesTransferred);
+                }
+                else
+                {
+                    Marshal.Copy(FileData, 0, Buffer, (int)BytesTransferred);
+
+                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+                    Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
+                }
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
                 RepositoryAuthenticationFailed?.Invoke(this, null);
                 Cache.Clear();
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
-                return;
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 416)
             {
                 DebugEnd(OperationId, CFN, $"STATUS_END_OF_FILE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_END_OF_FILE, 0);
-                return;
             }
             catch (HttpRequestException ex)
             {
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
-                return;
             }
             catch (Exception ex)
             {
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
-                return;
             }
-
-            if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
-            {
-                CFN.FileData = FileData;
-            }
-            BytesTransferred = (uint)FileData.Length;
-            if (FileData == null)
-            {
-                DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
-                Host.SendReadResponse(RequestHint, STATUS_OBJECT_NAME_NOT_FOUND, BytesTransferred);
-                return;
-            }
-            Marshal.Copy(FileData, 0, Buffer, (int)BytesTransferred);
-
-            DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
-            Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
         }
 
         public override Int32 Read(
@@ -1059,7 +1072,7 @@ namespace KS2Drive.FS
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
-                if (CFN.PendingUpload(Offset)) {
+                if (CFN.PendingUpload()) {
                     DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
                     return STATUS_END_OF_FILE;
                 }
@@ -1120,7 +1133,11 @@ namespace KS2Drive.FS
 
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task;
+                }
+                catch (Exception) { }
             }
 
             try
@@ -1256,6 +1273,7 @@ namespace KS2Drive.FS
                         }
                         else
                         {
+                            CFN.FlushUpload();
                             CFN.StartUpload(BytesTransferred);
                             CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, FileData, Offset, BytesTransferred);
                         }
