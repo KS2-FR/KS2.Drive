@@ -32,7 +32,7 @@ namespace KS2Drive.FS
                 for (int i = 0; i < Capacity; i++)
                 {
                     int n = i;
-                    Tasks[i] = Task.Run(() =>
+                    Tasks[n] = Task.Run(() =>
                     {
                         Clients[n] = new WebDavClient2(Timeout.InfiniteTimeSpan);
                         return n;
@@ -40,17 +40,17 @@ namespace KS2Drive.FS
                 }
             }
 
-            private void UploadTask(FileNode CFN, byte[] Data, UInt64 Offset, UInt32 Length)
+            private void UploadTask(FileNode CFN, UInt64 Offset)
             {
                 lock (this)
                 {
                     int i = Task.WhenAny(Tasks).GetAwaiter().GetResult().GetAwaiter().GetResult();
-                    var UploadTask = CFN.Upload(Clients[i], Data, Offset, Length);
+                    var UploadTask = CFN.Upload(Clients[i], Offset);
                     Tasks[i] = Task.Run(async () =>
                     {
                         try
                         {
-                            await UploadTask;
+                            await UploadTask.ConfigureAwait(false);
                         }
                         catch (Exception) { }
                         return i;
@@ -58,9 +58,9 @@ namespace KS2Drive.FS
                 }
             }
 
-            public Task Upload(FileNode CFN, byte[] Data, UInt64 Offset, UInt32 Length)
+            public Task Upload(FileNode CFN, UInt64 Offset)
             {
-                return Task.Run(() => UploadTask(CFN, Data, Offset, Length));
+                return Task.Run(() => UploadTask(CFN, Offset));
             }
         }
 
@@ -482,17 +482,17 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
-        private async Task AsyncCreate(Task Task, FileNode CFN, byte[] Data, UInt64 Offset, UInt32 Length)
+        private async Task AsyncCreate(Task Task, FileNode CFN, UInt64 Offset)
         {
             if (Task != null)
             {
                 try
                 {
-                    await Task;
+                    await Task.ConfigureAwait(false);
                 }
                 catch (Exception) { }
             }
-            await Pool.Upload(CFN, Data, Offset, Length);
+            await Pool.Upload(CFN, Offset);
         }
 
         public override Int32 Create(
@@ -561,8 +561,8 @@ namespace KS2Drive.FS
                 try
                 {
                     CFN = new FileNode(FileName);
-                    CFN.StartUpload(0);
-                    CFN.ContinuedTask = AsyncCreate(null, CFN, null, 0, 0);
+                    CFN.StartUpload();
+                    CFN.ContinuedTask = AsyncCreate(null, CFN, 0);
                     CFN.HasUnflushedData = true;
                 }
                 catch (WebDAVConflictException)
@@ -1006,7 +1006,7 @@ namespace KS2Drive.FS
             {
                 try
                 {
-                    await Task;
+                    await Task.ConfigureAwait(false);
                 }
                 catch (Exception) { }
             }
@@ -1133,11 +1133,7 @@ namespace KS2Drive.FS
 
             if (Task != null)
             {
-                try
-                {
-                    await Task;
-                }
-                catch (Exception) { }
+                await Task.ConfigureAwait(false);
             }
 
             try
@@ -1267,16 +1263,14 @@ namespace KS2Drive.FS
                 {
                     try
                     {
-                        if (CFN.ContinueUpload(Offset, BytesTransferred))
-                        {
-                            CFN.ContinuedTask = AsyncWrite(CFN.ContinuedTask, OperationId, CFN, FileData, BytesTransferred, Host.GetOperationRequestHint());
-                        }
-                        else
+                        if (!CFN.ContinueUpload(Offset))
                         {
                             CFN.FlushUpload();
-                            CFN.StartUpload(BytesTransferred);
-                            CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, FileData, Offset, BytesTransferred);
+                            CFN.StartUpload();
+                            CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, Offset);
                         }
+
+                        CFN.ContinuedTask = AsyncWrite(CFN.ContinuedTask, OperationId, CFN, FileData, BytesTransferred, Host.GetOperationRequestHint());
                         return STATUS_PENDING;
                     }
                     catch (WebDAVConflictException)
