@@ -10,7 +10,7 @@
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
-                <Paragraph FontSize="30" Margin="0">Yoda Drive - 0.2.5.0</Paragraph>
+                <Paragraph FontSize="30" Margin="0">Yoda Drive - 0.2.5.1</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a Yoda drive as a local drive.</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Yoda but should work with any webDAV server.</Paragraph>
 
