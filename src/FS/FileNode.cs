@@ -137,9 +137,9 @@ namespace KS2Drive.FS
             this.FileSecurity = GetDefaultSecurity();
         }
 
-        public void StartUpload(UInt32 Length)
+        public void StartUpload()
         {
-            UploadOffset = Length;
+            UploadStream = new AnonymousPipeServerStream();
         }
 
         public bool PendingUpload()
@@ -147,15 +147,9 @@ namespace KS2Drive.FS
             return (UploadStream != null);
         }
 
-        public bool ContinueUpload(UInt64 Offset, UInt32 Length)
+        public bool ContinueUpload(UInt64 Offset)
         {
-            if (UploadStream == null || UploadOffset != Offset)
-            {
-                return false;
-            }
-
-            UploadOffset += Length;
-            return true;
+            return (UploadStream != null && UploadOffset == Offset);
         }
 
         public void FlushUpload()
@@ -170,13 +164,14 @@ namespace KS2Drive.FS
 
         public void Upload(byte[] Data, UInt32 Length)
         {
+            UploadOffset += Length;
             UploadStream.Write(Data, 0, (int)Length);
         }
 
-        public Task<bool> Upload(WebDavClient2 Proxy, byte[] Data, UInt64 Offset, UInt32 Length)
+        public Task<bool> Upload(WebDavClient2 Proxy, UInt64 Offset)
         {
-            UploadStream = new AnonymousPipeServerStream();
             var PipeStream = new AnonymousPipeClientStream(PipeDirection.In, UploadStream.ClientSafePipeHandle);
+            UploadOffset = Offset;
             if (Offset == 0)
             {
                 UploadTask = Proxy.Upload(GetRepositoryParentPath(RepositoryPath), PipeStream, Name);
@@ -184,11 +179,6 @@ namespace KS2Drive.FS
             else
             {
                 UploadTask = Proxy.UploadPartial(GetRepositoryParentPath(RepositoryPath), PipeStream, Name, (long)Offset);
-            }
-
-            if (Data != null)
-            {
-                UploadStream.Write(Data, 0, (int)Length);
             }
 
             return UploadTask;
