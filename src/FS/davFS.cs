@@ -833,7 +833,17 @@ namespace KS2Drive.FS
 
                 try
                 {
-                    CFN.FlushUpload();
+                    try
+                    {
+                        if (CFN.ContinuedTask != null)
+                        {
+                            CFN.ContinuedTask.GetAwaiter().GetResult();
+                        }
+                    }
+                    finally
+                    {
+                        CFN.FlushUpload();
+                    }
                 }
                 catch (Exception)
                 {
