@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using System;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Threading.Tasks;
 using System.Web;
@@ -162,8 +163,11 @@ namespace KS2Drive.FS
             }
         }
 
-        public void Upload(byte[] Data, UInt32 Length)
+        public void Upload(IntPtr Buffer, UInt32 Length)
         {
+            var Data = new byte[Length];
+
+            Marshal.Copy(Buffer, Data, 0, (int)Length);
             UploadOffset += Length;
             UploadStream.Write(Data, 0, (int)Length);
         }
