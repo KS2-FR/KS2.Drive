@@ -157,9 +157,15 @@ namespace KS2Drive.FS
         {
             if (UploadStream != null)
             {
-                UploadStream.Close();
-                UploadStream = null;
-                UploadTask.GetAwaiter().GetResult();
+                try
+                {
+                    UploadStream.Close();
+                    UploadTask.GetAwaiter().GetResult();
+                }
+                finally
+                {
+                    UploadStream = null;
+                }
             }
         }
 
