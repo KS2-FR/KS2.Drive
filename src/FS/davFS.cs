@@ -1127,7 +1127,7 @@ namespace KS2Drive.FS
             }
         }
 
-        private async Task AsyncWrite(Task Task, String OperationId, FileNode CFN, byte[] Data, UInt32 Length, UInt64 RequestHint)
+        private async Task AsyncWrite(Task Task, String OperationId, FileNode CFN, IntPtr Buffer, UInt32 Length, UInt64 RequestHint)
         {
             LogListItem L;
 
@@ -1138,7 +1138,7 @@ namespace KS2Drive.FS
 
             try
             {
-                await Task.Run(() => CFN.Upload(Data, Length));
+                await Task.Run(() => CFN.Upload(Buffer, Length));
                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                 RepositoryActionPerformed?.Invoke(this, L);
                 DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
@@ -1237,27 +1237,6 @@ namespace KS2Drive.FS
                 }
 
                 BytesTransferred = (UInt32)(EndOffset - Offset);
-                var FileData = CFN.FileData;
-                var FileDataOffset = Offset;
-                if (this.FlushMode == FlushMode.FlushAtWrite)
-                {
-                    FileData = new byte[BytesTransferred];
-                    CFN.FileData = (Offset == 0 && BytesTransferred == CFN.FileInfo.FileSize) ? FileData : null;
-                    FileDataOffset = 0;
-                }
-
-                try
-                {
-                    Marshal.Copy(Buffer, FileData, (int)FileDataOffset, (int)BytesTransferred);
-                }
-                catch (Exception ex)
-                {
-                    logger.Trace($"{CFN.ObjectId} Write Exception {ex.Message}");
-                    BytesTransferred = default(UInt32);
-                    FileInfo = default(FileInfo);
-                    DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
-                    return STATUS_UNEXPECTED_IO_ERROR;
-                }
 
                 if (this.FlushMode == FlushMode.FlushAtWrite)
                 {
@@ -1270,7 +1249,7 @@ namespace KS2Drive.FS
                             CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, Offset);
                         }
 
-                        CFN.ContinuedTask = AsyncWrite(CFN.ContinuedTask, OperationId, CFN, FileData, BytesTransferred, Host.GetOperationRequestHint());
+                        CFN.ContinuedTask = AsyncWrite(CFN.ContinuedTask, OperationId, CFN, Buffer, BytesTransferred, Host.GetOperationRequestHint());
                         return STATUS_PENDING;
                     }
                     catch (WebDAVConflictException)
@@ -1300,6 +1279,19 @@ namespace KS2Drive.FS
                 }
                 else
                 {
+                    try
+                    {
+                        Marshal.Copy(Buffer, CFN.FileData, (int)Offset, (int)BytesTransferred);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Trace($"{CFN.ObjectId} Write Exception {ex.Message}");
+                        BytesTransferred = default(UInt32);
+                        FileInfo = default(FileInfo);
+                        DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
+                        return STATUS_UNEXPECTED_IO_ERROR;
+                    }
+
                     CFN.HasUnflushedData = true;
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Write", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                     RepositoryActionPerformed?.Invoke(this, L);
