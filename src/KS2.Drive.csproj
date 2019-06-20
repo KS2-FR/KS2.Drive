@@ -73,7 +73,7 @@
     <SignManifests>true</SignManifests>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestCertificateThumbprint>7F54B0AD4D65A4EECD4F5AFB7AB9009972E6FA55</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint>403D7833AE8FB792C017AF22B9716A3BD9D5DC31</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestKeyFile>universiteit_utrecht_protected.pfx</ManifestKeyFile>
