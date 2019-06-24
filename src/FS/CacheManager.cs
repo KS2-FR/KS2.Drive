@@ -310,36 +310,41 @@ namespace KS2Drive.FS
                     CFN.IsParsed = true;
                     CFN.LastRefresh = DateTime.Now;
 
-                    if (FileNodeCache == null) return; //Handle the case when the thread is still performing while the class has been unloaded
-
-                    String Filter = FileNode.IsRepositoryRootPath(CFN.RepositoryPath) ? "\\" : CFN.LocalPath + "\\";
-
-                    //Refresh from server result
-                    foreach (var Node in Result.Content)
+                    try //Handle the case when the thread is still performing while the class has been unloaded
                     {
-                        if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath))
-                        {
-                            this.AddFileNodeNoLock(Node.Item2);
-                        }
-                        else
-                        {
-                            //Refresh node with updated properties
-                            //TODO : Should more properties be updated ?
-                            var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
-                            if (!KnownCachedItem.HasUnflushedData) KnownCachedItem.FileInfo = Node.Item2.FileInfo;
-                        }
-                    }
+                        String Filter = FileNode.IsRepositoryRootPath(CFN.RepositoryPath) ? "\\" : CFN.LocalPath + "\\";
 
-                    //Supprimer les entrées de FileNodeCache qui ne sont plus dans Result.Content
-                    foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
+                        //Refresh from server result
+                        foreach (var Node in Result.Content)
+                        {
+                            if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath))
+                            {
+                                this.AddFileNodeNoLock(Node.Item2);
+                            }
+                            else
+                            {
+                                //Refresh node with updated properties
+                                //TODO : Should more properties be updated ?
+                                var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
+                                if (!KnownCachedItem.HasUnflushedData) KnownCachedItem.FileInfo = Node.Item2.FileInfo;
+                            }
+                        }
+
+                        //Supprimer les entrées de FileNodeCache qui ne sont plus dans Result.Content
+                        foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
+                        {
+                            if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
+                            {
+                                DeleteFileNode(s.Value);
+                            }
+                        }
+
+                        CFN.LastRefresh = DateTime.Now;
+                    }
+                    catch (Exception)
                     {
-                        if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
-                        {
-                            DeleteFileNode(s.Value);
-                        }
+                        return;
                     }
-
-                    CFN.LastRefresh = DateTime.Now;
                 }
             }
         }
