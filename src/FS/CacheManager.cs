@@ -22,7 +22,7 @@ namespace KS2Drive.FS
         private bool _PreLoadFoldersInCache;
 
         private object RunningRefreshActionListLock = new object();
-        private List<String> RunningRefreshActionList = new List<string>();
+        private List<FileNode> RunningRefreshActionList = new List<FileNode>();
 
         public CacheManager(CacheMode mode, bool PreLoadFoldersInCache)
         {
@@ -37,9 +37,12 @@ namespace KS2Drive.FS
         {
             lock (RunningRefreshActionListLock)
             {
-                if (RunningRefreshActionList.Contains(CFN.LocalPath)) return; //An action is already planned or in progress for this path
-                RunningRefreshActionList.Add(CFN.LocalPath);
-                new Thread(() => InternalRefreshFolderCacheContent(CFN)).Start();
+                if (RunningRefreshActionList.Contains(CFN)) return; //An action is already planned or in progress for this path
+                if (RunningRefreshActionList.Count == 0)
+                {
+                    new Thread(() => InternalRefreshFolderCacheContent()).Start();
+                }
+                RunningRefreshActionList.Add(CFN);
             }
         }
 
@@ -50,7 +53,7 @@ namespace KS2Drive.FS
         {
             lock (RunningRefreshActionListLock)
             {
-                RunningRefreshActionList.Remove(CFN.LocalPath);
+                RunningRefreshActionList.Remove(CFN);
             }
         }
 
@@ -283,47 +286,61 @@ namespace KS2Drive.FS
             Monitor.Exit(CacheLock);
         }
 
-        private void InternalRefreshFolderCacheContent(FileNode CFN)
+        private void InternalRefreshFolderCacheContent()
         {
-            var Result = ListRemoteServerFolderContent(CFN);
-            RemoveRefreshTask(CFN); //Server parsing operation has been made. The filenode status is now parsed
-            if (!Result.Success) return;
-
-            lock (CacheLock)
+            for (;;)
             {
-                CFN.IsParsed = true;
-                CFN.LastRefresh = DateTime.Now;
+                FileNode CFN;
 
-                if (FileNodeCache == null) return; //Handle the case when the thread is still performing while the class has been unloaded
-
-                String Filter = FileNode.IsRepositoryRootPath(CFN.RepositoryPath) ? "\\" : CFN.LocalPath + "\\";
-
-                //Refresh from server result
-                foreach (var Node in Result.Content)
+                lock (RunningRefreshActionListLock)
                 {
-                    if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath))
+                    if (RunningRefreshActionList.Count == 0)
                     {
-                        this.AddFileNodeNoLock(Node.Item2);
+                        return;
                     }
-                    else
-                    {
-                        //Refresh node with updated properties
-                        //TODO : Should more properties be updated ?
-                        var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
-                        if (!KnownCachedItem.HasUnflushedData) KnownCachedItem.FileInfo = Node.Item2.FileInfo;
-                    }
+                    CFN = RunningRefreshActionList[0];
+                    RunningRefreshActionList.RemoveAt(0);
                 }
 
-                //Supprimer les entrées de FileNodeCache qui ne sont plus dans Result.Content
-                foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
-                {
-                    if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
-                    {
-                        DeleteFileNode(s.Value);
-                    }
-                }
+                var Result = ListRemoteServerFolderContent(CFN);
+                if (!Result.Success) continue;
 
-                CFN.LastRefresh = DateTime.Now;
+                lock (CacheLock)
+                {
+                    CFN.IsParsed = true;
+                    CFN.LastRefresh = DateTime.Now;
+
+                    if (FileNodeCache == null) return; //Handle the case when the thread is still performing while the class has been unloaded
+
+                    String Filter = FileNode.IsRepositoryRootPath(CFN.RepositoryPath) ? "\\" : CFN.LocalPath + "\\";
+
+                    //Refresh from server result
+                    foreach (var Node in Result.Content)
+                    {
+                        if (!FileNodeCache.ContainsKey(Node.Item2.LocalPath))
+                        {
+                            this.AddFileNodeNoLock(Node.Item2);
+                        }
+                        else
+                        {
+                            //Refresh node with updated properties
+                            //TODO : Should more properties be updated ?
+                            var KnownCachedItem = FileNodeCache[Node.Item2.LocalPath];
+                            if (!KnownCachedItem.HasUnflushedData) KnownCachedItem.FileInfo = Node.Item2.FileInfo;
+                        }
+                    }
+
+                    //Supprimer les entrées de FileNodeCache qui ne sont plus dans Result.Content
+                    foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
+                    {
+                        if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
+                        {
+                            DeleteFileNode(s.Value);
+                        }
+                    }
+
+                    CFN.LastRefresh = DateTime.Now;
+                }
             }
         }
 
