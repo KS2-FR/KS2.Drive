@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<Package
+    xmlns="http://schemas.microsoft.com/developer/2004/01/bootstrapper"
+    Name="DisplayName"
+    Culture="Culture"
+    >
+
+    <Strings>
+        <String Name="DisplayName">WinFsp 2019.3 B2</String>
+        <String Name="Culture">en</String>
+        <String Name="NotAnAdmin">You do not have the permissions required to install WinFsp 2019.3 B2. Please contact your administrator.</String>
+        <String Name="GeneralFailure">A failure occurred attempting to install WinFsp 2019.3 B2.</String>
+        <String Name="WinFspRedistMsi">https://github.com/billziss-gh/winfsp/releases/download/v1.5B2/winfsp-1.5.19192.msi</String>
+    </Strings>
+</Package>

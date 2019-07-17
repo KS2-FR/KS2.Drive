@@ -4,16 +4,16 @@
   ProductCode="YodaWinFsp.Bootstrapper.Package">
 
   <PackageFiles>
-    <PackageFile Name="winfsp-1.5.19090.msi" HomeSite="WinFspRedistMsi" Hash="25ceb7ecb3b760936f8e2e76307a499d234c0789"/>
+    <PackageFile Name="winfsp-1.5.19192.msi" HomeSite="WinFspRedistMsi" Hash="0c98df733be9ba407b77bdf315f3da44f17cb11f"/>
   </PackageFiles>
 
   <InstallChecks>
     <MsiProductCheck Property="IsMsiInstalled"
-      Product="{124CF745-BED1-42C9-8D33-CAE2DB87D05A}"/>
+      Product="{F38AE4F3-8B0F-40A3-BDAB-715EAB50DB62}"/>
   </InstallChecks>
 
   <Commands>
-    <Command PackageFile="winfsp-1.5.19090.msi" Arguments="">
+    <Command PackageFile="winfsp-1.5.19192.msi" Arguments="">
 
       <InstallConditions>
         <BypassIf Property="IsMsiInstalled"

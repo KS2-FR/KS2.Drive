@@ -253,7 +253,7 @@
     </BootstrapperPackage>
     <BootstrapperPackage Include="YodaWinFsp.Bootstrapper.Package">
       <Visible>False</Visible>
-      <ProductName>WinFsp 2019.3 B1</ProductName>
+      <ProductName>WinFsp 2019.3 B2</ProductName>
       <Install>true</Install>
     </BootstrapperPackage>
   </ItemGroup>
