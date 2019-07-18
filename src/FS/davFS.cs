@@ -833,17 +833,14 @@ namespace KS2Drive.FS
 
                 try
                 {
-                    try
+                    if (CFN.ContinuedTask != null)
                     {
-                        if (CFN.ContinuedTask != null)
-                        {
-                            CFN.ContinuedTask.GetAwaiter().GetResult();
-                        }
+                        CFN.ContinuedTask.GetAwaiter().GetResult();
                     }
-                    finally
-                    {
-                        CFN.FlushUpload();
-                    }
+                    CFN.FlushUpload();
+                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Close Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
+                    RepositoryActionPerformed?.Invoke(this, L);
+                    DebugEnd(OperationId, null, "STATUS_SUCCESS");
                 }
                 catch (Exception)
                 {
@@ -851,6 +848,11 @@ namespace KS2Drive.FS
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, null, "STATUS_FAILED");
                 }
+                finally
+                {
+                    CFN.ContinuedTask = null;
+                }
+
 
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
                 if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
@@ -957,6 +959,27 @@ namespace KS2Drive.FS
                             }
                         }
                     }
+                }
+
+                try
+                {
+                    if (CFN.ContinuedTask != null)
+                    {
+                        CFN.ContinuedTask.GetAwaiter().GetResult();
+                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
+                        RepositoryActionPerformed?.Invoke(this, L);
+                        DebugEnd(OperationId, null, "STATUS_SUCCESS");
+                    }
+                }
+                catch (Exception)
+                {
+                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
+                    RepositoryActionPerformed?.Invoke(this, L);
+                    DebugEnd(OperationId, null, "STATUS_FAILED");
+                }
+                finally
+                {
+                    CFN.ContinuedTask = null;
                 }
 
                 /*
@@ -1254,9 +1277,10 @@ namespace KS2Drive.FS
                     {
                         if (!CFN.ContinueUpload(Offset))
                         {
+                            CFN.ContinuedTask.GetAwaiter().GetResult();
                             CFN.FlushUpload();
                             CFN.StartUpload();
-                            CFN.ContinuedTask = AsyncCreate(CFN.ContinuedTask, CFN, Offset);
+                            CFN.ContinuedTask = AsyncCreate(null, CFN, Offset);
                         }
 
                         CFN.ContinuedTask = AsyncWrite(CFN.ContinuedTask, OperationId, CFN, Buffer, BytesTransferred, Host.GetOperationRequestHint());
