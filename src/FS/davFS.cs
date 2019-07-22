@@ -24,11 +24,13 @@ namespace KS2Drive.FS
         {
             private WebDavClient2[] Clients;
             private Task<int>[] Tasks;
+            private SemaphoreSlim Sema;
 
             public UploadPool(int Capacity)
             {
                 Clients = new WebDavClient2[Capacity];
                 Tasks = new Task<int>[Capacity];
+                Sema = new SemaphoreSlim(1, 1);
                 for (int i = 0; i < Capacity; i++)
                 {
                     int n = i;
@@ -40,11 +42,12 @@ namespace KS2Drive.FS
                 }
             }
 
-            private void UploadTask(FileNode CFN, UInt64 Offset)
+            public async Task Upload(FileNode CFN, UInt64 Offset)
             {
-                lock (this)
-                {
-                    int i = Task.WhenAny(Tasks).GetAwaiter().GetResult().GetAwaiter().GetResult();
+                await Sema.WaitAsync().ConfigureAwait(false);
+                try {
+                    var v = await Task.WhenAny(Tasks).ConfigureAwait(false);
+                    int i = await v.ConfigureAwait(false);
                     var UploadTask = CFN.Upload(Clients[i], Offset);
                     Tasks[i] = Task.Run(async () =>
                     {
@@ -56,11 +59,10 @@ namespace KS2Drive.FS
                         return i;
                     });
                 }
-            }
-
-            public Task Upload(FileNode CFN, UInt64 Offset)
-            {
-                return Task.Run(() => UploadTask(CFN, Offset));
+                finally
+                {
+                    Sema.Release();
+                }
             }
         }
 
@@ -492,7 +494,7 @@ namespace KS2Drive.FS
                 }
                 catch (Exception) { }
             }
-            await Pool.Upload(CFN, Offset);
+            await Pool.Upload(CFN, Offset).ConfigureAwait(false);
         }
 
         public override Int32 Create(
@@ -1046,7 +1048,7 @@ namespace KS2Drive.FS
 
             try
             {
-                FileData = await DownloadClient.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1);
+                FileData = await DownloadClient.DownloadPartial(CFN.RepositoryPath, (long)Offset, (long)Offset + Length - 1).ConfigureAwait(false);
 
                 if (Offset == 0 && (ulong)FileData.LongLength == CFN.FileInfo.FileSize)
                 {
@@ -1171,7 +1173,7 @@ namespace KS2Drive.FS
 
             try
             {
-                await Task.Run(() => CFN.Upload(Buffer, Length));
+                await Task.Run(() => CFN.Upload(Buffer, Length)).ConfigureAwait(false);
                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                 RepositoryActionPerformed?.Invoke(this, L);
                 DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
