@@ -175,7 +175,7 @@ namespace KS2Drive.FS
 
             Marshal.Copy(Buffer, Data, 0, (int)Length);
             UploadOffset += Length;
-            await UploadStream.WriteAsync(Data, 0, (int)Length);
+            await UploadStream.WriteAsync(Data, 0, (int)Length).ConfigureAwait(false);
         }
 
         public Task<bool> Upload(WebDavClient2 Proxy, UInt64 Offset)

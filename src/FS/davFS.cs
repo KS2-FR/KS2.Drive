@@ -1173,7 +1173,7 @@ namespace KS2Drive.FS
 
             try
             {
-                await Task.Run(() => CFN.Upload(Buffer, Length)).ConfigureAwait(false);
+                await CFN.Upload(Buffer, Length).ConfigureAwait(false);
                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                 RepositoryActionPerformed?.Invoke(this, L);
                 DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
