@@ -133,7 +133,7 @@ namespace KS2Drive.FS
             }
 
             this.DownloadTask = null;
-            this.Pool = new UploadPool(2);
+            this.Pool = new UploadPool(5);
         }
 
         /// <summary>
