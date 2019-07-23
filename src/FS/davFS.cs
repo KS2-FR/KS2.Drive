@@ -1279,8 +1279,11 @@ namespace KS2Drive.FS
                     {
                         if (!CFN.ContinueUpload(Offset))
                         {
-                            CFN.ContinuedTask.GetAwaiter().GetResult();
-                            CFN.FlushUpload();
+                            if (CFN.ContinuedTask != null)
+                            {
+                                CFN.ContinuedTask.GetAwaiter().GetResult();
+                                CFN.FlushUpload();
+                            }
                             CFN.StartUpload();
                             CFN.ContinuedTask = AsyncCreate(null, CFN, Offset);
                         }
