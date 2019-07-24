@@ -169,13 +169,13 @@ namespace KS2Drive.FS
             }
         }
 
-        public void Upload(IntPtr Buffer, UInt32 Length)
+        public async Task Upload(IntPtr Buffer, UInt32 Length)
         {
             var Data = new byte[Length];
 
             Marshal.Copy(Buffer, Data, 0, (int)Length);
             UploadOffset += Length;
-            UploadStream.Write(Data, 0, (int)Length);
+            await UploadStream.WriteAsync(Data, 0, (int)Length).ConfigureAwait(false);
         }
 
         public Task<bool> Upload(WebDavClient2 Proxy, UInt64 Offset)
