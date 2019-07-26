@@ -1067,6 +1067,7 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                     Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
                 }
+                return;
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
@@ -1089,6 +1090,9 @@ namespace KS2Drive.FS
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
             }
+
+            // abandon possibly stuck connection
+            DownloadClient = new WebDavClient2();
         }
 
         public override Int32 Read(
