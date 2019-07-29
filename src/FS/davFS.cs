@@ -433,7 +433,7 @@ namespace KS2Drive.FS
                 DebugStart(OperationId.ToString(), CFN);
 
                 List<Tuple<String, FileNode>> ChildrenFileNames = null;
-                var Result = Cache.GetFolderContent(CFN, Marker);
+                var Result = Cache.GetFolderContent(CFN, Marker, new WebDavClient2());
                 if (!Result.Success)
                 {
                     if (Result.ErrorMessage == "401")
