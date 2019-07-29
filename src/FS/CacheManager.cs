@@ -181,14 +181,14 @@ namespace KS2Drive.FS
         /// If the folder as not already been parsed, we parse it from the server
         /// If the folder has been parsed, we serve content from the cache and update the cache from the server in a background task. So that we have a refreshed view for next call
         /// </summary>
-        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker)
+        public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker, WebDavClient2 Proxy)
         {
             List<FileNode> FileNodeToRefreshList = new List<FileNode>();
             List<Tuple<String, FileNode>> ReturnList = null;
 
             if (_mode == CacheMode.Disabled)
             {
-                var Result = ListRemoteServerFolderContent(CurrentFolder);
+                var Result = ListRemoteServerFolderContent(CurrentFolder, Proxy);
                 if (!Result.Success) return Result;
                 else return (true, Result.Content, null);
             }
@@ -197,7 +197,7 @@ namespace KS2Drive.FS
             {
                 if (!CurrentFolder.IsParsed)
                 {
-                    var Result = ListRemoteServerFolderContent(CurrentFolder);
+                    var Result = ListRemoteServerFolderContent(CurrentFolder, Proxy);
                     if (!Result.Success) return Result;
 
                     CurrentFolder.IsParsed = true;
@@ -288,6 +288,8 @@ namespace KS2Drive.FS
 
         private void InternalRefreshFolderCacheContent()
         {
+            var Proxy = new WebDavClient2();
+
             for (;;)
             {
                 FileNode CFN;
@@ -302,8 +304,12 @@ namespace KS2Drive.FS
                     RunningRefreshActionList.RemoveAt(0);
                 }
 
-                var Result = ListRemoteServerFolderContent(CFN);
-                if (!Result.Success) continue;
+                var Result = ListRemoteServerFolderContent(CFN, Proxy);
+                if (!Result.Success)
+                {
+                    Proxy = new WebDavClient2();
+                    continue;
+                }
 
                 lock (CacheLock)
                 {
@@ -349,9 +355,8 @@ namespace KS2Drive.FS
             }
         }
 
-        private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) ListRemoteServerFolderContent(FileNode CFN)
+        private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) ListRemoteServerFolderContent(FileNode CFN, WebDavClient2 Proxy)
         {
-            var Proxy = new WebDavClient2();
             List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
 
             IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;

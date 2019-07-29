@@ -413,6 +413,31 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        private async Task<IEnumerator<Tuple<String, FileNode>>> AsyncReadDirectory(Task Task, String OperationId, FileNode CFN, String Marker)
+        {
+            if (Task != null)
+            {
+                await Task;
+            }
+
+            var (Success, Content, ErrorMessage) = Cache.GetFolderContent(CFN, Marker, DownloadClient);
+            if (!Success)
+            {
+                if (ErrorMessage == "401")
+                {
+                    RepositoryAuthenticationFailed?.Invoke(this, null);
+                    Cache.Clear();
+                }
+                DebugEnd(OperationId, CFN, $"Exception : {ErrorMessage}");
+                DownloadClient = new WebDavClient2();
+                return null;
+            }
+            else
+            {
+                return Content.GetEnumerator();
+            }
+        }
+
         public override Boolean ReadDirectoryEntry(
             Object FileNode0,
             Object FileDesc,
@@ -428,30 +453,24 @@ namespace KS2Drive.FS
 
             if (Context == null)
             {
-                Enumerator = null;
+                Task<IEnumerator<Tuple<String, FileNode>>> Task;
+
                 OperationId = Guid.NewGuid();
                 DebugStart(OperationId.ToString(), CFN);
 
-                List<Tuple<String, FileNode>> ChildrenFileNames = null;
-                var Result = Cache.GetFolderContent(CFN, Marker);
-                if (!Result.Success)
+                lock (CFN.OperationLock)
                 {
-                    if (Result.ErrorMessage == "401")
-                    {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
-                    }
-                    DebugEnd(OperationId.ToString(), CFN, $"Exception : {Result.ErrorMessage}");
+                    Task = AsyncReadDirectory(CFN.ContinuedTask, OperationId.ToString(), CFN, Marker);
+                    CFN.ContinuedTask = Task;
+                }
+
+                Enumerator = Task.GetAwaiter().GetResult();
+                if (Enumerator == null)
+                {
                     FileName = default(String);
                     FileInfo = default(FileInfo);
                     return false;
                 }
-                else
-                {
-                    ChildrenFileNames = Result.Content;
-                }
-
-                Enumerator = ChildrenFileNames.GetEnumerator();
                 Context = new DirectoryEnumeratorContext() { Enumerator = Enumerator, OperationId = OperationId };
             }
             else
@@ -460,6 +479,8 @@ namespace KS2Drive.FS
                 OperationId = ((DirectoryEnumeratorContext)Context).OperationId;
             }
 
+            DebugEnd(OperationId.ToString(), CFN, "STATUS_SUCCESS");
+
             if (Enumerator.MoveNext())
             {
                 Tuple<String, FileNode> CurrentCFN = Enumerator.Current;
@@ -467,8 +488,6 @@ namespace KS2Drive.FS
                 FileInfo = CurrentCFN.Item2.FileInfo;
                 return true;
             }
-
-            DebugEnd(OperationId.ToString(), CFN, "STATUS_SUCCESS");
 
             FileName = default(String);
             FileInfo = default(FileInfo);
@@ -1067,6 +1086,7 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                     Host.SendReadResponse(RequestHint, STATUS_SUCCESS, BytesTransferred);
                 }
+                return;
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
@@ -1089,6 +1109,9 @@ namespace KS2Drive.FS
                 DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
                 Host.SendReadResponse(RequestHint, STATUS_NETWORK_UNREACHABLE, 0);
             }
+
+            // abandon possibly stuck connection
+            DownloadClient = new WebDavClient2();
         }
 
         public override Int32 Read(
