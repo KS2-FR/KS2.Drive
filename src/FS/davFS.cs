@@ -87,6 +87,7 @@ namespace KS2Drive.FS
         private CacheManager Cache;
         private WebDavClient2 DownloadClient;
         private Task DownloadTask;
+        private Object DownloadLock = new object();
         private UploadPool Pool;
 
         private const UInt16 MEMFS_SECTOR_SIZE = 4096;
@@ -417,7 +418,11 @@ namespace KS2Drive.FS
         {
             if (Task != null)
             {
-                await Task;
+                try
+                {
+                    await Task.ConfigureAwait(false);
+                }
+                catch (Exception) { }
             }
 
             var (Success, Content, ErrorMessage) = Cache.GetFolderContent(CFN, Marker, DownloadClient);
@@ -458,10 +463,10 @@ namespace KS2Drive.FS
                 OperationId = Guid.NewGuid();
                 DebugStart(OperationId.ToString(), CFN);
 
-                lock (CFN.OperationLock)
+                lock (DownloadLock)
                 {
-                    Task = AsyncReadDirectory(CFN.ContinuedTask, OperationId.ToString(), CFN, Marker);
-                    CFN.ContinuedTask = Task;
+                    Task = AsyncReadDirectory(DownloadTask, OperationId.ToString(), CFN, Marker);
+                    DownloadTask = Task;
                 }
 
                 Enumerator = Task.GetAwaiter().GetResult();
@@ -1138,7 +1143,10 @@ namespace KS2Drive.FS
                 byte[] FileData = null;
                 if (CFN.FileData == null)
                 {
-                    DownloadTask = AsyncRead(DownloadTask, OperationId, CFN, Buffer, Offset, Length, Host.GetOperationRequestHint());
+                    lock (DownloadLock)
+                    {
+                        DownloadTask = AsyncRead(DownloadTask, OperationId, CFN, Buffer, Offset, Length, Host.GetOperationRequestHint());
+                    }
                     return STATUS_PENDING;
                 }
                 else
@@ -1191,7 +1199,11 @@ namespace KS2Drive.FS
 
             if (Task != null)
             {
-                await Task.ConfigureAwait(false);
+                try
+                {
+                    await Task.ConfigureAwait(false);
+                }
+                catch (Exception) { }
             }
 
             try
