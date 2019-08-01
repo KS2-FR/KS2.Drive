@@ -20,6 +20,14 @@ namespace KS2Drive
         {
         }
 
+        public void Mount(ConfigurationManager manager) 
+        {
+            foreach(Configuration config in manager.GetConfigurations()) 
+            {
+                Mount(config);
+            }
+        }
+
         public void Mount(Configuration config)
         {
             davFs = new DavFS(config);

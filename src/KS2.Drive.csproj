@@ -153,6 +153,7 @@
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
     <Compile Include="Config\Configuration.cs" />
+    <Compile Include="Config\ConfigurationManager.cs" />
     <Compile Include="Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Converters\ProxyCustomAuthActivator.cs" />
     <Compile Include="Converters\ProxyActivator.cs" />

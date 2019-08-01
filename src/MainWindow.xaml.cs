@@ -18,7 +18,8 @@ namespace KS2Drive
         private FSPService Service;
         private bool IsMounted = false;
         private Thread T;
-        private Configuration AppConfiguration;
+        private ConfigurationManager AppConfigManager;
+        //private Configuration AppConfiguration;
         public ObservableCollection<LogListItem> ItemsToLog = new ObservableCollection<LogListItem>();
 
         private System.Windows.Forms.NotifyIcon AppNotificationIcon;
@@ -27,11 +28,13 @@ namespace KS2Drive
         public MainWindow()
         {
             InitializeComponent();
+            AppConfigManager = new ConfigurationManager();
 
-            AppConfiguration = ((App)Application.Current).AppConfiguration;
+            AppConfigManager.AddConfiguration(((App)Application.Current).AppConfiguration);
+            //AppConfiguration = ((App)Application.Current).AppConfiguration;
 
             AppMenu = (ContextMenu)this.FindResource("NotifierContextMenu");
-            ((MenuItem)AppMenu.Items[0]).IsEnabled = AppConfiguration.IsConfigured;
+            ((MenuItem)AppMenu.Items[0]).IsEnabled = AppConfigManager.GetConfigurations()[0].IsConfigured;
 
             this.Hide();
 
@@ -102,9 +105,9 @@ namespace KS2Drive
 
             Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"KS² Drive has started", System.Windows.Forms.ToolTipIcon.Info));
 
-            if (this.AppConfiguration.IsConfigured)
+            if (this.AppConfigManager.GetConfigurations()[0].IsConfigured)
             {
-                if (AppConfiguration.AutoMount) MountDrive();
+                if (AppConfigManager.GetConfigurations()[0].AutoMount) MountDrive();
             }
             else
             {
@@ -116,7 +119,7 @@ namespace KS2Drive
         {
             try
             {
-                Service.Mount(this.AppConfiguration);
+                Service.Mount(AppConfigManager);
             }
             catch (Exception ex)
             {
@@ -128,7 +131,11 @@ namespace KS2Drive
             ((MenuItem)AppMenu.Items[0]).Header = "_UNMOUNT";
             IsMounted = true;
             ((MenuItem)AppMenu.Items[2]).IsEnabled = false;
-            Process.Start($@"{this.AppConfiguration.DriveLetter}:\");
+            foreach (Configuration config in AppConfigManager.GetConfigurations())
+            {
+                Process.Start($@"{config.DriveLetter}:\");
+            }
+            
         }
 
         private void UnmountDrive()
@@ -180,7 +187,7 @@ namespace KS2Drive
         {
             ConfigurationUI OptionWindow = new ConfigurationUI();
             OptionWindow.ShowDialog();
-            if (AppConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
+            if (AppConfigManager.GetConfigurations()[0].IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
 
         private void MenuLog_Click(object sender, RoutedEventArgs e)
