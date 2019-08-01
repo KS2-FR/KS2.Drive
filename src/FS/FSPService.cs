@@ -20,6 +20,7 @@ namespace KS2Drive
         {
         }
 
+        /*
         public void Mount(ConfigurationManager manager) 
         {
             foreach(Configuration config in manager.GetConfigurations()) 
@@ -27,6 +28,7 @@ namespace KS2Drive
                 Mount(config);
             }
         }
+        */
 
         public void Mount(Configuration config)
         {

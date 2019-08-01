@@ -161,6 +161,7 @@
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />
+    <Compile Include="FS\MountingHelper.cs" />
     <Compile Include="ListboxBehaviour.cs" />
     <Compile Include="Log\LogListItem.cs" />
     <Compile Include="Tools.cs" />

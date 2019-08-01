@@ -1,4 +1,5 @@
 ﻿using KS2Drive.Config;
+using KS2Drive.FS;
 using KS2Drive.Log;
 using KS2Drive.WinFSP;
 using MahApps.Metro.Controls;
@@ -15,10 +16,12 @@ namespace KS2Drive
 {
     public partial class MainWindow : MetroWindow
     {
-        private FSPService Service;
+        //private FSPService Service1;
+        private MountingHelper[] mountingHelpers;
+
         private bool IsMounted = false;
-        private Thread T;
-        private ConfigurationManager AppConfigManager;
+        //private Thread T;
+        //private ConfigurationManager AppConfigManager;
         //private Configuration AppConfiguration;
         public ObservableCollection<LogListItem> ItemsToLog = new ObservableCollection<LogListItem>();
 
@@ -28,13 +31,29 @@ namespace KS2Drive
         public MainWindow()
         {
             InitializeComponent();
-            AppConfigManager = new ConfigurationManager();
+            mountingHelpers = new MountingHelper[2];
+            mountingHelpers[0] = new MountingHelper();
+            mountingHelpers[1] = new MountingHelper();
 
-            AppConfigManager.AddConfiguration(((App)Application.Current).AppConfiguration);
+            //AppConfigManager = new ConfigurationManager();
+
+            //AppConfigManager.AddConfiguration(((App)Application.Current).AppConfiguration);
+
+            //Configuration config2 = ((App)Application.Current).AppConfiguration;
+
+            //config2.DriveLetter = "B";
+            //AppConfigManager.AddConfiguration(config2);
             //AppConfiguration = ((App)Application.Current).AppConfiguration;
+            mountingHelpers[0].config = ((App)Application.Current).AppConfiguration;
+
+            Configuration config2 = ((App)Application.Current).AppConfiguration;
+
+            config2.DriveLetter = "B";
+
+            mountingHelpers[1].config = config2;
 
             AppMenu = (ContextMenu)this.FindResource("NotifierContextMenu");
-            ((MenuItem)AppMenu.Items[0]).IsEnabled = AppConfigManager.GetConfigurations()[0].IsConfigured;
+            ((MenuItem)AppMenu.Items[0]).IsEnabled = mountingHelpers[0].config.IsConfigured;
 
             this.Hide();
 
@@ -62,42 +81,44 @@ namespace KS2Drive
 
             #region Try to start WinFSP Service
 
-            try
+            for (int i = 0; i < mountingHelpers.Length; i++)
             {
-                Service = new FSPService();
-
-                #region Service Events
-
-                Service.RepositoryActionPerformed += (s1, e1) =>
+                try
                 {
-                    Dispatcher.Invoke(() => ItemsToLog.Add(e1));
-                    if (!e1.Result.Equals("STATUS_SUCCESS"))
+                    mountingHelpers[i].service = new FSPService();
+
+                    #region Service Events
+
+                    mountingHelpers[i].service.RepositoryActionPerformed += (s1, e1) =>
                     {
-                        if (!e1.AllowRetryOrRecover) Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed", System.Windows.Forms.ToolTipIcon.Warning));
-                        else Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed. You can recover this file via the LOG menu", System.Windows.Forms.ToolTipIcon.Warning));
+                        Dispatcher.Invoke(() => ItemsToLog.Add(e1));
+                        if (!e1.Result.Equals("STATUS_SUCCESS"))
+                        {
+                            if (!e1.AllowRetryOrRecover) Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed", System.Windows.Forms.ToolTipIcon.Warning));
+                            else Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed. You can recover this file via the LOG menu", System.Windows.Forms.ToolTipIcon.Warning));
+                        };
                     };
-                };
 
-                Service.RepositoryAuthenticationFailed += (s2, e2) =>
-                {
-                    Dispatcher.Invoke(() =>
+                    mountingHelpers[i].service.RepositoryAuthenticationFailed += (s2, e2) =>
                     {
-                        AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"Your credentials are invalid. Please update them in the Configuration panel", System.Windows.Forms.ToolTipIcon.Error);
-                    });
-                };
+                        Dispatcher.Invoke(() =>
+                        {
+                            AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"Your credentials are invalid. Please update them in the Configuration panel", System.Windows.Forms.ToolTipIcon.Error);
+                        });
+                    };
 
-                #endregion
+                    #endregion
+                    mountingHelpers[i].Start();
+                }
+                catch
+                {
+                    var MB = new WinFSPUI();
+                    MB.ShowDialog();
+                    QuitApp();
+                    return;
+                }
+            }
 
-                T = new Thread(() => Service.Run());
-                T.Start();
-            }
-            catch
-            {
-                var MB = new WinFSPUI();
-                MB.ShowDialog();
-                QuitApp();
-                return;
-            }
 
             #endregion
 
@@ -105,9 +126,9 @@ namespace KS2Drive
 
             Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"KS² Drive has started", System.Windows.Forms.ToolTipIcon.Info));
 
-            if (this.AppConfigManager.GetConfigurations()[0].IsConfigured)
+            if (this.mountingHelpers[0].config.IsConfigured)
             {
-                if (AppConfigManager.GetConfigurations()[0].AutoMount) MountDrive();
+                for(int i = 0; i < mountingHelpers.Length; i++) if (mountingHelpers[i].config.AutoMount) MountDrive(i);
             }
             else
             {
@@ -115,11 +136,16 @@ namespace KS2Drive
             }
         }
 
-        private void MountDrive()
+        private void MountDrives()
+        {
+            for (int i = 0; i < mountingHelpers.Length; i++) MountDrive(i);
+        }
+
+        private void MountDrive(int drive)
         {
             try
             {
-                Service.Mount(AppConfigManager);
+                mountingHelpers[drive].Mount();
             }
             catch (Exception ex)
             {
@@ -131,18 +157,23 @@ namespace KS2Drive
             ((MenuItem)AppMenu.Items[0]).Header = "_UNMOUNT";
             IsMounted = true;
             ((MenuItem)AppMenu.Items[2]).IsEnabled = false;
-            foreach (Configuration config in AppConfigManager.GetConfigurations())
-            {
-                Process.Start($@"{config.DriveLetter}:\");
-            }
-            
+            //foreach (Configuration config in AppConfigManager.GetConfigurations())
+            //{
+            Process.Start($@"{mountingHelpers[0].config.DriveLetter}:\");
+            //}
+
         }
 
-        private void UnmountDrive()
+        private void UnmountDrives()
+        {
+            for (int i = 0; i < mountingHelpers.Length; i++) UnmountDrive(i);
+        }
+
+        private void UnmountDrive(int drive)
         {
             try
             {
-                Service.Unmount();
+                mountingHelpers[drive].Unmount();
             }
             catch (Exception ex)
             {
@@ -171,7 +202,7 @@ namespace KS2Drive
         {
             AppNotificationIcon.Visible = false;
             AppNotificationIcon.Dispose();
-            Service?.Stop();
+            mountingHelpers[0].service?.Stop();
             Application.Current.Shutdown();
         }
 
@@ -179,15 +210,16 @@ namespace KS2Drive
 
         private void MenuMount_Click(object sender, RoutedEventArgs e)
         {
-            if (IsMounted) UnmountDrive();
-            else MountDrive();
+            if (IsMounted) UnmountDrives();
+            //else MountDrive();
+            else MountDrives();
         }
 
         private void MenuConfigure_Click(object sender, RoutedEventArgs e)
         {
             ConfigurationUI OptionWindow = new ConfigurationUI();
             OptionWindow.ShowDialog();
-            if (AppConfigManager.GetConfigurations()[0].IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
+            if (mountingHelpers[0].config.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
 
         private void MenuLog_Click(object sender, RoutedEventArgs e)
