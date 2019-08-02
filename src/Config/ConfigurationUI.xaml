@@ -187,7 +187,7 @@
                     <RadioButton Grid.Row="0" GroupName="ProxySettings" x:Name="rb_NoProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntZero}, Mode=TwoWay}">No proxy</RadioButton>
                     <RadioButton Grid.Row="1" GroupName="ProxySettings" x:Name="rb_DefaultProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntOne}, Mode=TwoWay}">Default proxy</RadioButton>
                     <RadioButton Grid.Row="2" GroupName="ProxySettings" x:Name="rb_CustomProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">Custom proxy</RadioButton>
-                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="25,0,20,0" Padding="10" Grid.Column="1" IsEnabled="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">
+                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="25,0,20,0" Padding="10" Grid.Column="1" IsEnabled="{Binding CurrentConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="25"></RowDefinition>
@@ -207,8 +207,8 @@
                             <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
                                 <Border.IsEnabled>
                                     <MultiBinding Converter="{StaticResource ProxyCustomAuthActivator}">
-                                        <Binding Path="AppConfiguration.HTTPProxyMode" />
-                                        <Binding Path="AppConfiguration.UseProxyAuthentication" />
+                                        <Binding Path="CurrentConfiguration.HTTPProxyMode" />
+                                        <Binding Path="CurrentConfiguration.UseProxyAuthentication" />
                                     </MultiBinding>
                                 </Border.IsEnabled>
                                 <Grid>

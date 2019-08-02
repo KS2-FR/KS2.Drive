@@ -1,5 +1,6 @@
 ﻿//using KS2Drive.Log;
 using KS2Drive.Config;
+using KS2Drive.FS;
 using Newtonsoft.Json;
 using NLog.LayoutRenderers;
 using System;
@@ -17,7 +18,8 @@ namespace KS2Drive
 {
     public partial class App : Application
     {
-        public Configuration AppConfiguration { get; set; }
+        //public Configuration AppConfiguration { get; set; }
+        public MountingHelper[] mountingHelpers {get; set; }
         public String ConfigurationFolderPath { get; set; }
         public String ConfigurationFilePath { get; set; }
 
@@ -50,10 +52,15 @@ namespace KS2Drive
             }
 
             ConfigurationFilePath = Path.Combine(ConfigurationFolderPath, "config.json");
-            this.AppConfiguration = Configuration.Load(ConfigurationFilePath);
+            //this.AppConfiguration = Configuration.Load(ConfigurationFilePath);
 
-            Tools.LoadProxy(this.AppConfiguration);
+            //Tools.LoadProxy(this.AppConfiguration);
 
+            this.mountingHelpers = new MountingHelper[1];
+            this.mountingHelpers[0] = new MountingHelper();
+            this.mountingHelpers[0].config = Configuration.Load(ConfigurationFilePath);
+
+            Tools.LoadProxy(this.mountingHelpers[0].config);
             #endregion
 
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");

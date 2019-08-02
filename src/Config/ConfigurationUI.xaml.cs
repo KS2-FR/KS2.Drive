@@ -15,12 +15,15 @@ namespace KS2Drive.Config
 {
     public partial class ConfigurationUI : MetroWindow
     {
-        public Configuration AppConfiguration { get; set; }
-
+        //public Configuration AppConfiguration { get; set; }
+        public MountingHelper[] mountingHelpers { get; set; }
+        public Configuration CurrentConfiguration { get; set; }
         public ConfigurationUI()
         {
             this.DataContext = this;
-            this.AppConfiguration = ((App)Application.Current).AppConfiguration;
+
+            this.mountingHelpers = ((App)Application.Current).mountingHelpers;
+            CurrentConfiguration = mountingHelpers[0].config;
             InitializeComponent();
 
             //Get Free drives
@@ -80,40 +83,42 @@ namespace KS2Drive.Config
             CBMountAsNetworkDrive.SelectedIndex = 0;
 
             //Reload values from config
-            this.AppConfiguration = ((App)Application.Current).AppConfiguration;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]);
-            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerURL)) txtURL.Text = this.AppConfiguration.ServerURL;
+            //this.AppConfiguration = ((App)Application.Current).AppConfiguration;
+            this.mountingHelpers = ((App)Application.Current).mountingHelpers;
 
-            var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType));
+            if (!String.IsNullOrEmpty(this.mountingHelpers[0].config.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.mountingHelpers[0].config.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.mountingHelpers[0].config.DriveLetter[0]);
+            if (!String.IsNullOrEmpty(this.mountingHelpers[0].config.ServerURL)) txtURL.Text = this.mountingHelpers[0].config.ServerURL;
+
+            var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.mountingHelpers[0].config.ServerType));
             if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
 
-            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerLogin)) txtLogin.Text = this.AppConfiguration.ServerLogin;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerPassword)) txtPassword.Password = this.AppConfiguration.ServerPassword;
+            if (!String.IsNullOrEmpty(this.mountingHelpers[0].config.ServerLogin)) txtLogin.Text = this.mountingHelpers[0].config.ServerLogin;
+            if (!String.IsNullOrEmpty(this.mountingHelpers[0].config.ServerPassword)) txtPassword.Password = this.mountingHelpers[0].config.ServerPassword;
 
-            var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode));
+            var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.mountingHelpers[0].config.KernelCacheMode));
             if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
 
-            var FlushMatchingItem = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.FlushMode));
+            var FlushMatchingItem = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.mountingHelpers[0].config.FlushMode));
             if (!FlushMatchingItem.Equals(default(KeyValuePair<int, string>))) CBFlush.SelectedItem = FlushMatchingItem;
 
-            var SyncOpsMatchingItem = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.SyncOps)));
+            var SyncOpsMatchingItem = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.mountingHelpers[0].config.SyncOps)));
             if (!SyncOpsMatchingItem.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SyncOpsMatchingItem;
 
-            var PreloadingMatchingItem = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.PreLoading)));
+            var PreloadingMatchingItem = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.mountingHelpers[0].config.PreLoading)));
             if (!PreloadingMatchingItem.Equals(default(KeyValuePair<int, string>))) CBPreloading.SelectedItem = PreloadingMatchingItem;
 
-            var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.MountAsNetworkDrive)));
+            var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.mountingHelpers[0].config.MountAsNetworkDrive)));
             if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
 
             //Look for certificate
-            if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.CertSerial) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreName))
+            if (this.mountingHelpers[0].config.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
+            if (!String.IsNullOrEmpty(this.mountingHelpers[0].config.CertSerial) && !String.IsNullOrEmpty(this.mountingHelpers[0].config.CertStoreLocation) && !String.IsNullOrEmpty(this.mountingHelpers[0].config.CertStoreName))
             {
-                var FoundCertificate = Tools.FindCertificate(this.AppConfiguration.CertStoreName, this.AppConfiguration.CertStoreLocation, this.AppConfiguration.CertSerial);
+                var FoundCertificate = Tools.FindCertificate(this.mountingHelpers[0].config.CertStoreName, this.mountingHelpers[0].config.CertStoreLocation, this.mountingHelpers[0].config.CertSerial);
                 if (FoundCertificate != null)
                 {
                     txt_ClientCertSubject.Text = FoundCertificate.Subject;
-                    if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
+                    if (this.mountingHelpers[0].config.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
                 }
             }
         }
@@ -167,21 +172,21 @@ namespace KS2Drive.Config
             }
             rkApp.Close();
 
-            this.AppConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
-            this.AppConfiguration.ServerURL = txtURL.Text;
-            this.AppConfiguration.ServerType = (Int32)CBMode.SelectedValue;
-            this.AppConfiguration.ServerLogin = txtLogin.Text;
-            this.AppConfiguration.ServerPassword = txtPassword.Password;
-            this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
-            this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
-            this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
-            this.AppConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
-            this.AppConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
-            this.AppConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
+            this.mountingHelpers[0].config.DriveLetter = CBFreeDrives.SelectedValue.ToString();
+            this.mountingHelpers[0].config.ServerURL = txtURL.Text;
+            this.mountingHelpers[0].config.ServerType = (Int32)CBMode.SelectedValue;
+            this.mountingHelpers[0].config.ServerLogin = txtLogin.Text;
+            this.mountingHelpers[0].config.ServerPassword = txtPassword.Password;
+            this.mountingHelpers[0].config.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
+            this.mountingHelpers[0].config.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
+            this.mountingHelpers[0].config.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
+            this.mountingHelpers[0].config.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
+            this.mountingHelpers[0].config.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
+            this.mountingHelpers[0].config.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
 
             try
             {
-                this.AppConfiguration.Save();
+                this.mountingHelpers[0].config.Save();
                 this.Close();
             }
             catch (Exception ex)
@@ -189,14 +194,14 @@ namespace KS2Drive.Config
                 MessageBox.Show($"Cannot save configuration : {ex.Message}");
             }
 
-            this.AppConfiguration.IsConfigured = true;
+            this.mountingHelpers[0].config.IsConfigured = true;
 
-            Tools.LoadProxy(this.AppConfiguration);
+            Tools.LoadProxy(this.mountingHelpers[0].config);
         }
 
         private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
         {
-            this.AppConfiguration.ProxyPassword = ProxyPassword.Password;
+            this.mountingHelpers[0].config.ProxyPassword = ProxyPassword.Password;
         }
 
         private void bt_UserClientCertSelect_Click(object sender, RoutedEventArgs e)
@@ -218,9 +223,9 @@ namespace KS2Drive.Config
 
                 if (sel.Count > 0)
                 {
-                    this.AppConfiguration.CertStoreName = StoreNameAsString;
-                    this.AppConfiguration.CertStoreLocation = StoreLocationAsString;
-                    this.AppConfiguration.CertSerial = sel[0].SerialNumber;
+                    this.mountingHelpers[0].config.CertStoreName = StoreNameAsString;
+                    this.mountingHelpers[0].config.CertStoreLocation = StoreLocationAsString;
+                    this.mountingHelpers[0].config.CertSerial = sel[0].SerialNumber;
                     txt_ClientCertSubject.Text = sel[0].Subject;
                 }
             }

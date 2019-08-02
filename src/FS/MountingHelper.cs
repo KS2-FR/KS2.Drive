@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace KS2Drive.FS
 {
-    class MountingHelper
+    public class MountingHelper
     {
         public Thread t;
         public FSPService service { get; set; }

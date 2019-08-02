@@ -31,9 +31,9 @@ namespace KS2Drive
         public MainWindow()
         {
             InitializeComponent();
-            mountingHelpers = new MountingHelper[2];
-            mountingHelpers[0] = new MountingHelper();
-            mountingHelpers[1] = new MountingHelper();
+            //mountingHelpers = new MountingHelper[1];
+            //mountingHelpers[0] = new MountingHelper();
+            //mountingHelpers[1] = new MountingHelper();
 
             //AppConfigManager = new ConfigurationManager();
 
@@ -44,13 +44,13 @@ namespace KS2Drive
             //config2.DriveLetter = "B";
             //AppConfigManager.AddConfiguration(config2);
             //AppConfiguration = ((App)Application.Current).AppConfiguration;
-            mountingHelpers[0].config = ((App)Application.Current).AppConfiguration;
+            mountingHelpers = ((App)Application.Current).mountingHelpers;
 
-            Configuration config2 = ((App)Application.Current).AppConfiguration;
+            //Configuration config2 = mountingHelpers[0].config;
 
-            config2.DriveLetter = "B";
+            //config2.DriveLetter = "B";
 
-            mountingHelpers[1].config = config2;
+            //mountingHelpers[1].config = config2;
 
             AppMenu = (ContextMenu)this.FindResource("NotifierContextMenu");
             ((MenuItem)AppMenu.Items[0]).IsEnabled = mountingHelpers[0].config.IsConfigured;
