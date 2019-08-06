@@ -15,19 +15,20 @@
         <sys:Int32 x:Key="IntOne">1</sys:Int32>
         <sys:Int32 x:Key="IntTwo">2</sys:Int32>
         <local:ProxyCustomAuthActivator x:Key="ProxyCustomAuthActivator" />
-     </Window.Resources>
+    </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="100"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="132"/>
+            <ColumnDefinition/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition/>
+            <RowDefinition Height="0"></RowDefinition>
             <RowDefinition Height="35"></RowDefinition>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0" Grid.ColumnSpan="2">
+        <TabControl Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,-0.333,3">
             <TabItem Header="General">
                 <Grid Margin="5">
                     <Grid.ColumnDefinitions>
@@ -35,21 +36,22 @@
                         <ColumnDefinition Width="*"></ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"></RowDefinition>
-                        <RowDefinition Height="*"></RowDefinition>
-                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="50"></RowDefinition>
+                        <RowDefinition Height="50"></RowDefinition>
+                        <RowDefinition Height="137*"></RowDefinition>
+                        <RowDefinition Height="142*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,10.333" Grid.RowSpan="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"></ColumnDefinition>
                                 <ColumnDefinition Width="*"></ColumnDefinition>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
                             <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
@@ -85,7 +87,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,30.667,-0.333,0.333">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"></ColumnDefinition>
@@ -93,16 +95,16 @@
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="39.333"></RowDefinition>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Login</TextBlock>
-                            <TextBox Grid.Row="0" Grid.Column="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,9,0,9.667" >Login</TextBlock>
+                            <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0,4,-0.333,4.667"></TextBox>
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
-                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword"></PasswordBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.333,0,6.667" >Password</TextBlock>
+                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0,2.333,-0.333,1.667"></PasswordBox>
 
-                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal">
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Height="35" Margin="0,2.333,-0.333,2">
                                 <CheckBox x:Name="Chk_UserClientCert">Additional client certificate</CheckBox>
                                 <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True"></TextBox>
                                 <extToolkit:DropDownButton Content="Select" Margin="0,5,0,5" Width="100" IsEnabled="{Binding Path=IsChecked,ElementName=Chk_UserClientCert}" x:Name="bt_UserClientCertSelect">
@@ -126,19 +128,26 @@
                                     </extToolkit:DropDownButton.DropDownContent>
                                 </extToolkit:DropDownButton>
                             </StackPanel>
-                            
+
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
-                        <Grid>
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,92,0.667,116.333" RenderTransformOrigin="0.5,0.5" Grid.RowSpan="2">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <SkewTransform/>
+                                <RotateTransform/>
+                                <TranslateTransform/>
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                        <Grid Margin="0,0,0,4.333">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="25"></RowDefinition>
                             </Grid.RowDefinitions>
 
-                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}"/>
-                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}"/>
+                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" Margin="0,0,-0.333,0"/>
+                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" Margin="0,0.333,0,-5.667"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -146,7 +155,7 @@
 
             </TabItem>
             <TabItem Header="Advanced">
-                <Border BorderThickness="1" BorderBrush="Gainsboro">
+                <Border BorderThickness="1" BorderBrush="Gainsboro" Margin="0,73,-0.333,-0.333">
                     <Grid Margin="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="150"></ColumnDefinition>
@@ -176,7 +185,7 @@
                 </Border>
             </TabItem>
             <TabItem Header="Proxy">
-                <Grid>
+                <Grid Margin="15,80,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="35"></RowDefinition>
                         <RowDefinition Height="35"></RowDefinition>
@@ -187,7 +196,7 @@
                     <RadioButton Grid.Row="0" GroupName="ProxySettings" x:Name="rb_NoProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntZero}, Mode=TwoWay}">No proxy</RadioButton>
                     <RadioButton Grid.Row="1" GroupName="ProxySettings" x:Name="rb_DefaultProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntOne}, Mode=TwoWay}">Default proxy</RadioButton>
                     <RadioButton Grid.Row="2" GroupName="ProxySettings" x:Name="rb_CustomProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">Custom proxy</RadioButton>
-                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="25,0,20,0" Padding="10" Grid.Column="1" IsEnabled="{Binding CurrentConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">
+                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="0,0,19.667,0.333" Padding="10" IsEnabled="{Binding CurrentConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="25"></RowDefinition>
@@ -236,8 +245,46 @@
             </TabItem>
         </TabControl>
 
+        <Border Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,41,9.667,364">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="15"></RowDefinition>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Configurations</TextBlock>
+                <Button Grid.Row="0" Grid.Column="1" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName1" Margin="5,0,5,-5"></Button>
+                <Button Grid.Row="0" Grid.Column="2" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName2" Margin="5,0,5,-5"></Button>
+                <Button Grid.Row="0" Grid.Column="3" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName3" Margin="5,0,5,-5"></Button>
+                <Button Grid.Row="0" Grid.Column="4" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName4" Margin="5,0,5,-5"></Button>
 
-        <Button x:Name="bt_Save" Grid.Row="1" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,5,5" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click" Grid.Column="1"></Button>
+            </Grid>
+        </Border>
+
+        <Border x:Name="DriveNameBorder" Opacity="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,74,9.667,329">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="15"></RowDefinition>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Drive name</TextBlock>
+                <TextBox Grid.Row="0" Grid.Column="1" Height="21" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtDriveName" Margin="5,0,5,-5"></TextBox>
+            </Grid>
+        </Border>
+
+        <Button x:Name="bt_Remove" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,124.667,4.667" VerticalAlignment="Bottom" Content="Remove" Click="bt_removeConfiguration_Click" Grid.Column="1"></Button>
+        <Button x:Name="bt_Save" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,4.667,4.667" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click" Grid.Column="1"></Button>
 
     </Grid>
 

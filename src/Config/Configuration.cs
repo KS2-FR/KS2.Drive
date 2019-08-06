@@ -11,6 +11,7 @@ namespace KS2Drive.Config
     public class Configuration
     {
         public String Path;
+        public String Name;
 
         public static Configuration Load(String ConfigurationFilePath)
         {

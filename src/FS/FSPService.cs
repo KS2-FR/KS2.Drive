@@ -3,6 +3,7 @@ using KS2Drive.Config;
 using KS2Drive.FS;
 using KS2Drive.Log;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
@@ -11,50 +12,54 @@ namespace KS2Drive
 {
     public class FSPService : Service
     {
-        private FileSystemHost Host;
-        private DavFS davFs;
+        //private FileSystemHost Host1, Host2;
+        //private DavFS davFs1, davFs2;
+        private List<Tuple<FileSystemHost, DavFS>> mounts;
         public event EventHandler<LogListItem> RepositoryActionPerformed;
         public event EventHandler RepositoryAuthenticationFailed;
 
         public FSPService() : base("KS2DriveService")
         {
+            mounts = new List<Tuple<FileSystemHost, DavFS>>();
         }
-
-        /*
-        public void Mount(ConfigurationManager manager) 
-        {
-            foreach(Configuration config in manager.GetConfigurations()) 
-            {
-                Mount(config);
-            }
-        }
-        */
-
+        
         public void Mount(Configuration config)
         {
-            davFs = new DavFS(config);
+            if (!config.IsConfigured) throw new IOException("Configuration is not configured.");
+            
+            DavFS davFs = new DavFS(config);
+            
             davFs.RepositoryActionPerformed += (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
             davFs.RepositoryAuthenticationFailed += (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
+            
+            FileSystemHost Host = new FileSystemHost(davFs);
+            davFs.Init(Host);
+            int r = Host.MountEx($"{config.DriveLetter}:", 64, null, true, 0);
+            if (r < 0) throw new IOException("cannot mount file system");
 
-            Host = new FileSystemHost(davFs);
-            if (Host.MountEx($"{config.DriveLetter}:", 64, null, config.SyncOps, 0) < 0) throw new IOException("cannot mount file system");
+            mounts.Add(new Tuple<FileSystemHost, DavFS>(Host, davFs));
         }
 
-        public void Unmount()
+        public void Unmount(Configuration config)
         {
-            davFs.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
-            davFs.RepositoryAuthenticationFailed -= (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
+            foreach(Tuple<FileSystemHost, DavFS> mount in mounts)
+            {
+                mount.Item2.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
+                mount.Item2.RepositoryAuthenticationFailed -= (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
 
-            Host.Unmount();
-            Host = null;
+                mount.Item1.Unmount();
+                mount.Item1.Dispose();
+            }
         }
 
         protected override void OnStop()
         {
-            if (Host != null)
+            foreach (Tuple<FileSystemHost, DavFS> mount in mounts)
             {
-                Unmount();
+                mount.Item1.Dispose();
             }
+
+            mounts = null;
         }
     }
 }

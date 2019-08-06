@@ -78,6 +78,10 @@
   <PropertyGroup>
     <ManifestKeyFile>COMODO_Code_Signing_2022.p12</ManifestKeyFile>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>
+    </StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="ControlzEx, Version=3.0.2.4, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\ControlzEx.3.0.2.4\lib\net45\ControlzEx.dll</HintPath>
@@ -161,7 +165,6 @@
     <Compile Include="FS\DirectoryEnumeratorContext.cs" />
     <Compile Include="FS\Enum.cs" />
     <Compile Include="FS\FSPService.cs" />
-    <Compile Include="FS\MountingHelper.cs" />
     <Compile Include="ListboxBehaviour.cs" />
     <Compile Include="Log\LogListItem.cs" />
     <Compile Include="Tools.cs" />
