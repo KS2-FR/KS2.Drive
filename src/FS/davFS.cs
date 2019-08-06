@@ -140,13 +140,13 @@ namespace KS2Drive.FS
         /// <summary>
         /// Define the general parameters of the file system
         /// </summary>
-        public override Int32 Init(Object Host0)
+        public Int32 Init(Object Host0, string fileSystemName, string prefix)
         {
             Host = (FileSystemHost)Host0;
 
             Host.FileInfoTimeout = unchecked((UInt32)(Int32)(this.kernelCacheMode));
-            Host.FileSystemName = "davFS";
-            if (MountAsNetworkDrive) Host.Prefix = $@"\{this.DAVServeurAuthority}\dav"; //mount as network drive
+            Host.FileSystemName = fileSystemName; // "davFS";
+            if (MountAsNetworkDrive) Host.Prefix = $@"\{this.DAVServeurAuthority}\" + prefix;//dav; //mount as network drive
             Host.SectorSize = DavFS.MEMFS_SECTOR_SIZE;
             Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();

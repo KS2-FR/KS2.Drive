@@ -33,7 +33,7 @@ namespace KS2Drive
             davFs.RepositoryAuthenticationFailed += (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
             
             FileSystemHost Host = new FileSystemHost(davFs);
-            davFs.Init(Host);
+            davFs.Init(Host, config.Name, config.Name);
             int r = Host.MountEx($"{config.DriveLetter}:", 64, null, true, 0);
             if (r < 0) throw new IOException("cannot mount file system");
 
