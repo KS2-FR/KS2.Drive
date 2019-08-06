@@ -42,16 +42,16 @@
                         <RowDefinition Height="142*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,10.333" Grid.RowSpan="2">
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,50.333" Grid.RowSpan="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"></ColumnDefinition>
                                 <ColumnDefinition Width="*"></ColumnDefinition>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="25"></RowDefinition>
-                                <RowDefinition Height="25"></RowDefinition>
-                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
                             <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
@@ -266,7 +266,7 @@
             </Grid>
         </Border>
 
-        <Border x:Name="DriveNameBorder" Opacity="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,74,9.667,329">
+        <Border x:Name="DriveNameBorder" Opacity="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,79,9.667,324">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"></ColumnDefinition>
