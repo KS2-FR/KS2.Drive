@@ -118,7 +118,7 @@ namespace KS2Drive
             }
         }
         
-        private void MountDrives(bool isAutoMount)
+        public void MountDrives(bool isAutoMount)
         {
             foreach (Configuration config in AppConfiguration.Configurations) if (config.AutoMount || !isAutoMount) MountDrive(config);
         }
@@ -190,15 +190,13 @@ namespace KS2Drive
 
         private void MenuMount_Click(object sender, RoutedEventArgs e)
         {
-            // Dit geeft nu nog een error omdat niet alle drives gemount worden
             if (IsMounted) UnmountDrives();
-            //else MountDrive();
             else MountDrives(false);
         }
 
         private void MenuConfigure_Click(object sender, RoutedEventArgs e)
         {
-            ConfigurationUI OptionWindow = new ConfigurationUI();
+            ConfigurationUI OptionWindow = new ConfigurationUI(this);
             OptionWindow.ShowDialog();
             if (CurrentConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }

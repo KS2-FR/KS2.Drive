@@ -10,18 +10,28 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace KS2Drive.Config
 {
     public partial class ConfigurationUI : MetroWindow
     {
         private String configurationFolderPath;
+        private MainWindow main;
 
         public ConfigurationManager AppConfiguration { get; set; }
         public Configuration CurrentConfiguration { get; set; }
 
-        public ConfigurationUI()
+        private bool? CustomProxy
         {
+            get
+            {
+                return rb_CustomProxy.IsChecked;
+            }
+        }
+        public ConfigurationUI(MainWindow main)
+        {
+            this.main = main;
             this.DataContext = this;
             this.configurationFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KS2Drive");
 
@@ -88,7 +98,6 @@ namespace KS2Drive.Config
             //Reload values from config
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
 
-            InitDriveNameButtons();
             EnterConfigurationData();
         }
 
@@ -96,6 +105,11 @@ namespace KS2Drive.Config
         {
             // Deze moet helaas volgens mij in elke methode apart omdat er anders bij het opstarten van het configuratiescherm een nullpointer komt.
             Button[] BTDriveNames = new Button[] { btDriveName1, btDriveName2, btDriveName3, btDriveName4 };
+
+            for (int i = 0; i < 4; i++) {
+                BTDriveNames[i].Click -= bt_AddConfiguration_Click;
+                BTDriveNames[i].Click -= bt_SwitchCurrentConfiguration_Click;
+            }
 
             foreach (Button b in BTDriveNames) b.Opacity = 0;
 
@@ -114,6 +128,7 @@ namespace KS2Drive.Config
                 BTDriveNames[configurationCount].Content = "+";
                 BTDriveNames[configurationCount].Opacity = 0.5;
                 BTDriveNames[configurationCount].Click += bt_AddConfiguration_Click;
+                BTDriveNames[configurationCount].Background = new SolidColorBrush(Color.FromRgb(247, 247, 247));
             }
         }
 
@@ -121,14 +136,24 @@ namespace KS2Drive.Config
         {
             b.Content = AppConfiguration.Configurations[i].Name;
             b.Opacity = 1;
-            b.Click -= bt_SwitchCurrentConfiguration_Click;
+            //b.Click -= bt_AddConfiguration_Click;
             b.Click += bt_SwitchCurrentConfiguration_Click;
             b.Tag = AppConfiguration.Configurations[i];
-            //if (b.)
+            
+            if (AppConfiguration.Configurations[i] == CurrentConfiguration)
+            {
+                //b.Background = new SolidColorBrush("Red");
+                b.Background = new SolidColorBrush(Color.FromRgb(96, 182, 229));
+            } else
+            {
+                b.Background = new SolidColorBrush(Color.FromRgb(247, 247, 247));
+            }
         }
 
         private void EnterConfigurationData()
         {
+            InitDriveNameButtons();
+
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.Name)) txtDriveName.Text = this.CurrentConfiguration.Name;
 
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]);
@@ -158,6 +183,15 @@ namespace KS2Drive.Config
             chk_AutoMount.IsChecked = CurrentConfiguration.AutoMount;
             chk_AutoStart.IsChecked = CurrentConfiguration.AutoStart;
 
+            if (this.CurrentConfiguration.HTTPProxyMode == 0) rb_NoProxy.IsChecked = true;
+            if (this.CurrentConfiguration.HTTPProxyMode == 1) rb_DefaultProxy.IsChecked = true;
+            if (this.CurrentConfiguration.HTTPProxyMode == 2) rb_CustomProxy.IsChecked = true;
+
+            ProxyRequiresAuthentication.IsChecked = this.CurrentConfiguration.UseProxyAuthentication;
+            ProxyURL.Text = this.CurrentConfiguration.ProxyURL;
+            ProxyLogin.Text = this.CurrentConfiguration.ProxyLogin;
+            ProxyPassword.Password = this.CurrentConfiguration.ProxyPassword;
+
             //Look for certificate
             if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.CertSerial) && !String.IsNullOrEmpty(this.CurrentConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.CurrentConfiguration.CertStoreName))
@@ -169,7 +203,11 @@ namespace KS2Drive.Config
                     if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
                 }
             }
+
+            // Prevent unsaved changes message when starting up the configuration screen
+            tb_Status.Text = "";
         }
+
         private void bt_Save_Click(object sender, RoutedEventArgs e)
         {
             if (String.IsNullOrEmpty(txtURL.Text))
@@ -246,11 +284,20 @@ namespace KS2Drive.Config
             this.CurrentConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
             this.CurrentConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
 
+            if (rb_NoProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 0;
+            if (rb_DefaultProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 1;
+            if (rb_CustomProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 2;
+
+            this.CurrentConfiguration.UseProxyAuthentication = ProxyRequiresAuthentication.IsChecked.Value;
+            this.CurrentConfiguration.ProxyURL = ProxyURL.Text;
+            this.CurrentConfiguration.ProxyLogin = ProxyLogin.Text;
+            this.CurrentConfiguration.ProxyPassword = ProxyPassword.Password;
+
             try
             {
                 //this.CurrentConfiguration.Save();
                 AppConfiguration.Save();
-                //this.Close();
+                tb_Status.Text = "Configuration saved";
             }
             catch (Exception ex)
             {
@@ -262,6 +309,12 @@ namespace KS2Drive.Config
             Tools.LoadProxy(this.CurrentConfiguration);
         }
 
+        private void UnsavedChangesMessage(object sender, TextChangedEventArgs args) => UnsavedChangesMessage();
+        private void UnsavedChangesMessage(object sender, SelectionChangedEventArgs args) => UnsavedChangesMessage();
+        private void UnsavedChangesMessage(object sender, RoutedEventArgs args) => UnsavedChangesMessage();
+
+        private void UnsavedChangesMessage() => tb_Status.Text = "There are unsaved changes";
+
         private Button GetDriveNameButtonByDriveName(String name)
         {
             Button[] BTDriveNames = new Button[] { btDriveName1, btDriveName2, btDriveName3, btDriveName4 };
@@ -269,11 +322,6 @@ namespace KS2Drive.Config
             foreach (Button b in BTDriveNames) if ((string)b.Content == name) return b;
 
             return null;
-        }
-
-        private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
-        {
-            this.CurrentConfiguration.ProxyPassword = ProxyPassword.Password;
         }
 
         private void bt_UserClientCertSelect_Click(object sender, RoutedEventArgs e)
@@ -340,6 +388,12 @@ namespace KS2Drive.Config
                 BTDriveNames[configurationCount].Opacity = 0.5;
                 BTDriveNames[configurationCount].Click += bt_AddConfiguration_Click;
             }
+        }
+
+        private void bt_mountConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            main.MountDrives(false);
+            this.Close();
         }
 
         private void bt_removeConfiguration_Click(object sender, RoutedEventArgs e)

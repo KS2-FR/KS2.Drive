@@ -1,15 +1,19 @@
-﻿using Newtonsoft.Json;
+﻿using KS2Drive.Log;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 
 namespace KS2Drive.Config
 {
     public class ConfigurationManager
     {
+
         public List<Configuration> Configurations { get; set; }
         public String Path { get; set; }
 
