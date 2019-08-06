@@ -136,13 +136,11 @@ namespace KS2Drive.Config
         {
             b.Content = AppConfiguration.Configurations[i].Name;
             b.Opacity = 1;
-            //b.Click -= bt_AddConfiguration_Click;
             b.Click += bt_SwitchCurrentConfiguration_Click;
             b.Tag = AppConfiguration.Configurations[i];
             
             if (AppConfiguration.Configurations[i] == CurrentConfiguration)
             {
-                //b.Background = new SolidColorBrush("Red");
                 b.Background = new SolidColorBrush(Color.FromRgb(96, 182, 229));
             } else
             {
@@ -295,7 +293,6 @@ namespace KS2Drive.Config
 
             try
             {
-                //this.CurrentConfiguration.Save();
                 AppConfiguration.Save();
                 tb_Status.Text = "Configuration saved";
             }
@@ -374,7 +371,6 @@ namespace KS2Drive.Config
 
             this.AppConfiguration.Configurations.Add(config);
             ((App)Application.Current).AppConfiguration = this.AppConfiguration;
-            //button.Tag = config;
 
             InitButton(button, AppConfiguration.Configurations.Count - 1);
 

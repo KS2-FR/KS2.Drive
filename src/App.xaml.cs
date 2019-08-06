@@ -55,7 +55,7 @@ namespace KS2Drive
 
             CurrentConfiguration = AppConfiguration.Configurations[0];
             
-            //Tools.LoadProxy(CurrentConfiguration);
+            Tools.LoadProxy(CurrentConfiguration);
             #endregion
 
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
