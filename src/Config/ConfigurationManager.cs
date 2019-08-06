@@ -24,6 +24,11 @@ namespace KS2Drive.Config
             this.Configurations.Add(config);
         }
 
+        /// <summary>
+        /// Save the configuration.
+        /// This saves a list of the paths of the individual configurations from ConfigurationManager.Configurations,
+        /// and saves each configuration individually.
+        /// </summary>
         public void Save()
         {
             StreamWriter file = new StreamWriter(Path);
@@ -38,6 +43,10 @@ namespace KS2Drive.Config
             file.Close();
         }
 
+        /// <summary>
+        /// The configuration manager is configured iff each configuration is configured.
+        /// </summary>
+        /// <returns></returns>
         public bool IsConfigured()
         {
             foreach(Configuration config in Configurations) if (!config.IsConfigured) return false;
@@ -45,6 +54,12 @@ namespace KS2Drive.Config
             return true;
         }
 
+        /// <summary>
+        /// Read the configuration lsit from the file,
+        /// load each configuration and put in in Configurations.
+        /// </summary>
+        /// <param name="path">The path of the list of configurations.</param>
+        /// <returns>The ConfigurationManager</returns>
         public static ConfigurationManager Load(String path)
         {
             ConfigurationManager manager = new ConfigurationManager(path);

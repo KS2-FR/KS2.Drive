@@ -12,8 +12,6 @@ namespace KS2Drive
 {
     public class FSPService : Service
     {
-        //private FileSystemHost Host1, Host2;
-        //private DavFS davFs1, davFs2;
         private List<Tuple<FileSystemHost, DavFS>> mounts;
         public event EventHandler<LogListItem> RepositoryActionPerformed;
         public event EventHandler RepositoryAuthenticationFailed;
@@ -34,8 +32,7 @@ namespace KS2Drive
             
             FileSystemHost Host = new FileSystemHost(davFs);
             davFs.Init(Host, config.Name, config.Name);
-            int r = Host.MountEx($"{config.DriveLetter}:", 64, null, true, 0);
-            if (r < 0) throw new IOException("cannot mount file system");
+            if (Host.MountEx($"{config.DriveLetter}:", 64, null, true, 0) < 0) throw new IOException("cannot mount file system");
 
             mounts.Add(new Tuple<FileSystemHost, DavFS>(Host, davFs));
         }

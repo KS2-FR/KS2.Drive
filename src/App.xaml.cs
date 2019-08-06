@@ -1,6 +1,5 @@
 ﻿//using KS2Drive.Log;
 using KS2Drive.Config;
-using KS2Drive.FS;
 using Newtonsoft.Json;
 using NLog.LayoutRenderers;
 using System;
@@ -19,10 +18,10 @@ namespace KS2Drive
     public partial class App : Application
     {
         public ConfigurationManager AppConfiguration { get; set; }
+        // Note: every configuration is mounted simultaneously, 
+        // CurrentConfiguration is necessary for the configuration screen.
         public Configuration CurrentConfiguration { get; set; }
         public String ConfigurationFolderPath { get; set; }
-        public String ConfigurationFilePath { get; set; }
-        public String ConfigurationFilePath2 { get; set; }
 
         private Mutex UnicityMutex = null;
 
