@@ -8,7 +8,7 @@
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:extToolkit="http://schemas.xceed.com/wpf/xaml/toolkit"
     mc:Ignorable="d"
-        Title="KS² Drive - Configuration" Height="500" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
+        Title="KS² Drive - Configuration" Height="522" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
     <Window.Resources>
         <local:ProxyActivator x:Key="ProxyActivator" />
         <sys:Int32 x:Key="IntZero">0</sys:Int32>
@@ -19,7 +19,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="132"/>
+            <ColumnDefinition Width="182.667"/>
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -42,7 +42,7 @@
                         <RowDefinition Height="142*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,50.333" Grid.RowSpan="2">
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,74" Grid.RowSpan="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"></ColumnDefinition>
@@ -87,24 +87,26 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,30.667,-0.333,0.333">
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,-0.333,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"></ColumnDefinition>
-                                <ColumnDefinition Width="*"></ColumnDefinition>
+                                <ColumnDefinition Width="173"></ColumnDefinition>
+                                <ColumnDefinition/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="35"></RowDefinition>
                                 <RowDefinition Height="30"></RowDefinition>
-                                <RowDefinition Height="39.333"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="40"></RowDefinition>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,9,0,9.667" >Login</TextBlock>
-                            <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0,4,-0.333,4.667" TextChanged="UnsavedChangesMessage"></TextBox>
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7,20.333,8.333" >Login</TextBlock>
+                            <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0.667,2,-0.333,3.333" TextChanged="UnsavedChangesMessage"></TextBox>
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.333,0,6.667" >Password</TextBlock>
-                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0,2.333,-0.333,1.667" PasswordChanged="UnsavedChangesMessage"></PasswordBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.667,20.333,7.667" >Password</TextBlock>
+                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0.667,2.667,-0.333,2.667" PasswordChanged="UnsavedChangesMessage"></PasswordBox>
+                            <CheckBox Grid.Row="2" x:Name="Chk_RemeberPassword" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage" Margin="0,0.333,20.333,0">Remember password</CheckBox>
 
-                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Height="35" Margin="0,2.333,-0.333,2">
+                            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Height="35" Margin="0,3,-0.333,3.333">
                                 <CheckBox x:Name="Chk_UserClientCert" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Additional client certificate</CheckBox>
                                 <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True" TextChanged="UnsavedChangesMessage"></TextBox>
                                 <extToolkit:DropDownButton Content="Select" Margin="0,5,0,5" Width="100" IsEnabled="{Binding Path=IsChecked,ElementName=Chk_UserClientCert}" x:Name="bt_UserClientCertSelect">
@@ -132,7 +134,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,92,0.667,116.333" RenderTransformOrigin="0.5,0.5" Grid.RowSpan="2">
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,81,0.667,0" RenderTransformOrigin="0.5,0.5">
                         <Border.RenderTransform>
                             <TransformGroup>
                                 <SkewTransform/>
@@ -245,7 +247,7 @@
             </TabItem>
         </TabControl>
 
-        <Border Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,41,9.667,364">
+        <Border Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,41,9.667,386">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"></ColumnDefinition>
@@ -266,7 +268,7 @@
             </Grid>
         </Border>
 
-        <Border x:Name="DriveNameBorder" Opacity="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,79,9.667,324">
+        <Border x:Name="DriveNameBorder" Opacity="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,79,9.667,347">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"></ColumnDefinition>
@@ -283,7 +285,7 @@
             </Grid>
         </Border>
 
-        <TextBlock x:Name="tb_Status" Grid.Row="2" HorizontalAlignment="Left" Height="25" Width="228" Margin="10,5,0,4.667" Text="Status" Grid.ColumnSpan="2"></TextBlock>
+        <TextBlock x:Name="tb_Status" Grid.Row="2" HorizontalAlignment="Left" Width="228" Margin="10,5,0,4.667" Text="Status" Grid.ColumnSpan="2"/>
         <Button x:Name="bt_Mount" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,121.667,4.667" VerticalAlignment="Bottom" Content="Mount" Click="bt_mountConfiguration_Click" Grid.Column="1"></Button>
         <Button x:Name="bt_Remove" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,242.667,4.667" VerticalAlignment="Bottom" Content="Remove" Click="bt_removeConfiguration_Click" Grid.Column="1"></Button>
         <Button x:Name="bt_Save" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,4.667,4.667" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click" Grid.Column="1"></Button>
