@@ -137,7 +137,7 @@ namespace KS2Drive.Config
             
             if (AppConfiguration.Configurations[i] == CurrentConfiguration)
             {
-                b.Background = new SolidColorBrush(Color.FromRgb(96, 182, 229));
+                b.Background = new SolidColorBrush(Color.FromRgb(254, 229, 56));
             } else
             {
                 b.Background = new SolidColorBrush(Color.FromRgb(247, 247, 247));
