@@ -8,7 +8,7 @@
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:extToolkit="http://schemas.xceed.com/wpf/xaml/toolkit"
     mc:Ignorable="d"
-        Title="Yoda Drive - Configuration" Height="300" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
+        Title="KS² Drive - Configuration" Height="522" Width="650" WindowStyle="ToolWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Icon="/KS2Drive;component/Resources/Main.ico">
     <Window.Resources>
         <local:ProxyActivator x:Key="ProxyActivator" />
         <sys:Int32 x:Key="IntZero">0</sys:Int32>
@@ -19,43 +19,45 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="100"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="182.667"/>
+            <ColumnDefinition/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition/>
+            <RowDefinition Height="0"></RowDefinition>
             <RowDefinition Height="35"></RowDefinition>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0" Grid.ColumnSpan="2">
-            <TabItem Header="Configuration" >
+        <TabControl Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,-0.333,3">
+            <TabItem Header="General">
                 <Grid Margin="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="100"></ColumnDefinition>
                         <ColumnDefinition Width="*"></ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"></RowDefinition>
-                        <RowDefinition Height="*"></RowDefinition>
-                        <RowDefinition Height="0"></RowDefinition>
+                        <RowDefinition Height="50"></RowDefinition>
+                        <RowDefinition Height="50"></RowDefinition>
+                        <RowDefinition Height="137*"></RowDefinition>
+                        <RowDefinition Height="142*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,74" Grid.RowSpan="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"></ColumnDefinition>
                                 <ColumnDefinition Width="*"></ColumnDefinition>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
-                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">URL</TextBlock>
-                            <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL" >
+                            <TextBox Grid.Row="1" Grid.Column="1" Height="20" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtURL" TextChanged="UnsavedChangesMessage">
                                 <TextBox.Style>
                                     <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
                                         <Style.Resources>
@@ -80,32 +82,33 @@
                                 </TextBox.Style>
                             </TextBox>
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Visibility="Collapsed">Type</TextBlock>
-                            <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" >Type</TextBlock>
+                            <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5">
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,-0.333,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"></ColumnDefinition>
-                                <ColumnDefinition Width="*"></ColumnDefinition>
+                                <ColumnDefinition Width="173"></ColumnDefinition>
+                                <ColumnDefinition/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="30"></RowDefinition>
+                                <RowDefinition Height="40"></RowDefinition>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Login</TextBlock>
-                            <TextBox Grid.Row="0" Grid.Column="1" Height="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin"></TextBox>
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7,20.333,8.333" >Login</TextBlock>
+                            <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0.667,2,-0.333,3.333" TextChanged="UnsavedChangesMessage"></TextBox>
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" >Password</TextBlock>
-                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="20"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalAlignment="Left" x:Name="txtPassword" Width="364"></PasswordBox>
-                            <CheckBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" x:Name="Chk_Password" Margin="0,0,10,0">Save Password</CheckBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.667,20.333,7.667" >Password</TextBlock>
+                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0.667,2.667,-0.333,2.667" PasswordChanged="UnsavedChangesMessage"></PasswordBox>
+                            <CheckBox Grid.Row="2" x:Name="Chk_RememberPassword" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage" Margin="0,0.333,20.333,0">Remember password</CheckBox>
 
-                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Visibility="Collapsed">
-                                <CheckBox x:Name="Chk_UserClientCert">Additional client certificate</CheckBox>
-                                <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True"></TextBox>
+                            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Height="35" Margin="0,3,-0.333,3.333">
+                                <CheckBox x:Name="Chk_UserClientCert" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Additional client certificate</CheckBox>
+                                <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True" TextChanged="UnsavedChangesMessage"></TextBox>
                                 <extToolkit:DropDownButton Content="Select" Margin="0,5,0,5" Width="100" IsEnabled="{Binding Path=IsChecked,ElementName=Chk_UserClientCert}" x:Name="bt_UserClientCertSelect">
                                     <extToolkit:DropDownButton.DropDownContent>
                                         <StackPanel Width="200" Orientation="Vertical">
@@ -131,27 +134,30 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,0,5" Visibility="Collapsed">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="61*"/>
-                                <ColumnDefinition Width="93*"/>
-                            </Grid.ColumnDefinitions>
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,81,0.667,0" RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <SkewTransform/>
+                                <RotateTransform/>
+                                <TranslateTransform/>
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                        <Grid Margin="0,0,0,4.333">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="35"></RowDefinition>
-                                <RowDefinition Height="35"></RowDefinition>
+                                <RowDefinition Height="22"></RowDefinition>
+                                <RowDefinition Height="22"></RowDefinition>
                             </Grid.RowDefinitions>
 
-                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" IsChecked="{Binding AppConfiguration.AutoMount, Mode=TwoWay}" Grid.ColumnSpan="2"/>
-                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" IsChecked="{Binding AppConfiguration.AutoStart, Mode=TwoWay}" Grid.ColumnSpan="2"/>
+                            <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" Margin="0,0,-0.333,0" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
+                            <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" Margin="0,0.333,0,-5.667" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
                         </Grid>
                     </Border>
                 </Grid>
 
 
             </TabItem>
-            <TabItem Header="Advanced" Visibility="Collapsed">
-                <Border BorderThickness="1" BorderBrush="Gainsboro">
+            <TabItem Header="Advanced">
+                <Border BorderThickness="1" BorderBrush="Gainsboro" Margin="0,73,-0.333,-0.333">
                     <Grid Margin="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="150"></ColumnDefinition>
@@ -172,16 +178,16 @@
                         <TextBlock Grid.Row="3" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">FlushMode</TextBlock>
                         <TextBlock Grid.Row="4" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Mount as network drive</TextBlock>
 
-                        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBKernelCache" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CBSyncOps" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CBPreloading"  HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CBFlush" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CBMountAsNetworkDrive" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBKernelCache" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CBSyncOps" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CBPreloading"  HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CBFlush" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CBMountAsNetworkDrive" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
                     </Grid>
                 </Border>
             </TabItem>
-            <TabItem Header="Proxy" Visibility="Collapsed">
-                <Grid>
+            <TabItem Header="Proxy">
+                <Grid Margin="15,80,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="35"></RowDefinition>
                         <RowDefinition Height="35"></RowDefinition>
@@ -189,10 +195,10 @@
                         <RowDefinition Height="*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <RadioButton Grid.Row="0" GroupName="ProxySettings" x:Name="rb_NoProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntZero}, Mode=TwoWay}">No proxy</RadioButton>
-                    <RadioButton Grid.Row="1" GroupName="ProxySettings" x:Name="rb_DefaultProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntOne}, Mode=TwoWay}">Default proxy</RadioButton>
-                    <RadioButton Grid.Row="2" GroupName="ProxySettings" x:Name="rb_CustomProxy" IsChecked="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">Custom proxy</RadioButton>
-                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="25,0,20,0" Padding="10" Grid.Column="1" IsEnabled="{Binding AppConfiguration.HTTPProxyMode, Converter={StaticResource ProxyActivator}, ConverterParameter={StaticResource IntTwo}, Mode=TwoWay}">
+                    <RadioButton Grid.Row="0" GroupName="ProxySettings" x:Name="rb_NoProxy" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">No proxy</RadioButton>
+                    <RadioButton Grid.Row="1" GroupName="ProxySettings" x:Name="rb_DefaultProxy" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Default proxy</RadioButton>
+                    <RadioButton Grid.Row="2" GroupName="ProxySettings" x:Name="rb_CustomProxy" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Custom proxy</RadioButton>
+                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="0,0,19.667,0.333" Padding="10" IsEnabled="{Binding CustomProxy, Mode=TwoWay}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="25"></RowDefinition>
@@ -205,15 +211,15 @@
                             </Grid.ColumnDefinitions>
 
                             <Label Grid.Row="0" Grid.Column="0" Content="Proxy URL" />
-                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="textBox" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyURL}"/>
+                            <TextBox x:Name="ProxyURL" Grid.Row="0" Grid.Column="1" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" TextChanged="UnsavedChangesMessage"/>
 
-                            <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" IsChecked="{Binding AppConfiguration.UseProxyAuthentication, Mode=TwoWay}"/>
+                            <CheckBox x:Name="ProxyRequiresAuthentication" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
 
                             <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
                                 <Border.IsEnabled>
                                     <MultiBinding Converter="{StaticResource ProxyCustomAuthActivator}">
-                                        <Binding Path="AppConfiguration.HTTPProxyMode" />
-                                        <Binding Path="AppConfiguration.UseProxyAuthentication" />
+                                        <Binding Path="CurrentConfiguration.HTTPProxyMode" />
+                                        <Binding Path="CurrentConfiguration.UseProxyAuthentication" />
                                     </MultiBinding>
                                 </Border.IsEnabled>
                                 <Grid>
@@ -227,10 +233,10 @@
                                     </Grid.ColumnDefinitions>
 
                                     <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
-                                    <TextBox Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding AppConfiguration.ProxyLogin}" Margin="5"/>
+                                    <TextBox x:Name="ProxyLogin" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Margin="5" TextChanged="UnsavedChangesMessage"/>
 
                                     <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
-                                    <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="PasswordBox_PasswordChanged"/>
+                                    <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="UnsavedChangesMessage"/>
                                 </Grid>
 
                             </Border>
@@ -241,8 +247,48 @@
             </TabItem>
         </TabControl>
 
+        <Border Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,41,9.667,386">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="15"></RowDefinition>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Configurations</TextBlock>
+                <Button Grid.Row="0" Grid.Column="1" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName1" Margin="5,0,5,-5"></Button>
+                <Button Grid.Row="0" Grid.Column="2" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName2" Margin="5,0,5,-5"></Button>
+                <Button Grid.Row="0" Grid.Column="3" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName3" Margin="5,0,5,-5"></Button>
+                <Button Grid.Row="0" Grid.Column="4" Height="21" Opacity="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="btDriveName4" Margin="5,0,5,-5"></Button>
 
-        <Button x:Name="bt_Save" Grid.Row="1" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,5,5" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click" Grid.Column="1"></Button>
+            </Grid>
+        </Border>
+
+        <Border x:Name="DriveNameBorder" Opacity="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="10,79,9.667,347">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                    <ColumnDefinition Width="120"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="15"></RowDefinition>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" >Drive name</TextBlock>
+                <TextBox Grid.Row="0" Grid.Column="1" Height="21" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtDriveName" Margin="5,0,5,-5" TextChanged="UnsavedChangesMessage"></TextBox>
+            </Grid>
+        </Border>
+
+        <TextBlock x:Name="tb_Status" Grid.Row="2" HorizontalAlignment="Left" Width="228" Margin="10,5,0,4.667" Text="Status" Grid.ColumnSpan="2"/>
+        <Button x:Name="bt_Mount" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,121.667,4.667" VerticalAlignment="Bottom" Content="Mount" Click="bt_mountConfiguration_Click" Grid.Column="1"></Button>
+        <Button x:Name="bt_Remove" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,242.667,4.667" VerticalAlignment="Bottom" Content="Remove" Click="bt_removeConfiguration_Click" Grid.Column="1"></Button>
+        <Button x:Name="bt_Save" Grid.Row="2" HorizontalAlignment="Right" Height="25" Width="100" Margin="0,0,4.667,4.667" VerticalAlignment="Bottom" Content="Save" Click="bt_Save_Click" Grid.Column="1"></Button>
 
     </Grid>
 

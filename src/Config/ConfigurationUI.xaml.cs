@@ -10,17 +10,33 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace KS2Drive.Config
 {
     public partial class ConfigurationUI : MetroWindow
     {
-        public Configuration AppConfiguration { get; set; }
+        private String configurationFolderPath;
+        private MainWindow main;
 
-        public ConfigurationUI()
+        public ConfigurationManager AppConfiguration { get; set; }
+        public Configuration CurrentConfiguration { get; set; }
+
+        private bool? CustomProxy
         {
+            get
+            {
+                return rb_CustomProxy.IsChecked;
+            }
+        }
+        public ConfigurationUI(MainWindow main)
+        {
+            this.main = main;
             this.DataContext = this;
+            this.configurationFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KS2Drive");
+
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
+            this.CurrentConfiguration = ((App)Application.Current).CurrentConfiguration;
             InitializeComponent();
 
             //Get Free drives
@@ -81,41 +97,132 @@ namespace KS2Drive.Config
 
             //Reload values from config
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]);
-            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerURL)) txtURL.Text = this.AppConfiguration.ServerURL;
 
-            var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType));
+            EnterConfigurationData();
+        }
+
+        private void InitDriveNameButtons()
+        {
+            // Deze moet helaas volgens mij in elke methode apart omdat er anders bij het opstarten van het configuratiescherm een nullpointer komt.
+            Button[] BTDriveNames = new Button[] { btDriveName1, btDriveName2, btDriveName3, btDriveName4 };
+
+            for (int i = 0; i < 4; i++) {
+                BTDriveNames[i].Click -= bt_AddConfiguration_Click;
+                BTDriveNames[i].Click -= bt_SwitchCurrentConfiguration_Click;
+            }
+
+            foreach (Button b in BTDriveNames) b.Opacity = 0;
+
+            int configurationCount = AppConfiguration.Configurations.Count;
+
+            if (configurationCount > 4) MessageBox.Show("Cannot have more than four drives.");
+
+            for (int i = 0; i < configurationCount; i++)
+            {
+                InitButton(BTDriveNames[i], i);
+            }
+
+            if (configurationCount < 4)
+            {
+                BTDriveNames[configurationCount].HorizontalContentAlignment = HorizontalAlignment.Center;
+                BTDriveNames[configurationCount].Content = "+";
+                BTDriveNames[configurationCount].Opacity = 0.5;
+                BTDriveNames[configurationCount].Click += bt_AddConfiguration_Click;
+                BTDriveNames[configurationCount].Background = new SolidColorBrush(Color.FromRgb(247, 247, 247));
+            }
+        }
+
+        private void InitButton(Button b, int i)
+        {
+            b.Content = AppConfiguration.Configurations[i].Name;
+            b.Opacity = 1;
+            b.Click += bt_SwitchCurrentConfiguration_Click;
+            b.Tag = AppConfiguration.Configurations[i];
+            
+            if (AppConfiguration.Configurations[i] == CurrentConfiguration)
+            {
+                b.Background = new SolidColorBrush(Color.FromRgb(96, 182, 229));
+            } else
+            {
+                b.Background = new SolidColorBrush(Color.FromRgb(247, 247, 247));
+            }
+        }
+
+        private void EnterConfigurationData()
+        {
+            InitDriveNameButtons();
+
+            if (!String.IsNullOrEmpty(this.CurrentConfiguration.Name)) txtDriveName.Text = this.CurrentConfiguration.Name;
+
+            if (!String.IsNullOrEmpty(this.CurrentConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]);
+            if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerURL)) txtURL.Text = this.CurrentConfiguration.ServerURL;
+
+            var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.ServerType));
             if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
 
-            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerLogin)) txtLogin.Text = this.AppConfiguration.ServerLogin;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.ServerPassword)) txtPassword.Password = this.AppConfiguration.ServerPassword;
-            Chk_Password.IsChecked = this.AppConfiguration.SavePassword;
+            if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerLogin)) txtLogin.Text = this.CurrentConfiguration.ServerLogin;
+            if (this.CurrentConfiguration.ServerPassword != null) txtPassword.Password = this.CurrentConfiguration.ServerPassword;
 
-            var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode));
+            var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.KernelCacheMode));
             if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
 
-            var FlushMatchingItem = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.FlushMode));
+            var FlushMatchingItem = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.FlushMode));
             if (!FlushMatchingItem.Equals(default(KeyValuePair<int, string>))) CBFlush.SelectedItem = FlushMatchingItem;
 
-            var SyncOpsMatchingItem = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.SyncOps)));
+            var SyncOpsMatchingItem = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.CurrentConfiguration.SyncOps)));
             if (!SyncOpsMatchingItem.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SyncOpsMatchingItem;
 
-            var PreloadingMatchingItem = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.PreLoading)));
+            var PreloadingMatchingItem = CBPreloading.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.CurrentConfiguration.PreLoading)));
             if (!PreloadingMatchingItem.Equals(default(KeyValuePair<int, string>))) CBPreloading.SelectedItem = PreloadingMatchingItem;
 
-            var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.MountAsNetworkDrive)));
+            var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.CurrentConfiguration.MountAsNetworkDrive)));
             if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
+            
+            chk_AutoMount.IsChecked = CurrentConfiguration.AutoMount;
+            chk_AutoStart.IsChecked = CurrentConfiguration.AutoStart;
+
+            if (this.CurrentConfiguration.HTTPProxyMode == 0) rb_NoProxy.IsChecked = true;
+            if (this.CurrentConfiguration.HTTPProxyMode == 1) rb_DefaultProxy.IsChecked = true;
+            if (this.CurrentConfiguration.HTTPProxyMode == 2) rb_CustomProxy.IsChecked = true;
+
+            ProxyRequiresAuthentication.IsChecked = this.CurrentConfiguration.UseProxyAuthentication;
+            ProxyURL.Text = this.CurrentConfiguration.ProxyURL;
+            ProxyLogin.Text = this.CurrentConfiguration.ProxyLogin;
+            ProxyPassword.Password = this.CurrentConfiguration.ProxyPassword;
+            Chk_RememberPassword.IsChecked = this.CurrentConfiguration.RememberPassword;
 
             //Look for certificate
-            if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.CertSerial) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreName))
+            if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
+            if (!String.IsNullOrEmpty(this.CurrentConfiguration.CertSerial) && !String.IsNullOrEmpty(this.CurrentConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.CurrentConfiguration.CertStoreName))
             {
-                var FoundCertificate = Tools.FindCertificate(this.AppConfiguration.CertStoreName, this.AppConfiguration.CertStoreLocation, this.AppConfiguration.CertSerial);
+                var FoundCertificate = Tools.FindCertificate(this.CurrentConfiguration.CertStoreName, this.CurrentConfiguration.CertStoreLocation, this.CurrentConfiguration.CertSerial);
                 if (FoundCertificate != null)
                 {
                     txt_ClientCertSubject.Text = FoundCertificate.Subject;
-                    if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
+                    if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
                 }
+            }
+
+            // Prevent unsaved changes message when starting up the configuration screen
+            tb_Status.Text = "";
+            
+            UpdateMountButton();
+        }
+
+        public void UpdateMountButton()
+        {
+            bt_Mount.Click -= bt_mountConfiguration_Click;
+            bt_Mount.Click -= bt_unmountConfiguration_Click;
+
+            if (CurrentConfiguration.IsMounted)
+            {
+                bt_Mount.Content = "Unmount";
+                bt_Mount.Click += bt_unmountConfiguration_Click;
+            }
+            else
+            {
+                bt_Mount.Content = "Mount";
+                bt_Mount.Click += bt_mountConfiguration_Click;
             }
         }
 
@@ -149,6 +256,12 @@ namespace KS2Drive.Config
                 return;
             }
 
+            if (((bool)chk_AutoStart.IsChecked || (bool)chk_AutoMount.IsChecked) && !(bool)Chk_RememberPassword.IsChecked)
+            {
+                MessageBox.Show("Cannot Auto-mount or mount on start without remembering password.");
+                return;
+            }
+
             //From : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup
             RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
             if (chk_AutoStart.IsChecked == true)
@@ -168,45 +281,72 @@ namespace KS2Drive.Config
             }
             rkApp.Close();
 
-            this.AppConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
-            this.AppConfiguration.ServerURL = txtURL.Text;
-            this.AppConfiguration.ServerType = (Int32)CBMode.SelectedValue;
-            this.AppConfiguration.ServerLogin = txtLogin.Text;
-            if (Chk_Password.IsChecked == true)
+            // Update the button text
+            GetDriveNameButtonByDriveName(this.CurrentConfiguration.Name).Content = txtDriveName.Text;
+
+            this.CurrentConfiguration.Name = txtDriveName.Text;
+
+            if (CurrentConfiguration.Path != Path.Combine(configurationFolderPath, this.CurrentConfiguration.Name.ToLower() + "-config.json"))
             {
-                this.AppConfiguration.ServerPassword = txtPassword.Password;
+                File.Delete(CurrentConfiguration.Path);
             }
-            else
-            {
-                this.AppConfiguration.ServerPassword = null;
-            }
-            this.AppConfiguration.SavePassword = Chk_Password.IsChecked.Value;
-            this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
-            this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
-            this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
-            this.AppConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
-            this.AppConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
-            this.AppConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
+
+            this.CurrentConfiguration.Path = Path.Combine(configurationFolderPath, this.CurrentConfiguration.Name.ToLower() + "-config.json");
+            this.CurrentConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
+            this.CurrentConfiguration.ServerURL = txtURL.Text;
+            this.CurrentConfiguration.ServerType = (Int32)CBMode.SelectedValue;
+
+            this.CurrentConfiguration.AutoMount = chk_AutoMount.IsChecked.Value;
+            this.CurrentConfiguration.AutoStart = chk_AutoStart.IsChecked.Value;
+
+            this.CurrentConfiguration.ServerLogin = txtLogin.Text;
+            this.CurrentConfiguration.ServerPassword = txtPassword.Password;
+            this.CurrentConfiguration.RememberPassword = Chk_RememberPassword.IsChecked.Value;
+
+            this.CurrentConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
+            this.CurrentConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
+            this.CurrentConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
+            this.CurrentConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
+            this.CurrentConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
+            this.CurrentConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
+
+            if (rb_NoProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 0;
+            if (rb_DefaultProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 1;
+            if (rb_CustomProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 2;
+
+            this.CurrentConfiguration.UseProxyAuthentication = ProxyRequiresAuthentication.IsChecked.Value;
+            this.CurrentConfiguration.ProxyURL = ProxyURL.Text;
+            this.CurrentConfiguration.ProxyLogin = ProxyLogin.Text;
+            this.CurrentConfiguration.ProxyPassword = ProxyPassword.Password;
 
             try
             {
-                this.AppConfiguration.Save();
-                this.Close();
+                AppConfiguration.Save();
+                tb_Status.Text = "Configuration saved";
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Cannot save configuration : {ex.Message}");
             }
 
-            this.AppConfiguration.ServerPassword = txtPassword.Password;
-            this.AppConfiguration.IsConfigured = true;
+            this.CurrentConfiguration.IsConfigured = true;
 
-            Tools.LoadProxy(this.AppConfiguration);
+            Tools.LoadProxy(this.CurrentConfiguration);
         }
 
-        private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        private void UnsavedChangesMessage(object sender, TextChangedEventArgs args) => UnsavedChangesMessage();
+        private void UnsavedChangesMessage(object sender, SelectionChangedEventArgs args) => UnsavedChangesMessage();
+        private void UnsavedChangesMessage(object sender, RoutedEventArgs args) => UnsavedChangesMessage();
+
+        private void UnsavedChangesMessage() => tb_Status.Text = "There are unsaved changes";
+
+        private Button GetDriveNameButtonByDriveName(String name)
         {
-            this.AppConfiguration.ProxyPassword = ProxyPassword.Password;
+            Button[] BTDriveNames = new Button[] { btDriveName1, btDriveName2, btDriveName3, btDriveName4 };
+
+            foreach (Button b in BTDriveNames) if ((string)b.Content == name) return b;
+
+            return null;
         }
 
         private void bt_UserClientCertSelect_Click(object sender, RoutedEventArgs e)
@@ -228,12 +368,76 @@ namespace KS2Drive.Config
 
                 if (sel.Count > 0)
                 {
-                    this.AppConfiguration.CertStoreName = StoreNameAsString;
-                    this.AppConfiguration.CertStoreLocation = StoreLocationAsString;
-                    this.AppConfiguration.CertSerial = sel[0].SerialNumber;
+                    this.CurrentConfiguration.CertStoreName = StoreNameAsString;
+                    this.CurrentConfiguration.CertStoreLocation = StoreLocationAsString;
+                    this.CurrentConfiguration.CertSerial = sel[0].SerialNumber;
                     txt_ClientCertSubject.Text = sel[0].Subject;
                 }
             }
+        }
+        
+        private void bt_SwitchCurrentConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            ((App)Application.Current).CurrentConfiguration = (Configuration)((Button)sender).Tag;
+            this.CurrentConfiguration = ((App)Application.Current).CurrentConfiguration;
+            EnterConfigurationData();
+        }
+
+        private void bt_AddConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            Button button = (Button)sender;
+            button.Content = "Drive " + (AppConfiguration.Configurations.Count + 1);
+            button.Opacity = 1;
+            button.Click -= bt_AddConfiguration_Click;
+            button.Click += bt_SwitchCurrentConfiguration_Click;
+
+            DriveNameBorder.Opacity = 1;
+
+            Configuration config = new Configuration();
+            config.Name = "Drive " + (AppConfiguration.Configurations.Count + 1);
+            config.Path = Path.Combine(configurationFolderPath, config.Name.ToLower() + "-config.json");
+
+            this.AppConfiguration.Configurations.Add(config);
+            ((App)Application.Current).AppConfiguration = this.AppConfiguration;
+
+            InitButton(button, AppConfiguration.Configurations.Count - 1);
+
+            Button[] BTDriveNames = new Button[] { btDriveName1, btDriveName2, btDriveName3, btDriveName4 };
+            int configurationCount = AppConfiguration.Configurations.Count;
+
+            if (configurationCount < 4)
+            {
+                BTDriveNames[configurationCount].HorizontalContentAlignment = HorizontalAlignment.Center;
+                BTDriveNames[configurationCount].Content = "+";
+                BTDriveNames[configurationCount].Opacity = 0.5;
+                BTDriveNames[configurationCount].Click += bt_AddConfiguration_Click;
+            }
+        }
+
+        private void bt_mountConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            main.MountDrive(CurrentConfiguration);
+            UpdateMountButton();
+        }
+
+        private void bt_unmountConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            main.UnmountDrive(CurrentConfiguration);
+            UpdateMountButton();
+        }
+
+        private void bt_removeConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            AppConfiguration.Configurations.Remove(CurrentConfiguration);
+            AppConfiguration.Save();
+            File.Delete(CurrentConfiguration.Path);
+            CurrentConfiguration = AppConfiguration.Configurations[0];
+
+            ((App)Application.Current).AppConfiguration = this.AppConfiguration;
+            ((App)Application.Current).CurrentConfiguration = this.CurrentConfiguration;
+
+            EnterConfigurationData();
+            InitDriveNameButtons();
         }
     }
 }
