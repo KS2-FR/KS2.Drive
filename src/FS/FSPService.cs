@@ -12,19 +12,22 @@ namespace KS2Drive
 {
     public class FSPService : Service
     {
-        private List<Tuple<FileSystemHost, DavFS>> mounts;
+        private List<Tuple<Configuration, FileSystemHost, DavFS>> mounts;
         public event EventHandler<LogListItem> RepositoryActionPerformed;
         public event EventHandler RepositoryAuthenticationFailed;
 
-        public FSPService() : base("KS2DriveService")
+        private ConfigurationUI configurationUI;
+
+        public FSPService(ConfigurationUI configurationUI) : base("KS2DriveService")
         {
-            mounts = new List<Tuple<FileSystemHost, DavFS>>();
+            mounts = new List<Tuple<Configuration, FileSystemHost, DavFS>>();
+            this.configurationUI = configurationUI;
         }
         
         public void Mount(Configuration config)
         {
             if (!config.IsConfigured) throw new IOException("Configuration is not configured.");
-            
+
             DavFS davFs = new DavFS(config);
             
             davFs.RepositoryActionPerformed += (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
@@ -34,26 +37,34 @@ namespace KS2Drive
             davFs.Init(Host, config.Name, config.Name);
             if (Host.MountEx($"{config.DriveLetter}:", 64, null, true, 0) < 0) throw new IOException("cannot mount file system");
 
-            mounts.Add(new Tuple<FileSystemHost, DavFS>(Host, davFs));
+            mounts.Add(new Tuple<Configuration, FileSystemHost, DavFS>(config, Host, davFs));
+
+            config.IsMounted = true;
+            this.configurationUI.UpdateMountButton();
         }
 
         public void Unmount(Configuration config)
         {
-            foreach(Tuple<FileSystemHost, DavFS> mount in mounts)
+            foreach(Tuple<Configuration, FileSystemHost, DavFS> mount in mounts)
             {
-                mount.Item2.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
-                mount.Item2.RepositoryAuthenticationFailed -= (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
+                if (config != mount.Item1) continue;
+                mount.Item3.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
+                mount.Item3.RepositoryAuthenticationFailed -= (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
 
-                mount.Item1.Unmount();
-                mount.Item1.Dispose();
+                mount.Item2.Unmount();
+                mount.Item2.Dispose();
             }
+
+            // If we get here the drive has succesfully unmounted (or was not mounted in the first place).
+            config.IsMounted = false;
+            this.configurationUI.UpdateMountButton();
         }
 
         protected override void OnStop()
         {
-            foreach (Tuple<FileSystemHost, DavFS> mount in mounts)
+            foreach (Tuple<Configuration, FileSystemHost, DavFS> mount in mounts)
             {
-                mount.Item1.Dispose();
+                mount.Item2.Dispose();
             }
 
             mounts = null;

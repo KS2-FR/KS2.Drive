@@ -104,7 +104,7 @@
 
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.667,20.333,7.667" >Password</TextBlock>
                             <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0.667,2.667,-0.333,2.667" PasswordChanged="UnsavedChangesMessage"></PasswordBox>
-                            <CheckBox Grid.Row="2" x:Name="Chk_RemeberPassword" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage" Margin="0,0.333,20.333,0">Remember password</CheckBox>
+                            <CheckBox Grid.Row="2" x:Name="Chk_RememberPassword" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage" Margin="0,0.333,20.333,0">Remember password</CheckBox>
 
                             <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Height="35" Margin="0,3,-0.333,3.333">
                                 <CheckBox x:Name="Chk_UserClientCert" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Additional client certificate</CheckBox>
@@ -144,8 +144,8 @@
                         </Border.RenderTransform>
                         <Grid Margin="0,0,0,4.333">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="25"></RowDefinition>
-                                <RowDefinition Height="25"></RowDefinition>
+                                <RowDefinition Height="22"></RowDefinition>
+                                <RowDefinition Height="22"></RowDefinition>
                             </Grid.RowDefinitions>
 
                             <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" Margin="0,0,-0.333,0" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>

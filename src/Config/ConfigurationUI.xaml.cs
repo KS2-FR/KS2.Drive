@@ -161,7 +161,7 @@ namespace KS2Drive.Config
             if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
 
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerLogin)) txtLogin.Text = this.CurrentConfiguration.ServerLogin;
-            if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerPassword)) txtPassword.Password = this.CurrentConfiguration.ServerPassword;
+            if (this.CurrentConfiguration.ServerPassword != null) txtPassword.Password = this.CurrentConfiguration.ServerPassword;
 
             var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.KernelCacheMode));
             if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
@@ -189,6 +189,7 @@ namespace KS2Drive.Config
             ProxyURL.Text = this.CurrentConfiguration.ProxyURL;
             ProxyLogin.Text = this.CurrentConfiguration.ProxyLogin;
             ProxyPassword.Password = this.CurrentConfiguration.ProxyPassword;
+            Chk_RememberPassword.IsChecked = this.CurrentConfiguration.RememberPassword;
 
             //Look for certificate
             if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
@@ -204,6 +205,25 @@ namespace KS2Drive.Config
 
             // Prevent unsaved changes message when starting up the configuration screen
             tb_Status.Text = "";
+            
+            UpdateMountButton();
+        }
+
+        public void UpdateMountButton()
+        {
+            bt_Mount.Click -= bt_mountConfiguration_Click;
+            bt_Mount.Click -= bt_unmountConfiguration_Click;
+
+            if (CurrentConfiguration.IsMounted)
+            {
+                bt_Mount.Content = "Unmount";
+                bt_Mount.Click += bt_unmountConfiguration_Click;
+            }
+            else
+            {
+                bt_Mount.Content = "Mount";
+                bt_Mount.Click += bt_mountConfiguration_Click;
+            }
         }
 
         private void bt_Save_Click(object sender, RoutedEventArgs e)
@@ -233,6 +253,12 @@ namespace KS2Drive.Config
             if (String.IsNullOrEmpty(txtPassword.Password))
             {
                 MessageBox.Show("Server password is mandatory");
+                return;
+            }
+
+            if (((bool)chk_AutoStart.IsChecked || (bool)chk_AutoMount.IsChecked) && !(bool)Chk_RememberPassword.IsChecked)
+            {
+                MessageBox.Show("Cannot Auto-mount or mount on start without remembering password.");
                 return;
             }
 
@@ -275,6 +301,8 @@ namespace KS2Drive.Config
 
             this.CurrentConfiguration.ServerLogin = txtLogin.Text;
             this.CurrentConfiguration.ServerPassword = txtPassword.Password;
+            this.CurrentConfiguration.RememberPassword = Chk_RememberPassword.IsChecked.Value;
+
             this.CurrentConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
             this.CurrentConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
             this.CurrentConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
@@ -388,8 +416,14 @@ namespace KS2Drive.Config
 
         private void bt_mountConfiguration_Click(object sender, RoutedEventArgs e)
         {
-            main.MountDrives(false);
-            this.Close();
+            main.MountDrive(CurrentConfiguration);
+            UpdateMountButton();
+        }
+
+        private void bt_unmountConfiguration_Click(object sender, RoutedEventArgs e)
+        {
+            main.UnmountDrive(CurrentConfiguration);
+            UpdateMountButton();
         }
 
         private void bt_removeConfiguration_Click(object sender, RoutedEventArgs e)

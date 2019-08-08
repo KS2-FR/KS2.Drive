@@ -12,6 +12,7 @@ namespace KS2Drive.Config
     {
         public String Path;
         public String Name;
+        public bool IsMounted = false;
 
         public static Configuration Load(String ConfigurationFilePath)
         {
@@ -39,6 +40,8 @@ namespace KS2Drive.Config
             File.WriteAllText(Path, Tools.Protect(JsonConvert.SerializeObject(this)));
         }
 
+        public bool ShouldSerializeServerPassword() => RememberPassword;
+
         [JsonIgnore]
         public bool IsConfigured { get; set; } = true;
 
@@ -52,6 +55,7 @@ namespace KS2Drive.Config
         public Int32 ServerType { get; set; } = 0;
         public String ServerLogin { get; set; }
         public String ServerPassword { get; set; }
+        public bool RememberPassword { get; set; } = false;
         public Int32 KernelCacheMode { get; set; } = -1;
         public Int32 FlushMode { get; set; } = 1;
         public bool SyncOps { get; set; } = false;

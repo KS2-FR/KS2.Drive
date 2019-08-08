@@ -9,9 +9,8 @@
     <Window.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
-            <MenuItem Header="_MOUNT" Click="MenuMount_Click"/>
             <MenuItem Header="_LOG" Click="MenuLog_Click" />
-            <MenuItem Header="_CONFIGURE" Click="MenuConfigure_Click" />
+            <MenuItem Header="_MANAGE" Click="MenuManage_Click" />
             <MenuItem Header="_ABOUT" Click="MenuAbout_Click" />
             <MenuItem Header="_EXIT" Click="MenuExit_Click"/>
         </ContextMenu>

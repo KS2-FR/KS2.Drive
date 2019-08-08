@@ -18,8 +18,8 @@ namespace KS2Drive
     {
         private FSPService Service;
         private Configuration CurrentConfiguration;
+        ConfigurationUI OptionWindow;
 
-        private bool IsMounted = false;
         private Thread T;
 
         private ConfigurationManager AppConfiguration;
@@ -63,10 +63,11 @@ namespace KS2Drive
 
             #endregion
 
+            OptionWindow = new ConfigurationUI(this);
             #region Try to start WinFSP Service
             try
             {
-                Service = new FSPService();
+                Service = new FSPService(OptionWindow);
 
                 #region Service Events
 
@@ -110,20 +111,15 @@ namespace KS2Drive
             if (this.AppConfiguration.IsConfigured())
             {
                 // Currentconfiguration is altijd 0, dit aanpassen als ik daar mee verder ga
-                MountDrives(true);
+                foreach (Configuration config in AppConfiguration.Configurations) if (config.AutoMount) MountDrive(config);
             }
             else
             {
-                MenuConfigure_Click(this, null);
+                MenuManage_Click(this, null);
             }
         }
-        
-        public void MountDrives(bool isAutoMount)
-        {
-            foreach (Configuration config in AppConfiguration.Configurations) if (config.AutoMount || !isAutoMount) MountDrive(config);
-        }
 
-        private void MountDrive(Configuration config)
+        public void MountDrive(Configuration config)
         {
             try
             {
@@ -136,34 +132,21 @@ namespace KS2Drive
             }
 
             ItemsToLog.Clear();
-            ((MenuItem)AppMenu.Items[0]).Header = "_UNMOUNT";
-            IsMounted = true;
-            ((MenuItem)AppMenu.Items[2]).IsEnabled = false;
             
             Process.Start($@"{config.DriveLetter}:\");
 
         }
 
-        private void UnmountDrives()
-        {
-            for (int i = 0; i < AppConfiguration.Configurations.Count; i++) UnmountDrive(i);
-        }
-
-        private void UnmountDrive(int drive)
+        public void UnmountDrive(Configuration config)
         {
             try
             {
-                Service.Unmount(AppConfiguration.Configurations[drive]);
+                Service.Unmount(config);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
-
-            ((MenuItem)AppMenu.Items[0]).Header = "_MOUNT";
-            IsMounted = false;
-            ((MenuItem)AppMenu.Items[2]).IsEnabled = true;
-            ((MenuItem)AppMenu.Items[2]).ToolTip = null;
         }
 
         /// <summary>
@@ -187,16 +170,9 @@ namespace KS2Drive
         }
 
         #region Menu actions
-
-        private void MenuMount_Click(object sender, RoutedEventArgs e)
+        
+        private void MenuManage_Click(object sender, RoutedEventArgs e)
         {
-            if (IsMounted) UnmountDrives();
-            else MountDrives(false);
-        }
-
-        private void MenuConfigure_Click(object sender, RoutedEventArgs e)
-        {
-            ConfigurationUI OptionWindow = new ConfigurationUI(this);
             OptionWindow.ShowDialog();
             if (CurrentConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
