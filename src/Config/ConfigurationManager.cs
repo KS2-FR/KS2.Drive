@@ -48,12 +48,17 @@ namespace KS2Drive.Config
         }
 
         /// <summary>
-        /// The configuration manager is configured iff each configuration is configured.
+        /// The configuration manager is configured iff each configuration with automount on is configured.
         /// </summary>
         /// <returns></returns>
         public bool IsConfigured()
         {
-            foreach(Configuration config in Configurations) if (!config.IsConfigured) return false;
+            foreach (Configuration config in Configurations)
+            {
+                // Only used to see if automounting is possible, so if automount is false skip the config.
+                if (!config.AutoMount) continue;
+                if (!config.IsConfigured) return false;
+            }
 
             return true;
         }

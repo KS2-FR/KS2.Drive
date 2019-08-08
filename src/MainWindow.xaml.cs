@@ -108,10 +108,13 @@ namespace KS2Drive
 
             Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "Yoda Drive", $"Yoda Drive has started", System.Windows.Forms.ToolTipIcon.Info));
 
-            if (this.AppConfiguration.IsConfigured)
+            if (this.AppConfiguration.IsConfigured())
             {
                 // Currentconfiguration is altijd 0, dit aanpassen als ik daar mee verder ga
-                foreach (Configuration config in AppConfiguration.Configurations) if (config.AutoMount) MountDrive(config);
+                foreach (Configuration config in AppConfiguration.Configurations)
+                {
+                    if (config.AutoMount) MountDrive(config);
+                }
             }
             else
             {
@@ -176,12 +179,7 @@ namespace KS2Drive
             OptionWindow.ShowDialog();
             if (CurrentConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
-
-        private void MenuLog_Click(object sender, RoutedEventArgs e)
-        {
-            if (!this.IsVisible) this.Show();
-        }
-
+        
         private void MenuExit_Click(object sender, RoutedEventArgs e)
         {
             QuitApp();
