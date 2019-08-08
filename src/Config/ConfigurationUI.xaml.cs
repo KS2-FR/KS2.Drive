@@ -147,17 +147,19 @@ namespace KS2Drive.Config
         private void EnterConfigurationData()
         {
             InitDriveNameButtons();
-
-            if (!String.IsNullOrEmpty(this.CurrentConfiguration.Name)) txtDriveName.Text = this.CurrentConfiguration.Name;
+            
+            txtDriveName.Text = this.CurrentConfiguration.Name == null ? "" : this.CurrentConfiguration.Name;
 
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]);
-            if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerURL)) txtURL.Text = this.CurrentConfiguration.ServerURL;
+
+            txtURL.Text = this.CurrentConfiguration.ServerURL == null ? "" : this.CurrentConfiguration.ServerURL;
 
             var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.ServerType));
             if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
 
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerLogin)) txtLogin.Text = this.CurrentConfiguration.ServerLogin;
-            if (this.CurrentConfiguration.ServerPassword != null) txtPassword.Password = this.CurrentConfiguration.ServerPassword;
+
+            txtPassword.Password = this.CurrentConfiguration.ServerPassword == null ? "" : this.CurrentConfiguration.ServerPassword;
 
             /*
             var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.KernelCacheMode));
