@@ -64,6 +64,7 @@ namespace KS2Drive.Config
             CBMode.Items.Add(new KeyValuePair<int, string>(1, "AOS"));
             CBMode.SelectedIndex = 0;
 
+            /*
             CBKernelCache.SelectedValuePath = "Key";
             CBKernelCache.DisplayMemberPath = "Value";
             CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.Disabled, KernelCacheMode.Disabled.ToString()));
@@ -88,12 +89,7 @@ namespace KS2Drive.Config
             CBPreloading.Items.Add(new KeyValuePair<int, string>(0, "No"));
             CBPreloading.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
             CBPreloading.SelectedIndex = 1;
-
-            CBMountAsNetworkDrive.SelectedValuePath = "Key";
-            CBMountAsNetworkDrive.DisplayMemberPath = "Value";
-            CBMountAsNetworkDrive.Items.Add(new KeyValuePair<int, string>(0, "No"));
-            CBMountAsNetworkDrive.Items.Add(new KeyValuePair<int, string>(1, "Yes"));
-            CBMountAsNetworkDrive.SelectedIndex = 0;
+            */
 
             //Reload values from config
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
@@ -163,6 +159,7 @@ namespace KS2Drive.Config
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerLogin)) txtLogin.Text = this.CurrentConfiguration.ServerLogin;
             if (this.CurrentConfiguration.ServerPassword != null) txtPassword.Password = this.CurrentConfiguration.ServerPassword;
 
+            /*
             var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.KernelCacheMode));
             if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
 
@@ -177,9 +174,10 @@ namespace KS2Drive.Config
 
             var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.CurrentConfiguration.MountAsNetworkDrive)));
             if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
-            
+            */
             chk_AutoMount.IsChecked = CurrentConfiguration.AutoMount;
             chk_AutoStart.IsChecked = CurrentConfiguration.AutoStart;
+            chk_NetworkDrive.IsChecked = CurrentConfiguration.MountAsNetworkDrive;
 
             if (this.CurrentConfiguration.HTTPProxyMode == 0) rb_NoProxy.IsChecked = true;
             if (this.CurrentConfiguration.HTTPProxyMode == 1) rb_DefaultProxy.IsChecked = true;
@@ -191,6 +189,7 @@ namespace KS2Drive.Config
             ProxyPassword.Password = this.CurrentConfiguration.ProxyPassword;
             Chk_RememberPassword.IsChecked = this.CurrentConfiguration.RememberPassword;
 
+            /*
             //Look for certificate
             if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.CertSerial) && !String.IsNullOrEmpty(this.CurrentConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.CurrentConfiguration.CertStoreName))
@@ -202,7 +201,7 @@ namespace KS2Drive.Config
                     if (this.CurrentConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
                 }
             }
-
+            */
             // Prevent unsaved changes message when starting up the configuration screen
             tb_Status.Text = "";
             
@@ -298,18 +297,20 @@ namespace KS2Drive.Config
 
             this.CurrentConfiguration.AutoMount = chk_AutoMount.IsChecked.Value;
             this.CurrentConfiguration.AutoStart = chk_AutoStart.IsChecked.Value;
+            this.CurrentConfiguration.MountAsNetworkDrive = chk_NetworkDrive.IsChecked.Value;
 
             this.CurrentConfiguration.ServerLogin = txtLogin.Text;
             this.CurrentConfiguration.ServerPassword = txtPassword.Password;
             this.CurrentConfiguration.RememberPassword = Chk_RememberPassword.IsChecked.Value;
 
+            /*
             this.CurrentConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
             this.CurrentConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
             this.CurrentConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
             this.CurrentConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
             this.CurrentConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
             this.CurrentConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
-
+            */
             if (rb_NoProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 0;
             if (rb_DefaultProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 1;
             if (rb_CustomProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 2;
@@ -371,7 +372,7 @@ namespace KS2Drive.Config
                     this.CurrentConfiguration.CertStoreName = StoreNameAsString;
                     this.CurrentConfiguration.CertStoreLocation = StoreLocationAsString;
                     this.CurrentConfiguration.CertSerial = sel[0].SerialNumber;
-                    txt_ClientCertSubject.Text = sel[0].Subject;
+                    //txt_ClientCertSubject.Text = sel[0].Subject;
                 }
             }
         }

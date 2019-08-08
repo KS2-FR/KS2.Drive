@@ -36,13 +36,13 @@
                         <ColumnDefinition Width="*"></ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="50"></RowDefinition>
-                        <RowDefinition Height="50"></RowDefinition>
-                        <RowDefinition Height="137*"></RowDefinition>
-                        <RowDefinition Height="142*"></RowDefinition>
+                        <RowDefinition Height="65.333"></RowDefinition>
+                        <RowDefinition Height="34.667"></RowDefinition>
+                        <RowDefinition Height="74*"></RowDefinition>
+                        <RowDefinition Height="80*"></RowDefinition>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,24,-0.333,74" Grid.RowSpan="2">
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="1,9.667,-0.333,66.333" Grid.RowSpan="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"></ColumnDefinition>
@@ -87,7 +87,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,5,-0.333,0">
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="1,84,-0.333,111" Grid.RowSpan="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="173"></ColumnDefinition>
@@ -97,7 +97,6 @@
                                 <RowDefinition Height="30"></RowDefinition>
                                 <RowDefinition Height="30"></RowDefinition>
                                 <RowDefinition Height="30"></RowDefinition>
-                                <RowDefinition Height="40"></RowDefinition>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7,20.333,8.333" >Login</TextBlock>
                             <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0.667,2,-0.333,3.333" TextChanged="UnsavedChangesMessage"></TextBox>
@@ -105,36 +104,10 @@
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.667,20.333,7.667" >Password</TextBlock>
                             <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0.667,2.667,-0.333,2.667" PasswordChanged="UnsavedChangesMessage"></PasswordBox>
                             <CheckBox Grid.Row="2" x:Name="Chk_RememberPassword" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage" Margin="0,0.333,20.333,0">Remember password</CheckBox>
-
-                            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" Orientation="Horizontal" Height="35" Margin="0,3,-0.333,3.333">
-                                <CheckBox x:Name="Chk_UserClientCert" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Additional client certificate</CheckBox>
-                                <TextBox x:Name="txt_ClientCertSubject" Width="300" Margin="20,0,20,0" Height="20" IsReadOnly="True" TextChanged="UnsavedChangesMessage"></TextBox>
-                                <extToolkit:DropDownButton Content="Select" Margin="0,5,0,5" Width="100" IsEnabled="{Binding Path=IsChecked,ElementName=Chk_UserClientCert}" x:Name="bt_UserClientCertSelect">
-                                    <extToolkit:DropDownButton.DropDownContent>
-                                        <StackPanel Width="200" Orientation="Vertical">
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.My</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.AddressBook</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.AuthRoot</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.CertificateAuthority</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.Root</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.TrustedPeople</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">CurrentUser.TrustedPublisher</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.My</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.AddressBook</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.AuthRoot</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.CertificateAuthority</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.Root</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.TrustedPeople</Button>
-                                            <Button HorizontalContentAlignment="Left" Click="bt_UserClientCertSelect_Click">LocalMachine.TrustedPublisher</Button>
-                                        </StackPanel>
-                                    </extToolkit:DropDownButton.DropDownContent>
-                                </extToolkit:DropDownButton>
-                            </StackPanel>
-
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="0,81,0.667,0" RenderTransformOrigin="0.5,0.5">
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="0" BorderBrush="Gainsboro" BorderThickness="1" Padding="5" Margin="1,50.667,0.667,17" RenderTransformOrigin="0.5,0.5">
                         <Border.RenderTransform>
                             <TransformGroup>
                                 <SkewTransform/>
@@ -146,46 +119,17 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="22"></RowDefinition>
                                 <RowDefinition Height="22"></RowDefinition>
+                                <RowDefinition Height="22"></RowDefinition>
                             </Grid.RowDefinitions>
 
                             <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" Margin="0,0,-0.333,0" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
                             <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" Margin="0,0.333,0,-5.667" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
+                            <CheckBox Grid.Row="2" Grid.Column="0" x:Name="chk_NetworkDrive" Content="Mount as network drive" Margin="0,0.333,0,-5.667" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
                         </Grid>
                     </Border>
                 </Grid>
-
-
             </TabItem>
-            <TabItem Header="Advanced">
-                <Border BorderThickness="1" BorderBrush="Gainsboro" Margin="0,73,-0.333,-0.333">
-                    <Grid Margin="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"></ColumnDefinition>
-                            <ColumnDefinition Width="*"></ColumnDefinition>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="35"></RowDefinition>
-                            <RowDefinition Height="35"></RowDefinition>
-                            <RowDefinition Height="35"></RowDefinition>
-                            <RowDefinition Height="35"></RowDefinition>
-                            <RowDefinition Height="35"></RowDefinition>
-                            <RowDefinition Height="35"></RowDefinition>
-                        </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Kernel Cache</TextBlock>
-                        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Sync ops</TextBlock>
-                        <TextBlock Grid.Row="2" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Pre-Loading</TextBlock>
-                        <TextBlock Grid.Row="3" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">FlushMode</TextBlock>
-                        <TextBlock Grid.Row="4" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">Mount as network drive</TextBlock>
-
-                        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBKernelCache" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
-                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CBSyncOps" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
-                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CBPreloading"  HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
-                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CBFlush" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
-                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CBMountAsNetworkDrive" HorizontalAlignment="Left" Width="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
-                    </Grid>
-                </Border>
-            </TabItem>
             <TabItem Header="Proxy">
                 <Grid Margin="15,80,0,0">
                     <Grid.RowDefinitions>
