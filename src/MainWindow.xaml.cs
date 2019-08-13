@@ -113,6 +113,7 @@ namespace KS2Drive
                 // Currentconfiguration is altijd 0, dit aanpassen als ik daar mee verder ga
                 foreach (Configuration config in AppConfiguration.Configurations)
                 {
+                    config.IsMounted = false;
                     if (config.AutoMount) MountDrive(config);
                 }
             }
@@ -177,7 +178,7 @@ namespace KS2Drive
         private void MenuManage_Click(object sender, RoutedEventArgs e)
         {
             OptionWindow.ShowDialog();
-            if (CurrentConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
+            ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
         
         private void MenuExit_Click(object sender, RoutedEventArgs e)

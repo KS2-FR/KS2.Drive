@@ -147,7 +147,7 @@ namespace KS2Drive.Config
         private void EnterConfigurationData()
         {
             InitDriveNameButtons();
-            
+
             txtDriveName.Text = this.CurrentConfiguration.Name == null ? "" : this.CurrentConfiguration.Name;
 
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.CurrentConfiguration.DriveLetter[0]);
@@ -215,7 +215,7 @@ namespace KS2Drive.Config
             bt_Mount.Click -= bt_mountConfiguration_Click;
             bt_Mount.Click -= bt_unmountConfiguration_Click;
 
-            if (CurrentConfiguration.IsMounted)
+            if (this.CurrentConfiguration.IsMounted)
             {
                 bt_Mount.Content = "Unmount";
                 bt_Mount.Click += bt_unmountConfiguration_Click;
