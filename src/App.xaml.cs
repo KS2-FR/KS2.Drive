@@ -17,9 +17,11 @@ namespace KS2Drive
 {
     public partial class App : Application
     {
-        public Configuration AppConfiguration { get; set; }
+        public ConfigurationManager AppConfiguration { get; set; }
+        // Note: every configuration is mounted simultaneously, 
+        // CurrentConfiguration is necessary for the configuration screen.
+        public Configuration CurrentConfiguration { get; set; }
         public String ConfigurationFolderPath { get; set; }
-        public String ConfigurationFilePath { get; set; }
 
         private Mutex UnicityMutex = null;
 
@@ -48,12 +50,12 @@ namespace KS2Drive
                     return;
                 }
             }
+            
+            AppConfiguration = ConfigurationManager.Load(Path.Combine(ConfigurationFolderPath, "config.json"));
 
-            ConfigurationFilePath = Path.Combine(ConfigurationFolderPath, "config.json");
-            this.AppConfiguration = Configuration.Load(ConfigurationFilePath);
-
-            Tools.LoadProxy(this.AppConfiguration);
-
+            CurrentConfiguration = AppConfiguration.Configurations[0];
+            
+            Tools.LoadProxy(CurrentConfiguration);
             #endregion
 
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");

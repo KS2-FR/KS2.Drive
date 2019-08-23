@@ -10,7 +10,11 @@
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
-                <Paragraph FontSize="30" Margin="0">Yoda Drive - 0.2.6.0</Paragraph>
+                <Paragraph FontSize="35" Margin="0">
+                    <InlineUIContainer>
+                        <Image Margin="0,5,0,-18" Stretch="Fill" Width="60" Height="60" Source="/KS2Drive;component/logo.svg.png"/>
+                    </InlineUIContainer> Yoda Drive - 0.2.6.0
+                </Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a Yoda drive as a local drive.</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Yoda but should work with any webDAV server.</Paragraph>
 
@@ -20,7 +24,7 @@
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">
                             <Hyperlink NavigateUri="https://github.com/UtrechtUniversity/YodaDrive/releases" RequestNavigate="Hyperlink_RequestNavigate">Download the setup program</Hyperlink>
-                            </Paragraph>
+                        </Paragraph>
                     </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Click on the Yoda Drive icon on your desktop</Paragraph>
@@ -36,22 +40,26 @@
                     </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Hit "SAVE"</Paragraph>
-                    </ListItem>                    
+                    </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Right-click on the icon loaded in the notification area and select "MOUNT"</Paragraph>
                     </ListItem>
                 </List>
 
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray" Margin="0,0,0,0">Based on WinFSP by Bill Zissimopoulos :
-                    <Hyperlink NavigateUri="http://www.secfs.net/winfsp" RequestNavigate="Hyperlink_RequestNavigate">http://www.secfs.net/winfsp</Hyperlink></Paragraph>
+                    <Hyperlink NavigateUri="http://www.secfs.net/winfsp" RequestNavigate="Hyperlink_RequestNavigate">http://www.secfs.net/winfsp</Hyperlink>
+                </Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">Based on the WebdavClient library by Sagui Itay:
                     <Hyperlink NavigateUri="https://github.com/saguiitay/WebDAVClient" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/saguiitay/WebDAVClient</Hyperlink>
                 </Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">Based on KS2.Drive.
                     <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/FrKaram/KS2.Drive</Hyperlink>
                 </Paragraph>
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">This software is under GPLV3.
-                    <Hyperlink NavigateUri="https://github.com/UtrechtUniversity/YodaDrive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">
+                    <Run Text="This software is under GPLV3. "/>
+                    <Hyperlink NavigateUri="https://github.com/UtrechtUniversity/YodaDrive" RequestNavigate="Hyperlink_RequestNavigate">
+                        <Run Text="Source available on GitHub"/>
+                    </Hyperlink>
                 </Paragraph>
             </FlowDocument>
         </RichTextBox>

@@ -1,4 +1,5 @@
 ﻿using KS2Drive.Config;
+using KS2Drive.FS;
 using KS2Drive.Log;
 using KS2Drive.WinFSP;
 using MahApps.Metro.Controls;
@@ -16,9 +17,12 @@ namespace KS2Drive
     public partial class MainWindow : MetroWindow
     {
         private FSPService Service;
-        private bool IsMounted = false;
+        private Configuration CurrentConfiguration;
+        ConfigurationUI OptionWindow;
+
         private Thread T;
-        private Configuration AppConfiguration;
+
+        private ConfigurationManager AppConfiguration;
         public ObservableCollection<LogListItem> ItemsToLog = new ObservableCollection<LogListItem>();
 
         private System.Windows.Forms.NotifyIcon AppNotificationIcon;
@@ -29,9 +33,11 @@ namespace KS2Drive
             InitializeComponent();
 
             AppConfiguration = ((App)Application.Current).AppConfiguration;
+            CurrentConfiguration = ((App)Application.Current).CurrentConfiguration;
 
             AppMenu = (ContextMenu)this.FindResource("NotifierContextMenu");
-            ((MenuItem)AppMenu.Items[0]).IsEnabled = AppConfiguration.IsConfigured;
+
+            ((MenuItem)AppMenu.Items[0]).IsEnabled = CurrentConfiguration.IsConfigured;
 
             this.Hide();
 
@@ -57,11 +63,11 @@ namespace KS2Drive
 
             #endregion
 
+            OptionWindow = new ConfigurationUI(this);
             #region Try to start WinFSP Service
-
             try
             {
-                Service = new FSPService();
+                Service = new FSPService(OptionWindow);
 
                 #region Service Events
 
@@ -84,7 +90,6 @@ namespace KS2Drive
                 };
 
                 #endregion
-
                 T = new Thread(() => Service.Run());
                 T.Start();
             }
@@ -96,27 +101,33 @@ namespace KS2Drive
                 return;
             }
 
+
             #endregion
 
             LogList.ItemsSource = ItemsToLog;
 
             Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "Yoda Drive", $"Yoda Drive has started", System.Windows.Forms.ToolTipIcon.Info));
 
-            if (this.AppConfiguration.IsConfigured)
+            if (this.AppConfiguration.IsConfigured())
             {
-                if (AppConfiguration.AutoMount) MountDrive();
+                // Currentconfiguration is altijd 0, dit aanpassen als ik daar mee verder ga
+                foreach (Configuration config in AppConfiguration.Configurations)
+                {
+                    config.IsMounted = false;
+                    if (config.AutoMount) MountDrive(config);
+                }
             }
             else
             {
-                MenuConfigure_Click(this, null);
+                MenuManage_Click(this, null);
             }
         }
 
-        private void MountDrive()
+        public void MountDrive(Configuration config)
         {
             try
             {
-                Service.Mount(this.AppConfiguration);
+                Service.Mount(config);
             }
             catch (Exception ex)
             {
@@ -125,27 +136,21 @@ namespace KS2Drive
             }
 
             ItemsToLog.Clear();
-            ((MenuItem)AppMenu.Items[0]).Header = "_UNMOUNT";
-            IsMounted = true;
-            ((MenuItem)AppMenu.Items[2]).IsEnabled = false;
-            Process.Start($@"{this.AppConfiguration.DriveLetter}:\");
+            
+            Process.Start($@"{config.DriveLetter}:\");
+
         }
 
-        private void UnmountDrive()
+        public void UnmountDrive(Configuration config)
         {
             try
             {
-                Service.Unmount();
+                Service.Unmount(config);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
-
-            ((MenuItem)AppMenu.Items[0]).Header = "_MOUNT";
-            IsMounted = false;
-            ((MenuItem)AppMenu.Items[2]).IsEnabled = true;
-            ((MenuItem)AppMenu.Items[2]).ToolTip = null;
         }
 
         /// <summary>
@@ -169,25 +174,13 @@ namespace KS2Drive
         }
 
         #region Menu actions
-
-        private void MenuMount_Click(object sender, RoutedEventArgs e)
+        
+        private void MenuManage_Click(object sender, RoutedEventArgs e)
         {
-            if (IsMounted) UnmountDrive();
-            else MountDrive();
-        }
-
-        private void MenuConfigure_Click(object sender, RoutedEventArgs e)
-        {
-            ConfigurationUI OptionWindow = new ConfigurationUI();
             OptionWindow.ShowDialog();
-            if (AppConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
+            ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
-
-        private void MenuLog_Click(object sender, RoutedEventArgs e)
-        {
-            if (!this.IsVisible) this.Show();
-        }
-
+        
         private void MenuExit_Click(object sender, RoutedEventArgs e)
         {
             QuitApp();
