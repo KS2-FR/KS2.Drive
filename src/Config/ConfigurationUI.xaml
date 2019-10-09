@@ -63,7 +63,7 @@
                                         <Style.Resources>
                                             <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
                                                 <VisualBrush.Visual>
-                                                    <Label Content="ex : http://10.10.100.154:8080/alfresco/aos/swsdp/documentLibrary" Foreground="LightGray" />
+                                                    <Label Content="https:/its.data.uu.nl" Foreground="LightGray" />
                                                 </VisualBrush.Visual>
                                             </VisualBrush>
                                         </Style.Resources>
@@ -96,10 +96,33 @@
                                 <RowDefinition Height="30"></RowDefinition>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7,20.333,8.333" >Login</TextBlock>
-                            <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0.667,2,-0.333,3.333" TextChanged="UnsavedChangesMessage"></TextBox>
+                            <TextBox Grid.Row="0" Grid.Column="1" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" VerticalAlignment="Center" x:Name="txtLogin" Margin="0.667,2,-0.333,3.333" TextChanged="UnsavedChangesMessage">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                                        <Style.Resources>
+                                            <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                                <VisualBrush.Visual>
+                                                    <Label Content="j.a.smith@uu.nl" Foreground="LightGray" />
+                                                </VisualBrush.Visual>
+                                            </VisualBrush>
+                                        </Style.Resources>
+                                        <Style.Triggers>
+                                            <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="Text" Value="{x:Null}">
+                                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter Property="Background" Value="White" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Height="16" Margin="0,7.667,20.333,7.667" >Password</TextBlock>
-                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0.667,2.667,-0.333,2.667" PasswordChanged="UnsavedChangesMessage"></PasswordBox>
+                            <PasswordBox Grid.Row="1" Grid.Column="1" Height="26"  VerticalContentAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" x:Name="txtPassword" Margin="0.667,2.667,-0.333,2.667" PasswordChanged="UnsavedChangesMessage">                            </PasswordBox>
                             <CheckBox Grid.Row="2" x:Name="Chk_RememberPassword" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage" Margin="0,0.333,20.333,0">Remember password</CheckBox>
                         </Grid>
                     </Border>
