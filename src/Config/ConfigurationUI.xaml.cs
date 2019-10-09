@@ -26,7 +26,8 @@ namespace KS2Drive.Config
         {
             get
             {
-                return rb_CustomProxy.IsChecked;
+                /*return rb_CustomProxy.IsChecked;*/
+                return false;
             }
         }
         public ConfigurationUI(MainWindow main)
@@ -58,13 +59,13 @@ namespace KS2Drive.Config
 
             CBFreeDrives.SelectedIndex = 0;
 
+            /*
             CBMode.SelectedValuePath = "Key";
             CBMode.DisplayMemberPath = "Value";
             CBMode.Items.Add(new KeyValuePair<int, string>(0, "webDAV"));
             CBMode.Items.Add(new KeyValuePair<int, string>(1, "AOS"));
             CBMode.SelectedIndex = 0;
 
-            /*
             CBKernelCache.SelectedValuePath = "Key";
             CBKernelCache.DisplayMemberPath = "Value";
             CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.Disabled, KernelCacheMode.Disabled.ToString()));
@@ -154,8 +155,10 @@ namespace KS2Drive.Config
 
             txtURL.Text = this.CurrentConfiguration.ServerURL == null ? "" : this.CurrentConfiguration.ServerURL;
 
+            /*
             var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.CurrentConfiguration.ServerType));
             if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
+            */
 
             if (!String.IsNullOrEmpty(this.CurrentConfiguration.ServerLogin)) txtLogin.Text = this.CurrentConfiguration.ServerLogin;
 
@@ -181,6 +184,7 @@ namespace KS2Drive.Config
             chk_AutoStart.IsChecked = CurrentConfiguration.AutoStart;
             chk_NetworkDrive.IsChecked = CurrentConfiguration.MountAsNetworkDrive;
 
+            /*
             if (this.CurrentConfiguration.HTTPProxyMode == 0) rb_NoProxy.IsChecked = true;
             if (this.CurrentConfiguration.HTTPProxyMode == 1) rb_DefaultProxy.IsChecked = true;
             if (this.CurrentConfiguration.HTTPProxyMode == 2) rb_CustomProxy.IsChecked = true;
@@ -189,6 +193,7 @@ namespace KS2Drive.Config
             ProxyURL.Text = this.CurrentConfiguration.ProxyURL;
             ProxyLogin.Text = this.CurrentConfiguration.ProxyLogin;
             ProxyPassword.Password = this.CurrentConfiguration.ProxyPassword;
+            */
             Chk_RememberPassword.IsChecked = this.CurrentConfiguration.RememberPassword;
 
             /*
@@ -295,7 +300,9 @@ namespace KS2Drive.Config
             this.CurrentConfiguration.Path = Path.Combine(configurationFolderPath, this.CurrentConfiguration.Name.ToLower() + "-config.json");
             this.CurrentConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
             this.CurrentConfiguration.ServerURL = txtURL.Text;
+            /*
             this.CurrentConfiguration.ServerType = (Int32)CBMode.SelectedValue;
+            */
 
             this.CurrentConfiguration.AutoMount = chk_AutoMount.IsChecked.Value;
             this.CurrentConfiguration.AutoStart = chk_AutoStart.IsChecked.Value;
@@ -312,7 +319,7 @@ namespace KS2Drive.Config
             this.CurrentConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
             this.CurrentConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
             this.CurrentConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
-            */
+            
             if (rb_NoProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 0;
             if (rb_DefaultProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 1;
             if (rb_CustomProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 2;
@@ -321,6 +328,7 @@ namespace KS2Drive.Config
             this.CurrentConfiguration.ProxyURL = ProxyURL.Text;
             this.CurrentConfiguration.ProxyLogin = ProxyLogin.Text;
             this.CurrentConfiguration.ProxyPassword = ProxyPassword.Password;
+            */
 
             try
             {
@@ -434,6 +442,17 @@ namespace KS2Drive.Config
             AppConfiguration.Configurations.Remove(CurrentConfiguration);
             AppConfiguration.Save();
             File.Delete(CurrentConfiguration.Path);
+
+            // Add empty configuration if no configurations are left.
+            if (AppConfiguration.Configurations.Count == 0)
+            {
+                Configuration config = new Configuration();
+                config.Name = "Drive " + (AppConfiguration.Configurations.Count + 1);
+                config.Path = Path.Combine(configurationFolderPath, config.Name.ToLower() + "-config.json");
+
+                this.AppConfiguration.Configurations.Add(config);
+                ((App)Application.Current).AppConfiguration = this.AppConfiguration;
+            }
             CurrentConfiguration = AppConfiguration.Configurations[0];
 
             ((App)Application.Current).AppConfiguration = this.AppConfiguration;

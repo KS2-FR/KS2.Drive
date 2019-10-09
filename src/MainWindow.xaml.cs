@@ -1,5 +1,4 @@
 ﻿using KS2Drive.Config;
-using KS2Drive.FS;
 using KS2Drive.Log;
 using KS2Drive.WinFSP;
 using MahApps.Metro.Controls;
@@ -37,7 +36,7 @@ namespace KS2Drive
 
             AppMenu = (ContextMenu)this.FindResource("NotifierContextMenu");
 
-            ((MenuItem)AppMenu.Items[0]).IsEnabled = CurrentConfiguration.IsConfigured;
+            ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
 
             this.Hide();
 
@@ -110,7 +109,6 @@ namespace KS2Drive
 
             if (this.AppConfiguration.IsConfigured())
             {
-                // Currentconfiguration is altijd 0, dit aanpassen als ik daar mee verder ga
                 foreach (Configuration config in AppConfiguration.Configurations)
                 {
                     config.IsMounted = false;
@@ -177,6 +175,7 @@ namespace KS2Drive
         
         private void MenuManage_Click(object sender, RoutedEventArgs e)
         {
+            OptionWindow = new ConfigurationUI(this);
             OptionWindow.ShowDialog();
             ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }

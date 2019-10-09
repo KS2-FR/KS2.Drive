@@ -28,8 +28,8 @@
             <RowDefinition Height="35"></RowDefinition>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,-0.333,3">
-            <TabItem Header="General">
+        <TabControl Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
+            <TabItem Header="Configuration">
                 <Grid Margin="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="100"></ColumnDefinition>
@@ -81,9 +81,6 @@
                                     </Style>
                                 </TextBox.Style>
                             </TextBox>
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" >Type</TextBlock>
-                            <ComboBox Grid.Row="2" Grid.Column="2" x:Name="CBMode"  Width="150"  HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
                         </Grid>
                     </Border>
 
@@ -127,66 +124,6 @@
                             <CheckBox Grid.Row="2" Grid.Column="0" x:Name="chk_NetworkDrive" Content="Mount as network drive" Margin="0,0.333,0,-5.667" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
                         </Grid>
                     </Border>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="Proxy">
-                <Grid Margin="15,80,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="35"></RowDefinition>
-                        <RowDefinition Height="*"></RowDefinition>
-                    </Grid.RowDefinitions>
-
-                    <RadioButton Grid.Row="0" GroupName="ProxySettings" x:Name="rb_NoProxy" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">No proxy</RadioButton>
-                    <RadioButton Grid.Row="1" GroupName="ProxySettings" x:Name="rb_DefaultProxy" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Default proxy</RadioButton>
-                    <RadioButton Grid.Row="2" GroupName="ProxySettings" x:Name="rb_CustomProxy" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage">Custom proxy</RadioButton>
-                    <Border Grid.Row="3" BorderThickness="1" BorderBrush="#FF939090" Margin="0,0,19.667,0.333" Padding="10" IsEnabled="{Binding CustomProxy, Mode=TwoWay}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="25"></RowDefinition>
-                                <RowDefinition Height="25"></RowDefinition>
-                                <RowDefinition Height="95"></RowDefinition>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"></ColumnDefinition>
-                                <ColumnDefinition Width="*"></ColumnDefinition>
-                            </Grid.ColumnDefinitions>
-
-                            <Label Grid.Row="0" Grid.Column="0" Content="Proxy URL" />
-                            <TextBox x:Name="ProxyURL" Grid.Row="0" Grid.Column="1" Height="23" TextWrapping="Wrap" HorizontalAlignment="Stretch" TextChanged="UnsavedChangesMessage"/>
-
-                            <CheckBox x:Name="ProxyRequiresAuthentication" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Requires authentication" Margin="5,7,0,0" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
-
-                            <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="25,10,20,0" Padding="10" BorderBrush="#FF939090" BorderThickness="1">
-                                <Border.IsEnabled>
-                                    <MultiBinding Converter="{StaticResource ProxyCustomAuthActivator}">
-                                        <Binding Path="CurrentConfiguration.HTTPProxyMode" />
-                                        <Binding Path="CurrentConfiguration.UseProxyAuthentication" />
-                                    </MultiBinding>
-                                </Border.IsEnabled>
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="30"></RowDefinition>
-                                        <RowDefinition Height="30"></RowDefinition>
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="70"></ColumnDefinition>
-                                        <ColumnDefinition Width="*"></ColumnDefinition>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Label Grid.Row="0" Grid.Column="0" Content="Login" Margin="2"/>
-                                    <TextBox x:Name="ProxyLogin" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Stretch" Margin="5" TextChanged="UnsavedChangesMessage"/>
-
-                                    <Label Grid.Row="1" Grid.Column="0" Content="Password" Margin="2"/>
-                                    <PasswordBox x:Name="ProxyPassword"  Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5" PasswordChanged="UnsavedChangesMessage"/>
-                                </Grid>
-
-                            </Border>
-                        </Grid>
-                    </Border>
-
                 </Grid>
             </TabItem>
         </TabControl>

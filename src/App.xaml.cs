@@ -1,5 +1,4 @@
-﻿//using KS2Drive.Log;
-using KS2Drive.Config;
+﻿using KS2Drive.Config;
 using Newtonsoft.Json;
 using NLog.LayoutRenderers;
 using System;
@@ -53,6 +52,16 @@ namespace KS2Drive
             
             AppConfiguration = ConfigurationManager.Load(Path.Combine(ConfigurationFolderPath, "config.json"));
 
+            // Add empty configuration if no configurations are left.
+            if (AppConfiguration.Configurations.Count == 0)
+            {
+                Configuration config = new Configuration();
+                config.Name = "Drive " + (AppConfiguration.Configurations.Count + 1);
+                config.Path = Path.Combine(ConfigurationFolderPath, "config.json");
+
+                this.AppConfiguration.Configurations.Add(config);
+                ((App)Application.Current).AppConfiguration = this.AppConfiguration;
+            }
             CurrentConfiguration = AppConfiguration.Configurations[0];
             
             Tools.LoadProxy(CurrentConfiguration);
