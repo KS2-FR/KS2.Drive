@@ -22,14 +22,6 @@ namespace KS2Drive.Config
         public ConfigurationManager AppConfiguration { get; set; }
         public Configuration CurrentConfiguration { get; set; }
 
-        private bool? CustomProxy
-        {
-            get
-            {
-                /*return rb_CustomProxy.IsChecked;*/
-                return false;
-            }
-        }
         public ConfigurationUI(MainWindow main)
         {
             this.main = main;
@@ -232,7 +224,7 @@ namespace KS2Drive.Config
             }
         }
 
-        private bool saveConfiguration(object sender, RoutedEventArgs e)
+        private bool SaveConfiguration(object sender, RoutedEventArgs e)
         {
             if (String.IsNullOrEmpty(txtURL.Text))
             {
@@ -326,7 +318,7 @@ namespace KS2Drive.Config
         }
         private void bt_Save_Click(object sender, RoutedEventArgs e)
         {
-            saveConfiguration(sender, e);
+            this.SaveConfiguration(sender, e);
         }
 
         private void UnsavedChangesMessage(object sender, TextChangedEventArgs args) => UnsavedChangesMessage();
@@ -412,7 +404,7 @@ namespace KS2Drive.Config
         private void bt_mountConfiguration_Click(object sender, RoutedEventArgs e)
         {
             // Save before mounting.
-            if(this.saveConfiguration(sender, e))
+            if(this.SaveConfiguration(sender, e))
             {
                 main.MountDrive(CurrentConfiguration);
                 UpdateMountButton();
