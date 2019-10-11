@@ -236,7 +236,7 @@ namespace WebDAVClient
                     }
                     catch (Exception ex)
                     {
-                        throw new WebDAVException("Failed deserializing data returned from server.", ex);
+                        throw new WebDAVException("Server does not seem to be a webDAV server.", ex);
                     }
                 }
 

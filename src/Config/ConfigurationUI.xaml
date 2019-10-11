@@ -51,7 +51,6 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="30"></RowDefinition>
                                 <RowDefinition Height="30"></RowDefinition>
-                                <RowDefinition Height="30"></RowDefinition>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">Drive letter</TextBlock>
                             <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CBFreeDrives" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" SelectionChanged="UnsavedChangesMessage"/>
@@ -139,12 +138,10 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="22"></RowDefinition>
                                 <RowDefinition Height="22"></RowDefinition>
-                                <RowDefinition Height="22"></RowDefinition>
                             </Grid.RowDefinitions>
 
                             <CheckBox Grid.Row="0" Grid.Column="0" x:Name="chk_AutoMount" Content="Auto-mount drive" Margin="0,0,-0.333,0" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
                             <CheckBox Grid.Row="1" Grid.Column="0" x:Name="chk_AutoStart" Content="Start with Windows" Margin="0,0.333,0,-5.667" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
-                            <CheckBox Grid.Row="2" Grid.Column="0" x:Name="chk_NetworkDrive" Content="Mount as network drive" Margin="0,0.333,0,-5.667" Checked="UnsavedChangesMessage" Unchecked="UnsavedChangesMessage"/>
                         </Grid>
                     </Border>
                 </Grid>

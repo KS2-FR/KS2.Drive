@@ -49,8 +49,15 @@ namespace KS2Drive
                     return;
                 }
             }
-            
-            AppConfiguration = ConfigurationManager.Load(Path.Combine(ConfigurationFolderPath, "config.json"));
+
+            if (File.Exists(Path.Combine(ConfigurationFolderPath, "config.json")))
+            {
+                AppConfiguration = ConfigurationManager.Load(Path.Combine(ConfigurationFolderPath, "config.json"));
+            }
+            else
+            {
+                AppConfiguration = new ConfigurationManager(Path.Combine(ConfigurationFolderPath, "config.json"));
+            }
 
             // Add empty configuration if no configurations are left.
             if (AppConfiguration.Configurations.Count == 0)

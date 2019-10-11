@@ -179,10 +179,10 @@ namespace KS2Drive.Config
 
             var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.CurrentConfiguration.MountAsNetworkDrive)));
             if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
+            chk_NetworkDrive.IsChecked = CurrentConfiguration.MountAsNetworkDrive;
             */
             chk_AutoMount.IsChecked = CurrentConfiguration.AutoMount;
             chk_AutoStart.IsChecked = CurrentConfiguration.AutoStart;
-            chk_NetworkDrive.IsChecked = CurrentConfiguration.MountAsNetworkDrive;
 
             /*
             if (this.CurrentConfiguration.HTTPProxyMode == 0) rb_NoProxy.IsChecked = true;
@@ -232,12 +232,12 @@ namespace KS2Drive.Config
             }
         }
 
-        private void bt_Save_Click(object sender, RoutedEventArgs e)
+        private bool saveConfiguration(object sender, RoutedEventArgs e)
         {
             if (String.IsNullOrEmpty(txtURL.Text))
             {
                 MessageBox.Show("URL is mandatory");
-                return;
+                return false;
             }
 
             try
@@ -247,25 +247,25 @@ namespace KS2Drive.Config
             catch
             {
                 MessageBox.Show("The selected URL is not valid");
-                return;
+                return false;
             }
 
             if (String.IsNullOrEmpty(txtLogin.Text))
             {
                 MessageBox.Show("Server login is mandatory");
-                return;
+                return false;
             }
 
             if (String.IsNullOrEmpty(txtPassword.Password))
             {
                 MessageBox.Show("Server password is mandatory");
-                return;
+                return false;
             }
 
             if (((bool)chk_AutoStart.IsChecked || (bool)chk_AutoMount.IsChecked) && !(bool)Chk_RememberPassword.IsChecked)
             {
                 MessageBox.Show("Cannot Auto-mount or mount on start without remembering password.");
-                return;
+                return false;
             }
 
             //From : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup
@@ -300,35 +300,13 @@ namespace KS2Drive.Config
             this.CurrentConfiguration.Path = Path.Combine(configurationFolderPath, this.CurrentConfiguration.Name.ToLower() + "-config.json");
             this.CurrentConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
             this.CurrentConfiguration.ServerURL = txtURL.Text;
-            /*
-            this.CurrentConfiguration.ServerType = (Int32)CBMode.SelectedValue;
-            */
 
             this.CurrentConfiguration.AutoMount = chk_AutoMount.IsChecked.Value;
             this.CurrentConfiguration.AutoStart = chk_AutoStart.IsChecked.Value;
-            this.CurrentConfiguration.MountAsNetworkDrive = chk_NetworkDrive.IsChecked.Value;
 
             this.CurrentConfiguration.ServerLogin = txtLogin.Text;
             this.CurrentConfiguration.ServerPassword = txtPassword.Password;
             this.CurrentConfiguration.RememberPassword = Chk_RememberPassword.IsChecked.Value;
-
-            /*
-            this.CurrentConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
-            this.CurrentConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
-            this.CurrentConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
-            this.CurrentConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
-            this.CurrentConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
-            this.CurrentConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
-            
-            if (rb_NoProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 0;
-            if (rb_DefaultProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 1;
-            if (rb_CustomProxy.IsChecked.Value) this.CurrentConfiguration.HTTPProxyMode = 2;
-
-            this.CurrentConfiguration.UseProxyAuthentication = ProxyRequiresAuthentication.IsChecked.Value;
-            this.CurrentConfiguration.ProxyURL = ProxyURL.Text;
-            this.CurrentConfiguration.ProxyLogin = ProxyLogin.Text;
-            this.CurrentConfiguration.ProxyPassword = ProxyPassword.Password;
-            */
 
             try
             {
@@ -338,11 +316,17 @@ namespace KS2Drive.Config
             catch (Exception ex)
             {
                 MessageBox.Show($"Cannot save configuration : {ex.Message}");
+                return false;
             }
 
             this.CurrentConfiguration.IsConfigured = true;
 
             Tools.LoadProxy(this.CurrentConfiguration);
+            return true;
+        }
+        private void bt_Save_Click(object sender, RoutedEventArgs e)
+        {
+            saveConfiguration(sender, e);
         }
 
         private void UnsavedChangesMessage(object sender, TextChangedEventArgs args) => UnsavedChangesMessage();
@@ -427,8 +411,12 @@ namespace KS2Drive.Config
 
         private void bt_mountConfiguration_Click(object sender, RoutedEventArgs e)
         {
-            main.MountDrive(CurrentConfiguration);
-            UpdateMountButton();
+            // Save before mounting.
+            if(this.saveConfiguration(sender, e))
+            {
+                main.MountDrive(CurrentConfiguration);
+                UpdateMountButton();
+            }
         }
 
         private void bt_unmountConfiguration_Click(object sender, RoutedEventArgs e)
