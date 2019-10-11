@@ -224,11 +224,11 @@ namespace KS2Drive.Config
             }
         }
 
-        private bool SaveConfiguration(object sender, RoutedEventArgs e)
+        private bool SaveConfiguration(object sender, RoutedEventArgs e, bool mount = false)
         {
             if (String.IsNullOrEmpty(txtURL.Text))
             {
-                MessageBox.Show("URL is mandatory");
+                MessageBox.Show("Server URL is mandatory");
                 return false;
             }
 
@@ -238,25 +238,25 @@ namespace KS2Drive.Config
             }
             catch
             {
-                MessageBox.Show("The selected URL is not valid");
+                MessageBox.Show("Server URL is not valid");
                 return false;
             }
 
             if (String.IsNullOrEmpty(txtLogin.Text))
             {
-                MessageBox.Show("Server login is mandatory");
+                MessageBox.Show("Server login is missing");
                 return false;
             }
 
-            if (String.IsNullOrEmpty(txtPassword.Password))
+            if (mount && String.IsNullOrEmpty(txtPassword.Password))
             {
-                MessageBox.Show("Server password is mandatory");
+                MessageBox.Show("Server password is missing");
                 return false;
             }
 
             if (((bool)chk_AutoStart.IsChecked || (bool)chk_AutoMount.IsChecked) && !(bool)Chk_RememberPassword.IsChecked)
             {
-                MessageBox.Show("Cannot Auto-mount or mount on start without remembering password.");
+                MessageBox.Show("Cannot auto-mount or mount on start without remembering password.");
                 return false;
             }
 
@@ -404,7 +404,7 @@ namespace KS2Drive.Config
         private void bt_mountConfiguration_Click(object sender, RoutedEventArgs e)
         {
             // Save before mounting.
-            if(this.SaveConfiguration(sender, e))
+            if(this.SaveConfiguration(sender, e, true))
             {
                 main.MountDrive(CurrentConfiguration);
                 UpdateMountButton();
