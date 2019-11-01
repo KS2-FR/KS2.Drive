@@ -836,6 +836,12 @@
             <returns>True if a reparse point was found, false otherwise.</returns>
             <seealso cref="M:Fsp.FileSystemBase.GetSecurityByName(System.String,System.UInt32@,System.Byte[]@)"/>
         </member>
+        <member name="M:Fsp.FileSystemBase.MakeReparsePoint(System.IntPtr,System.UInt32)">
+            <summary>
+            Makes a byte array that contains a reparse point.
+            </summary>
+            <returns>The reparse point byte array.</returns>
+        </member>
         <member name="M:Fsp.FileSystemBase.GetReparseTag(System.Byte[])">
             <summary>
             Gets the reparse tag from reparse data.
@@ -909,6 +915,31 @@
             Gets or sets the file information timeout.
             </summary>
         </member>
+        <member name="P:Fsp.FileSystemHost.VolumeInfoTimeout">
+            <summary>
+            Gets or sets the volume information timeout.
+            </summary>
+        </member>
+        <member name="P:Fsp.FileSystemHost.DirInfoTimeout">
+            <summary>
+            Gets or sets the directory information timeout.
+            </summary>
+        </member>
+        <member name="P:Fsp.FileSystemHost.SecurityTimeout">
+            <summary>
+            Gets or sets the security information timeout.
+            </summary>
+        </member>
+        <member name="P:Fsp.FileSystemHost.StreamInfoTimeout">
+            <summary>
+            Gets or sets the stream information timeout.
+            </summary>
+        </member>
+        <member name="P:Fsp.FileSystemHost.EaTimeout">
+            <summary>
+            Gets or sets the EA information timeout.
+            </summary>
+        </member>
         <member name="P:Fsp.FileSystemHost.CaseSensitiveSearch">
             <summary>
             Gets or sets a value that determines whether the file system is case sensitive.
@@ -944,6 +975,11 @@
         <member name="P:Fsp.FileSystemHost.NamedStreams">
             <summary>
             Gets or sets a value that determines whether the file system supports named streams.
+            </summary>
+        </member>
+        <member name="P:Fsp.FileSystemHost.ExtendedAttributes">
+            <summary>
+            Gets or sets a value that determines whether the file system supports extended attributes.
             </summary>
         </member>
         <member name="P:Fsp.FileSystemHost.Prefix">
@@ -988,7 +1024,34 @@
             A value of 0 disables all debug logging.
             A value of -1 enables all debug logging.
             </param>
-            <returns></returns>
+            <returns>STATUS_SUCCESS or error code.</returns>
+        </member>
+        <member name="M:Fsp.FileSystemHost.MountEx(System.String,System.UInt32,System.Byte[],System.Boolean,System.UInt32)">
+            <summary>
+            Mounts a file system.
+            </summary>
+            <param name="MountPoint">
+            The mount point for the new file system. A value of null means that
+            the file system should use the next available drive letter counting
+            downwards from Z: as its mount point.
+            </param>
+            <param name="ThreadCount">
+            Number of threads to use to service file system requests. A value
+            of 0 means that the default number of threads should be used.
+            </param>
+            <param name="SecurityDescriptor">
+            Security descriptor to use if mounting on (newly created) directory.
+            A value of null means the directory should be created with default
+            security.
+            </param>
+            <param name="Synchronized">
+            If true file system operations are synchronized using an exclusive lock.
+            </param>
+            <param name="DebugLog">
+            A value of 0 disables all debug logging.
+            A value of -1 enables all debug logging.
+            </param>
+            <returns>STATUS_SUCCESS or error code.</returns>
         </member>
         <member name="M:Fsp.FileSystemHost.Unmount">
             <summary>
@@ -1020,6 +1083,56 @@
             <summary>
             Return the installed version of WinFsp.
             </summary>
+        </member>
+        <member name="M:Fsp.FileSystemHost.GetOperationRequestHint">
+            <summary>
+            Returns a RequestHint to reference the current operation asynchronously.
+            </summary>
+        </member>
+        <member name="M:Fsp.FileSystemHost.SendReadResponse(System.UInt64,System.Int32,System.UInt32)">
+            <summary>
+            Asynchronously complete a Read operation.
+            </summary>
+            <param name="RequestHint">
+            A reference to the operation to complete.
+            </param>
+            <param name="Status">
+            STATUS_SUCCESS or error code.
+            </param>
+            <param name="BytesTransferred">
+            Number of bytes read.
+            </param>
+        </member>
+        <member name="M:Fsp.FileSystemHost.SendWriteResponse(System.UInt64,System.Int32,System.UInt32,Fsp.Interop.FileInfo@)">
+            <summary>
+            Asynchronously complete a Write operation.
+            </summary>
+            <param name="RequestHint">
+            A reference to the operation to complete.
+            </param>
+            <param name="Status">
+            STATUS_SUCCESS or error code.
+            </param>
+            <param name="BytesTransferred">
+            The number of bytes written.
+            </param>
+            <param name="FileInfo">
+            Updated file information.
+            </param>
+        </member>
+        <member name="M:Fsp.FileSystemHost.SendReadDirectoryResponse(System.UInt64,System.Int32,System.UInt32)">
+            <summary>
+            Asynchronously complete a ReadDirectory operation.
+            </summary>
+            <param name="RequestHint">
+            A reference to the operation to complete.
+            </param>
+            <param name="Status">
+            STATUS_SUCCESS or error code.
+            </param>
+            <param name="BytesTransferred">
+            Number of bytes read.
+            </param>
         </member>
         <member name="T:Fsp.Interop.VolumeInfo">
             <summary>
@@ -1097,6 +1210,11 @@
             <summary>
             The number of hard links.
             Not currently implemented. Set to 0.
+            </summary>
+        </member>
+        <member name="P:Fsp.Interop.FileInfo.EaSize">
+            <summary>
+            The extended attribute size of the file.
             </summary>
         </member>
         <member name="T:Fsp.Service">
