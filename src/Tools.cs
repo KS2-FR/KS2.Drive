@@ -1,10 +1,12 @@
 ﻿using KS2Drive.Config;
+using Microsoft.Win32;
 using System;
 using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Linq;
 
 namespace KS2Drive
 {
@@ -65,6 +67,29 @@ namespace KS2Drive
             }
 
             return null;
+        }
+
+        public static bool IsMsiIntalled(String ProductCode)
+        {
+            // search in: CurrentUser
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+            {
+                if (key.GetSubKeyNames().FirstOrDefault(x => x.Equals(ProductCode)) != null) return true;
+            }
+
+            // search in: LocalMachine_32
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+            {
+                if (key.GetSubKeyNames().FirstOrDefault(x => x.Equals(ProductCode)) != null) return true;
+            }
+
+            // search in: LocalMachine_64
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"))
+            {
+                if (key.GetSubKeyNames().FirstOrDefault(x => x.Equals(ProductCode)) != null) return true;
+            }
+
+            return false;
         }
     }
 }

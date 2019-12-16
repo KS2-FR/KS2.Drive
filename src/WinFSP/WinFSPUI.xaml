@@ -5,25 +5,29 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KS2Drive.WinFSP"
-        mc:Ignorable="d" TitlebarHeight="0"
-        Height="155" Width="530" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False" WindowStyle="None">
-	<StackPanel>
-		<RichTextBox Padding="10" IsReadOnly="True" IsDocumentEnabled="True" BorderThickness="0">
-            <FlowDocument>
-                <Paragraph FontSize="16" TextAlignment="Center">
-                    <Run Text="KS² Drive"/>
-                </Paragraph>
-                <Paragraph FontSize="12" TextAlignment="Center">
-                    <Run Text="Failed to start WinFSP Service. Please ensure you have installed version 2018.2 B1 or superior"></Run>
-                </Paragraph>
-                <Paragraph FontSize="12" TextAlignment="Center">
-                    <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases">
-                        <Run Text="Click here to download"/>
-                    </Hyperlink>
-                </Paragraph>
-            </FlowDocument>
-        </RichTextBox>
+        mc:Ignorable="d"
+        Height="255" Width="550" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False" WindowStyle="None" Closing="MetroWindow_Closing">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"></ColumnDefinition>
+            <ColumnDefinition Width="*"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition Height="35"></RowDefinition>
+        </Grid.RowDefinitions>
 
-		<Button Content="Close" Margin="10" Click="Button_Click"></Button>
-	</StackPanel>
+        <StackPanel x:Name="InstallPanel" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2">
+        <Label x:Name="InstallWinFSP" Visibility="Visible" Margin="10" HorizontalAlignment="Center" FontSize="16"></Label>
+        </StackPanel>
+        <StackPanel x:Name="InstallingPanel" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,50,0,0" Visibility="Hidden">
+            <Label FontSize="18" HorizontalAlignment="Center">Installing</Label>
+        <ProgressBar  x:Name="InstallingWinFSP" Visibility="Visible" Height="25" Margin="10" IsIndeterminate="True"></ProgressBar>
+        </StackPanel>
+
+        <Button Grid.Row="1" Grid.Column="0" Content="Install" Margin="5" x:Name="btn_Install" Click="Btn_Install_Click"></Button>
+        <Button Grid.Row="1" Grid.Column="1" Content="Quit" Margin="5" x:Name="bt_Quit" Click="Bt_Quit_Click"></Button>
+    </Grid>
+    
+
 </UserControl:MetroWindow>

@@ -21,6 +21,11 @@ namespace KS2Drive
         private Configuration AppConfiguration;
         public ObservableCollection<LogListItem> ItemsToLog = new ObservableCollection<LogListItem>();
 
+        //Set the WinFSP version against which the program was built (see /Reference folder in source)
+        //Installer ProductCode (can be extracted from MSI file with superorca http://www.pantaray.com/msi_super_orca.html)
+        //Installer URL
+        //WinFSP Version Name
+        private (String MsiProductCode, String PackageURL, String VersionName) RequiredWinFSP = ("{634630BA-B57E-44F1-9292-6AE199678717}", "https://github.com/billziss-gh/winfsp/releases/download/v1.5B4/winfsp-1.5.19320.msi", "WinFSP 2019.3 B4");
         private System.Windows.Forms.NotifyIcon AppNotificationIcon;
         private ContextMenu AppMenu;
 
@@ -34,6 +39,18 @@ namespace KS2Drive
             ((MenuItem)AppMenu.Items[0]).IsEnabled = AppConfiguration.IsConfigured;
 
             this.Hide();
+
+            //Check installed WinFSP version
+            if (!Tools.IsMsiIntalled(RequiredWinFSP.MsiProductCode))
+            {
+                WinFSPUI Dialog = new WinFSPUI(RequiredWinFSP);
+                var DialogResult = Dialog.ShowDialog();
+                if (!DialogResult.HasValue || !DialogResult.Value)
+                {
+                    QuitApp();
+                    return;
+                }
+            }
 
             #region Window events
 
@@ -56,6 +73,8 @@ namespace KS2Drive
             AppNotificationIcon.MouseClick += (s, e) => { this.Dispatcher.Invoke(() => { AppMenu.IsOpen = !AppMenu.IsOpen; }); };
 
             #endregion
+
+            LogList.ItemsSource = ItemsToLog;
 
             #region Try to start WinFSP Service
 
@@ -90,15 +109,12 @@ namespace KS2Drive
             }
             catch
             {
-                var MB = new WinFSPUI();
-                MB.ShowDialog();
+                MessageBox.Show("Cannot start WinFSP service. KS² Drive will now close", "", MessageBoxButton.OK, MessageBoxImage.Error);
                 QuitApp();
                 return;
             }
 
             #endregion
-
-            LogList.ItemsSource = ItemsToLog;
 
             Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"KS² Drive has started", System.Windows.Forms.ToolTipIcon.Info));
 
@@ -162,8 +178,11 @@ namespace KS2Drive
         /// </summary>
         private void QuitApp()
         {
-            AppNotificationIcon.Visible = false;
-            AppNotificationIcon.Dispose();
+            if (AppNotificationIcon != null)
+            {
+                AppNotificationIcon.Visible = false;
+                AppNotificationIcon.Dispose();
+            }
             Service?.Stop();
             Application.Current.Shutdown();
         }
