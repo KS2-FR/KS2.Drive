@@ -18,6 +18,8 @@ namespace KS2Drive.WinFSP
         private CancellationTokenSource CTS;
         private CancellationToken CT;
 
+        public bool IsInstallSuccessFull { get; set; } = false;
+
         public WinFSPUI((String MsiProductCode, String PackageURL, String VersionName) RequiredWinFSP)
         {
             InitializeComponent();
@@ -33,18 +35,22 @@ namespace KS2Drive.WinFSP
             this.Close();
         }
 
+        private void MetroWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            CTS.Cancel();
+        }
+
         private async void Btn_Install_Click(object sender, RoutedEventArgs e)
         {
             InstallPanel.Visibility = Visibility.Hidden;
             InstallingPanel.Visibility = Visibility.Visible;
             btn_Install.IsEnabled = false;
 
-            var InstallResult = await IntallWinFSPAsync();
-            this.DialogResult = InstallResult;
+            await IntallWinFSPAsync();
             this.Close();
         }
 
-        private async Task<bool> IntallWinFSPAsync()
+        private async Task IntallWinFSPAsync()
         {
             try
             {
@@ -64,7 +70,7 @@ namespace KS2Drive.WinFSP
                         InstallProcess.WaitForExit();
                         var ExitCode = InstallProcess.ExitCode;
                         File.Delete(TemporaryFilePath);
-                        return ExitCode == 0;
+                        IsInstallSuccessFull = true;
                     }
                 }
             }
@@ -77,12 +83,6 @@ namespace KS2Drive.WinFSP
             {
                 MessageBox.Show("An error occur when installing WinFSP");
             }
-            return false;
-        }
-
-        private void MetroWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-           CTS.Cancel();
         }
     }
 }

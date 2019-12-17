@@ -44,8 +44,8 @@ namespace KS2Drive
             if (!Tools.IsMsiIntalled(RequiredWinFSP.MsiProductCode))
             {
                 WinFSPUI Dialog = new WinFSPUI(RequiredWinFSP);
-                var DialogResult = Dialog.ShowDialog();
-                if (!DialogResult.HasValue || !DialogResult.Value)
+                Dialog.ShowDialog();
+                if (!Dialog.IsInstallSuccessFull)
                 {
                     QuitApp();
                     return;
