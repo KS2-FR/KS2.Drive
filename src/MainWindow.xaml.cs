@@ -25,7 +25,7 @@ namespace KS2Drive
         //Installer ProductCode (can be extracted from MSI file with superorca http://www.pantaray.com/msi_super_orca.html)
         //Installer URL
         //WinFSP Version Name
-        private (String MsiProductCode, String PackageURL, String VersionName) RequiredWinFSP = ("{634630BA-B57E-44F1-9292-6AE199678717}", "https://github.com/billziss-gh/winfsp/releases/download/v1.5B4/winfsp-1.5.19320.msi", "WinFSP 2019.3 B4");
+        private (String MsiProductCode, String PackageURL, String VersionName) RequiredWinFSP = ("{4EE1629A-41FB-4261-847A-C12B466B017D}", "https://github.com/billziss-gh/winfsp/releases/download/v1.5/winfsp-1.5.20002.msi", "WinFsp 2019.3");
         private System.Windows.Forms.NotifyIcon AppNotificationIcon;
         private ContextMenu AppMenu;
 
