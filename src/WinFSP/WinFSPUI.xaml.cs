@@ -70,7 +70,7 @@ namespace KS2Drive.WinFSP
                         InstallProcess.WaitForExit();
                         var ExitCode = InstallProcess.ExitCode;
                         File.Delete(TemporaryFilePath);
-                        IsInstallSuccessFull = true;
+                        if(ExitCode == 0) IsInstallSuccessFull = true;
                     }
                 }
             }

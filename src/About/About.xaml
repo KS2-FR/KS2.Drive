@@ -10,19 +10,13 @@
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
-                <Paragraph FontSize="30" Margin="0">KS² Drive - 0.8.5.1</Paragraph>
+                <Paragraph FontSize="30" Margin="0">KS² Drive - 0.8.5.2</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a webDAV / AOS server as a local drive.</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.</Paragraph>
 
                 <Paragraph FontSize="24" Margin="0,30,0,0">Usage</Paragraph>
 
                 <List MarkerStyle="Box" >
-                    <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">
-                            <Hyperlink NavigateUri="https://github.com/billziss-gh/winfsp/releases" RequestNavigate="Hyperlink_RequestNavigate">Install the 2018.2 B2 release of WinFSP or superior</Hyperlink>
-                        </Paragraph>
-                        
-                    </ListItem>
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">
                             <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive/releases/download/0.8/setup.exe" RequestNavigate="Hyperlink_RequestNavigate">Download the setup program</Hyperlink>
