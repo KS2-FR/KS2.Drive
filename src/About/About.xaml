@@ -12,7 +12,7 @@
             <FlowDocument>
                 <Paragraph FontSize="35" Margin="0">
                     <InlineUIContainer>
-                        <Image Margin="0,5,0,-18" Stretch="Fill" Width="60" Height="60" Source="/KS2Drive;component/logo.svg.png"/>
+                        <Image Margin="0,5,0,-18" Stretch="Fill" Width="60" Height="60" Source="/KS2Drive;component/ru-logo.png"/>
                     </InlineUIContainer> Yoda Drive - 0.2.6.2
                 </Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a Yoda drive as a local drive.</Paragraph>
