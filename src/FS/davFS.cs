@@ -1360,7 +1360,15 @@ namespace KS2Drive.FS
                         {
                             if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0 && WebDAVMode == WebDAVMode.AOS)
                             {
-                                Proxy.DeleteFile(FileNode.ConvertLocalPathToRepositoryPath(NewFileName));
+                                //The target must be deleted before the MOVE is sent: wait for the deletion to complete.
+                                //A 404 means it is already gone, which is what we want
+                                try
+                                {
+                                    Proxy.DeleteFile(FileNode.ConvertLocalPathToRepositoryPath(NewFileName)).GetAwaiter().GetResult();
+                                }
+                                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
+                                {
+                                }
                                 Cache.DeleteFileEntry(NewFileName);
                             }
                             else
