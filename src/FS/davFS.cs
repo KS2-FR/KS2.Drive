@@ -1782,14 +1782,14 @@ namespace KS2Drive.FS
         /// When <paramref name="SetAllocationSize"/> is <c>true</c>, reallocates <c>FileData</c>
         /// to <paramref name="NewSize"/> bytes (keeping existing data, truncating <c>FileSize</c> if needed). Otherwise changes
         /// <c>FileSize</c>, growing the allocation to the next allocation unit if necessary and zero-filling the extended range.
-        /// Exceptions are logged and swallowed.
         /// </summary>
         /// <param name="FileNode">Node to resize.</param>
         /// <param name="NewSize">New allocation size or file size.</param>
         /// <param name="SetAllocationSize"><c>true</c> to set the allocation size, <c>false</c> to set the file size.</param>
-        /// <returns><c>STATUS_SUCCESS</c> (also when an exception was swallowed), <c>STATUS_DISK_FULL</c> if the size exceeds the maximum
-        /// file size, <c>STATUS_INSUFFICIENT_RESOURCES</c> if the buffer cannot be allocated, or <c>STATUS_NETWORK_UNREACHABLE</c>
-        /// if the content had to be downloaded and the download failed.</returns>
+        /// <returns><c>STATUS_SUCCESS</c>, <c>STATUS_DISK_FULL</c> if the size exceeds the maximum file size,
+        /// <c>STATUS_INSUFFICIENT_RESOURCES</c> if the buffer cannot be allocated, <c>STATUS_NETWORK_UNREACHABLE</c> if the content
+        /// had to be downloaded and the download failed, or <c>STATUS_UNEXPECTED_IO_ERROR</c> on any other error (logged).
+        /// On error the file size and content are left unchanged.</returns>
         private Int32 SetFileSizeInternal(
             FileNode FileNode,
             UInt64 NewSize,
@@ -1851,7 +1851,10 @@ namespace KS2Drive.FS
             }
             catch (Exception ex)
             {
+                //Report the failure instead of pretending the file was resized: callers would otherwise write into
+                //or upload a buffer that does not have the expected size
                 logger.Error($"{FileNode.ObjectId} SetFileSizeInternal {ex.Message} {ex.StackTrace}");
+                return (ex is OutOfMemoryException || ex is OverflowException) ? STATUS_INSUFFICIENT_RESOURCES : STATUS_UNEXPECTED_IO_ERROR;
             }
 
             return STATUS_SUCCESS;
