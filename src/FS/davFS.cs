@@ -1013,7 +1013,7 @@ namespace KS2Drive.FS
         /// <param name="Offset">Offset in the file where reading starts.</param>
         /// <param name="Length">Number of bytes requested.</param>
         /// <param name="BytesTransferred">Receives the number of bytes copied.</param>
-        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_END_OF_FILE</c> if <paramref name="Offset"/> is past the end of the data;
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_END_OF_FILE</c> if <paramref name="Offset"/> is past the end of the file (<c>FileInfo.FileSize</c>);
         /// <c>STATUS_NETWORK_UNREACHABLE</c> if the download fails (including 401).</returns>
         public override Int32 Read(
             Object FileNode0,
@@ -1045,7 +1045,9 @@ namespace KS2Drive.FS
                     return STATUS_END_OF_FILE;
                 }
 
-                UInt64 FileSize = (UInt64)CFN.FileData.LongLength;
+                //The buffer can be larger than the file (it is rounded up to the allocation size after a write or resize):
+                //the logical end of the file is FileInfo.FileSize, the buffer length is only an upper bound
+                UInt64 FileSize = Math.Min(CFN.FileInfo.FileSize, (UInt64)CFN.FileData.LongLength);
 
                 if (Offset >= FileSize)
                 {
