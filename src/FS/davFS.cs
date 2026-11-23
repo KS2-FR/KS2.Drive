@@ -29,8 +29,19 @@ namespace KS2Drive.FS
     public class DavFS : FileSystemBase
     {
         public event EventHandler<LogListItem> RepositoryActionPerformed;
+
+        /// <summary>
+        /// Raised at most once per mount, the first time the server rejects the credentials (HTTP 401).
+        /// Handlers must not unmount the drive synchronously: the event is raised from inside a WinFSP callback.
+        /// </summary>
         public event EventHandler RepositoryAuthenticationFailed;
         private static Logger logger = LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Set to 1 once <see cref="RepositoryAuthenticationFailed"/> has been raised, so that parallel operations
+        /// failing with a 401 do not notify the application several times.
+        /// </summary>
+        private Int32 AuthenticationFailureNotified = 0;
 
         private UInt32 MaxFileNodes;
         private UInt32 MaxFileSize;
@@ -162,7 +173,7 @@ namespace KS2Drive.FS
         /// <c>desktop.ini</c> and <c>autorun.inf</c> are always reported as missing. Otherwise the node is looked up in the cache;
         /// if unknown, it is fetched from the repository and added to the cache, and a missing element is recorded in the cache as
         /// non-existent so later lookups do not hit the server. On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised
-        /// and the cache is cleared.
+        /// (once per mount).
         /// </summary>
         /// <param name="FileName">Local path of the file (relative to the volume root).</param>
         /// <param name="FileAttributes">Receives the file attributes.</param>
@@ -207,8 +218,7 @@ namespace KS2Drive.FS
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
+                        OnAuthenticationFailed();
                         FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
@@ -267,7 +277,7 @@ namespace KS2Drive.FS
         /// WinFSP callback that opens an existing file or directory. The node is taken from the cache or, if unknown, fetched from the
         /// repository and cached (missing elements are cached as non-existent). The node's open handle count is incremented.
         /// File contents are not downloaded here; they are downloaded lazily by <see cref="Read"/>.
-        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised and the cache is cleared.
+        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised (once per mount).
         /// </summary>
         /// <param name="FileName">Local path of the file to open.</param>
         /// <param name="FileNode0">Receives the <see cref="FileNode"/> used as file context by subsequent callbacks.</param>
@@ -317,8 +327,7 @@ namespace KS2Drive.FS
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
+                        OnAuthenticationFailed();
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
                     catch (WebDAVException ex)
@@ -421,7 +430,7 @@ namespace KS2Drive.FS
         /// content is obtained from <see cref="CacheManager.GetFolderContent"/> (which may query the server) starting after
         /// <paramref name="Marker"/>, and an enumerator is stored in <paramref name="Context"/>; subsequent calls advance that enumerator.
         /// <paramref name="Pattern"/> is not applied. If the listing fails with a 401, <see cref="RepositoryAuthenticationFailed"/> is raised
-        /// and the cache is cleared.
+        /// (once per mount).
         /// </summary>
         /// <param name="FileNode0">The directory node.</param>
         /// <param name="Context">Enumeration state (<see cref="DirectoryEnumeratorContext"/>) kept between calls.</param>
@@ -453,8 +462,7 @@ namespace KS2Drive.FS
                 {
                     if (Result.ErrorMessage == "401")
                     {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
+                        OnAuthenticationFailed();
                     }
                     DebugEnd(OperationId.ToString(), CFN, $"Exception : {Result.ErrorMessage}");
                     FileName = default(String);
@@ -509,7 +517,7 @@ namespace KS2Drive.FS
         /// already exist, then either uploads an empty file (marked as having unflushed data) or creates the folder, re-reads the
         /// created element from the repository, adds it to the cache and increments its open handle count.
         /// <paramref name="AllocationSize"/>, <paramref name="SecurityDescriptor"/> and <paramref name="CreateOptions"/> are ignored.
-        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised and the cache is cleared.
+        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised (once per mount).
         /// </summary>
         /// <param name="FileName">Local path of the element to create.</param>
         /// <param name="FileAttributes">Attributes requested; only the Directory flag is used to choose between file and folder creation.</param>
@@ -555,8 +563,7 @@ namespace KS2Drive.FS
             }
             catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
             {
-                RepositoryAuthenticationFailed?.Invoke(this, null);
-                Cache.Clear();
+                OnAuthenticationFailed();
                 return STATUS_NETWORK_UNREACHABLE;
             }
             catch (HttpRequestException)
@@ -615,8 +622,7 @@ namespace KS2Drive.FS
                 }
                 catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                 {
-                    RepositoryAuthenticationFailed?.Invoke(this, null);
-                    Cache.Clear();
+                    OnAuthenticationFailed();
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException)
@@ -662,8 +668,7 @@ namespace KS2Drive.FS
                 }
                 catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                 {
-                    RepositoryAuthenticationFailed?.Invoke(this, null);
-                    Cache.Clear();
+                    OnAuthenticationFailed();
                     return STATUS_NETWORK_UNREACHABLE;
                 }
                 catch (WebDAVException)
@@ -745,8 +750,8 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// WinFSP callback invoked when an existing file is opened with overwrite/supersede semantics. Resizes the in-memory
-        /// allocation to <paramref name="AllocationSize"/>, replaces or merges the attributes (always adding Archive), resets the
+        /// WinFSP callback invoked when an existing file is opened with overwrite/supersede semantics. Discards the in-memory
+        /// content (nothing is downloaded), allocates an empty buffer of <paramref name="AllocationSize"/> bytes, replaces or merges the attributes (always adding Archive), resets the
         /// file size to 0 and updates the timestamps. Only the local node is changed; nothing is sent to the server here.
         /// </summary>
         /// <returns><c>STATUS_SUCCESS</c>, the error returned by <see cref="SetFileSizeInternal"/>, or <c>STATUS_UNEXPECTED_IO_ERROR</c> on exception.</returns>
@@ -768,6 +773,11 @@ namespace KS2Drive.FS
 
                 try
                 {
+                    //The previous content is discarded: start from an empty file instead of downloading or copying the old content
+                    CFN.FileData = null;
+                    CFN.FileInfo.FileSize = 0;
+                    CFN.FileInfo.AllocationSize = 0;
+
                     Int32 Result = SetFileSizeInternal(CFN, AllocationSize, true);
                     if (Result < 0)
                     {
@@ -855,7 +865,6 @@ namespace KS2Drive.FS
                                 var Proxy = new WebDavClient2();
                                 if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                                 {
-                                    CFN.GenerateLocalCopy();
                                     throw new Exception("Upload failed");
                                 }
                             }
@@ -864,13 +873,16 @@ namespace KS2Drive.FS
                             RepositoryActionPerformed?.Invoke(this, L);
                             DebugEnd(OperationId, null, "STATUS_SUCCESS");
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
+                            //Whatever the failure (refused upload, network error, 401...), keep a local copy so the user can recover the data
+                            if (CFN.FileData != null) CFN.GenerateLocalCopy();
+                            if (IsAuthenticationError(ex)) OnAuthenticationFailed();
                             L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Close Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
                             RepositoryActionPerformed?.Invoke(this, L);
                             //Cache.DeleteFileNode(CFN); //TODO : ??
                             DebugEnd(OperationId, null, "STATUS_FAILED");
-                            return;
+                            //Do not return here: the handle must still be released below
                         }
                     }
                 }
@@ -934,6 +946,7 @@ namespace KS2Drive.FS
                         }
                         catch (Exception ex)
                         {
+                            if (IsAuthenticationError(ex)) OnAuthenticationFailed();
                             RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Delete", File = CFN.LocalPath, Result = "STATUS_FAILED" });
                             DebugEnd(OperationId, CFN, $"Exception : {ex.Message}");
                         }
@@ -951,8 +964,9 @@ namespace KS2Drive.FS
                             RepositoryActionPerformed?.Invoke(this, L);
                             DebugEnd(OperationId, null, "STATUS_SUCCESS");
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
+                            if (IsAuthenticationError(ex)) OnAuthenticationFailed();
                             L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Delete", File = CFN.LocalPath, Result = "STATUS_FAILED" };
                             RepositoryActionPerformed?.Invoke(this, L);
                             DebugEnd(OperationId, null, "STATUS_FAILED");
@@ -972,7 +986,6 @@ namespace KS2Drive.FS
                                 {
                                     if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                                     {
-                                        CFN.GenerateLocalCopy();
                                         throw new Exception("Upload failed");
                                     }
                                 }
@@ -981,8 +994,11 @@ namespace KS2Drive.FS
                                 RepositoryActionPerformed?.Invoke(this, L);
                                 DebugEnd(OperationId, null, "STATUS_SUCCESS");
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
+                                //Whatever the failure (refused upload, network error, 401...), keep a local copy so the user can recover the data
+                                if (CFN.FileData != null) CFN.GenerateLocalCopy();
+                                if (IsAuthenticationError(ex)) OnAuthenticationFailed();
                                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
                                 RepositoryActionPerformed?.Invoke(this, L);
                                 DebugEnd(OperationId, null, "STATUS_FAILED");
@@ -1044,14 +1060,14 @@ namespace KS2Drive.FS
         /// <summary>
         /// WinFSP callback that reads file content. On the first read of an open node (<c>FileData</c> is null) the whole file is downloaded
         /// from the server and kept in memory; the requested range is then copied from memory into <paramref name="Buffer"/>.
-        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised and the cache is cleared.
+        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised (once per mount).
         /// </summary>
         /// <param name="Buffer">Destination buffer.</param>
         /// <param name="Offset">Offset in the file where reading starts.</param>
         /// <param name="Length">Number of bytes requested.</param>
         /// <param name="BytesTransferred">Receives the number of bytes copied.</param>
         /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_END_OF_FILE</c> if <paramref name="Offset"/> is past the end of the data;
-        /// <c>STATUS_OBJECT_NAME_NOT_FOUND</c> if no content could be obtained; <c>STATUS_NETWORK_UNREACHABLE</c> if the download fails (including 401).</returns>
+        /// <c>STATUS_NETWORK_UNREACHABLE</c> if the download fails (including 401).</returns>
         public override Int32 Read(
             Object FileNode0,
             Object FileDesc,
@@ -1068,37 +1084,18 @@ namespace KS2Drive.FS
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
-                if (CFN.FileData == null)
+                Int32 LoadResult = EnsureContentLoaded(CFN, true);
+                if (LoadResult < 0)
                 {
-                    var Proxy = new WebDavClient2();
-                    try
-                    {
-                        CFN.FileData = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        CFN.FileData = null;
-                        DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception ex)
-                    {
-                        CFN.FileData = null;
-                        DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
+                    DebugEnd(OperationId, CFN, $"Cannot load content : {LoadResult}");
+                    return LoadResult;
                 }
 
                 if (CFN.FileData == null)
                 {
-                    DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_NOT_FOUND");
-                    return STATUS_OBJECT_NAME_NOT_FOUND;
+                    //Defensive: should not happen after a download
+                    DebugEnd(OperationId, CFN, "STATUS_END_OF_FILE");
+                    return STATUS_END_OF_FILE;
                 }
 
                 UInt64 FileSize = (UInt64)CFN.FileData.LongLength;
@@ -1145,7 +1142,8 @@ namespace KS2Drive.FS
         /// truncated to the current file size; otherwise the file is grown as needed (and <paramref name="WriteToEndOfFile"/> appends).
         /// In <see cref="FlushMode.FlushAtWrite"/> mode the whole content (up to <c>FileSize</c>) is uploaded after each write and the node
         /// is invalidated in the cache on failure; in other modes the node is only marked as having unflushed data, to be uploaded at
-        /// <see cref="Cleanup"/>/<see cref="Close"/>. The file content is not downloaded here.
+        /// <see cref="Cleanup"/>/<see cref="Close"/>. If the content is not loaded yet, it is downloaded first so that the bytes outside
+        /// the written range are preserved.
         /// </summary>
         /// <param name="Buffer">Source buffer.</param>
         /// <param name="Offset">Offset in the file where writing starts (ignored if <paramref name="WriteToEndOfFile"/> is set).</param>
@@ -1153,7 +1151,8 @@ namespace KS2Drive.FS
         /// <param name="BytesTransferred">Receives the number of bytes written.</param>
         /// <param name="FileInfo">Receives the updated file information.</param>
         /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_UNEXPECTED_IO_ERROR</c> if the node is deleted, resizing or copying fails, or the upload
-        /// fails; <c>STATUS_ACCESS_DENIED</c> on a WebDAV conflict during upload; <c>STATUS_NETWORK_UNREACHABLE</c> on transport errors.</returns>
+        /// fails; <c>STATUS_ACCESS_DENIED</c> on a WebDAV conflict during upload; <c>STATUS_NETWORK_UNREACHABLE</c> on transport errors,
+        /// on 401, or if the current content cannot be downloaded.</returns>
         public override Int32 Write(
             Object FileNode0,
             Object FileDesc,
@@ -1179,6 +1178,14 @@ namespace KS2Drive.FS
                 DebugStart(OperationId, CFN);
 
                 if (CFN.IsDeleted) return STATUS_UNEXPECTED_IO_ERROR;
+
+                //The bytes that are not overwritten must be kept: load the current content before writing into it
+                Int32 LoadResult = EnsureContentLoaded(CFN);
+                if (LoadResult < 0)
+                {
+                    DebugEnd(OperationId, CFN, $"Cannot load content : {LoadResult}");
+                    return LoadResult;
+                }
 
                 /*
                 CFN.FileData = null;
@@ -1259,6 +1266,14 @@ namespace KS2Drive.FS
                         {
                             throw new Exception();
                         }
+                    }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                    {
+                        OnAuthenticationFailed();
+                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_NETWORK_UNREACHABLE" };
+                        RepositoryActionPerformed?.Invoke(this, L);
+                        DebugEnd(OperationId, CFN, "STATUS_NETWORK_UNREACHABLE");
+                        return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (WebDAVConflictException)
                     {
@@ -1354,7 +1369,7 @@ namespace KS2Drive.FS
         /// <param name="ReplaceIfExists">Whether an existing target may be replaced.</param>
         /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_OBJECT_NAME_COLLISION</c>; <c>STATUS_ACCESS_DENIED</c> if the move is refused or fails;
         /// <c>STATUS_CANNOT_MAKE</c> if the target existence check fails; <c>STATUS_NETWORK_UNREACHABLE</c> on transport errors or 401
-        /// (which also raises <see cref="RepositoryAuthenticationFailed"/> and clears the cache).</returns>
+        /// (which also raises <see cref="RepositoryAuthenticationFailed"/>).</returns>
         public override Int32 Rename(
             Object FileNode0,
             Object FileDesc,
@@ -1409,8 +1424,9 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    if (IsAuthenticationError(ex)) OnAuthenticationFailed();
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_CANNOT_MAKE" };
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, CFN, $"STATUS_CANNOT_MAKE");
@@ -1432,8 +1448,7 @@ namespace KS2Drive.FS
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
+                        OnAuthenticationFailed();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (HttpRequestException)
@@ -1466,8 +1481,7 @@ namespace KS2Drive.FS
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
-                        RepositoryAuthenticationFailed?.Invoke(this, null);
-                        Cache.Clear();
+                        OnAuthenticationFailed();
                         return STATUS_NETWORK_UNREACHABLE;
                     }
                     catch (HttpRequestException)
@@ -1618,7 +1632,7 @@ namespace KS2Drive.FS
 
         /// <summary>
         /// WinFSP callback that changes the file size or the allocation size of the in-memory content through
-        /// <see cref="SetFileSizeInternal"/>. Nothing is sent to the server here.
+        /// <see cref="SetFileSizeInternal"/> (which downloads the content first if it is not loaded). Nothing is sent to the server here.
         /// </summary>
         /// <param name="NewSize">New file size or allocation size.</param>
         /// <param name="SetAllocationSize"><c>true</c> to change the allocation size, <c>false</c> to change the file size.</param>
@@ -1656,7 +1670,45 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Resizes the in-memory content of a node. When <paramref name="SetAllocationSize"/> is <c>true</c>, reallocates <c>FileData</c>
+        /// Makes sure the content of a file node is held in memory (<c>FileData</c>), downloading it from the server if needed.
+        /// Must be called with the node's <c>OperationLock</c> held. Nothing is downloaded if the content is already loaded,
+        /// or if the node is known to be empty (e.g. a file just created or overwritten) and <paramref name="DownloadIfEmpty"/> is false.
+        /// After a download, the file size and allocation size are set to the size of the downloaded content.
+        /// </summary>
+        /// <param name="DownloadIfEmpty">Download even if the node size is 0. Used for reads, because some WebDAV servers do not
+        /// return the content length, in which case a size of 0 does not mean that the file is empty.</param>
+        /// <returns><c>STATUS_SUCCESS</c>, or <c>STATUS_NETWORK_UNREACHABLE</c> if the download failed (including on 401,
+        /// which also raises <see cref="RepositoryAuthenticationFailed"/>).</returns>
+        private Int32 EnsureContentLoaded(FileNode CFN, bool DownloadIfEmpty = false)
+        {
+            if (CFN.FileData != null) return STATUS_SUCCESS;
+            if ((CFN.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0) return STATUS_SUCCESS;
+            if (!DownloadIfEmpty && CFN.FileInfo.FileSize == 0 && CFN.FileInfo.AllocationSize == 0) return STATUS_SUCCESS; //Empty file: nothing to download
+
+            Byte[] Content;
+            try
+            {
+                var Proxy = new WebDavClient2();
+                Content = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                if (IsAuthenticationError(ex)) OnAuthenticationFailed();
+                logger.Trace($"{CFN.ObjectId} Download of {CFN.LocalPath} failed : {ex.Message}");
+                return STATUS_NETWORK_UNREACHABLE;
+            }
+
+            if (Content == null) return STATUS_NETWORK_UNREACHABLE;
+
+            CFN.FileData = Content;
+            CFN.FileInfo.FileSize = (UInt64)Content.LongLength;
+            CFN.FileInfo.AllocationSize = (UInt64)Content.LongLength;
+            return STATUS_SUCCESS;
+        }
+
+        /// <summary>
+        /// Resizes the in-memory content of a node, loading it from the server first if needed (see <see cref="EnsureContentLoaded"/>).
+        /// When <paramref name="SetAllocationSize"/> is <c>true</c>, reallocates <c>FileData</c>
         /// to <paramref name="NewSize"/> bytes (keeping existing data, truncating <c>FileSize</c> if needed). Otherwise changes
         /// <c>FileSize</c>, growing the allocation to the next allocation unit if necessary and zero-filling the extended range.
         /// Exceptions are logged and swallowed.
@@ -1665,12 +1717,17 @@ namespace KS2Drive.FS
         /// <param name="NewSize">New allocation size or file size.</param>
         /// <param name="SetAllocationSize"><c>true</c> to set the allocation size, <c>false</c> to set the file size.</param>
         /// <returns><c>STATUS_SUCCESS</c> (also when an exception was swallowed), <c>STATUS_DISK_FULL</c> if the size exceeds the maximum
-        /// file size, or <c>STATUS_INSUFFICIENT_RESOURCES</c> if the buffer cannot be allocated.</returns>
+        /// file size, <c>STATUS_INSUFFICIENT_RESOURCES</c> if the buffer cannot be allocated, or <c>STATUS_NETWORK_UNREACHABLE</c>
+        /// if the content had to be downloaded and the download failed.</returns>
         private Int32 SetFileSizeInternal(
             FileNode FileNode,
             UInt64 NewSize,
             Boolean SetAllocationSize)
         {
+            //Resizing keeps the existing content: it must be loaded first
+            Int32 LoadResult = EnsureContentLoaded(FileNode);
+            if (LoadResult < 0) return LoadResult;
+
             try
             {
                 if (SetAllocationSize)
@@ -1936,6 +1993,28 @@ namespace KS2Drive.FS
         {
             Cache.Clear();
             base.Unmounted(Host);
+        }
+
+        /// <summary>
+        /// Notifies the application that the server rejected the credentials (HTTP 401). Only the first call per mount
+        /// raises <see cref="RepositoryAuthenticationFailed"/>; the application is then expected to unmount the drive.
+        /// The cache is left untouched: it is cleared by <see cref="Unmounted"/>.
+        /// </summary>
+        private void OnAuthenticationFailed()
+        {
+            if (Interlocked.Exchange(ref AuthenticationFailureNotified, 1) == 0)
+            {
+                logger.Warn("The server rejected the credentials (HTTP 401)");
+                RepositoryAuthenticationFailed?.Invoke(this, null);
+            }
+        }
+
+        /// <summary>
+        /// Returns true if the exception is a WebDAV error caused by rejected credentials (HTTP 401).
+        /// </summary>
+        private static bool IsAuthenticationError(Exception ex)
+        {
+            return ex is WebDAVException WebDAVEx && WebDAVEx.GetHttpCode() == 401;
         }
 
         /// <summary>

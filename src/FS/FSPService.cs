@@ -41,23 +41,59 @@ namespace KS2Drive
         public void Mount(Configuration config)
         {
             davFs = new DavFS(config);
-            davFs.RepositoryActionPerformed += (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
-            davFs.RepositoryAuthenticationFailed += (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
+            davFs.RepositoryActionPerformed += DavFs_RepositoryActionPerformed;
+            davFs.RepositoryAuthenticationFailed += DavFs_RepositoryAuthenticationFailed;
 
             Host = new FileSystemHost(davFs);
-            if (Host.Mount($"{config.DriveLetter}:", null, config.SyncOps, 0) < 0) throw new IOException("cannot mount file system");
+            if (Host.Mount($"{config.DriveLetter}:", null, config.SyncOps, 0) < 0)
+            {
+                Host.Dispose();
+                Host = null;
+                DetachFileSystem();
+                throw new IOException("cannot mount file system");
+            }
         }
 
         /// <summary>
-        /// Unmounts the file system and releases the WinFSP host.
+        /// Unmounts the file system and releases the WinFSP host. Does nothing if no file system is mounted.
+        /// Events are detached only after the unmount, so that failures reported by the last cleanup/close operations still reach the UI.
         /// </summary>
         public void Unmount()
         {
-            davFs.RepositoryActionPerformed -= (s, e) => { RepositoryActionPerformed?.Invoke(s, e); };
-            davFs.RepositoryAuthenticationFailed -= (s, e) => { RepositoryAuthenticationFailed?.Invoke(s, e); };
+            if (Host != null)
+            {
+                Host.Unmount();
+                Host = null;
+            }
 
-            Host.Unmount();
-            Host = null;
+            DetachFileSystem();
+        }
+
+        /// <summary>
+        /// Detaches the event handlers from the current <see cref="DavFS"/> instance and releases it.
+        /// </summary>
+        private void DetachFileSystem()
+        {
+            if (davFs == null) return;
+            davFs.RepositoryActionPerformed -= DavFs_RepositoryActionPerformed;
+            davFs.RepositoryAuthenticationFailed -= DavFs_RepositoryAuthenticationFailed;
+            davFs = null;
+        }
+
+        /// <summary>
+        /// Relays <see cref="DavFS.RepositoryActionPerformed"/> to <see cref="RepositoryActionPerformed"/>.
+        /// </summary>
+        private void DavFs_RepositoryActionPerformed(object sender, LogListItem e)
+        {
+            RepositoryActionPerformed?.Invoke(sender, e);
+        }
+
+        /// <summary>
+        /// Relays <see cref="DavFS.RepositoryAuthenticationFailed"/> to <see cref="RepositoryAuthenticationFailed"/>.
+        /// </summary>
+        private void DavFs_RepositoryAuthenticationFailed(object sender, EventArgs e)
+        {
+            RepositoryAuthenticationFailed?.Invoke(sender, e);
         }
 
         /// <summary>

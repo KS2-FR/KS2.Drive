@@ -268,15 +268,20 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Writes <see cref="FileData"/> to a temporary file (created on first call) so that the content is not lost
-        /// when it cannot be uploaded. On failure, <see cref="TemporaryLocalCopyPath"/> is set to null.
+        /// Writes the first <c>FileInfo.FileSize</c> bytes of <see cref="FileData"/> (the buffer may be larger, rounded up to the
+        /// allocation size) to a temporary file (created on first call) so that the content is not lost when it cannot be uploaded.
+        /// On failure, <see cref="TemporaryLocalCopyPath"/> is set to null.
         /// </summary>
         internal void GenerateLocalCopy()
         {
-            if (String.IsNullOrEmpty(TemporaryLocalCopyPath)) TemporaryLocalCopyPath = System.IO.Path.GetTempFileName();
             try
             {
-                System.IO.File.WriteAllBytes(TemporaryLocalCopyPath, FileData);
+                if (String.IsNullOrEmpty(TemporaryLocalCopyPath)) TemporaryLocalCopyPath = System.IO.Path.GetTempFileName();
+                int Length = (int)Math.Min((UInt64)FileData.LongLength, FileInfo.FileSize);
+                using (var Stream = new System.IO.FileStream(TemporaryLocalCopyPath, System.IO.FileMode.Create, System.IO.FileAccess.Write))
+                {
+                    Stream.Write(FileData, 0, Length);
+                }
             }
             catch
             {

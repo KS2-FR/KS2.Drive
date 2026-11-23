@@ -98,22 +98,21 @@ namespace KS2Drive
 
                 #region Service Events
 
+                //These events are raised from WinFSP callbacks: always use BeginInvoke. A synchronous Invoke would deadlock
+                //when the UI thread is unmounting the drive, since the unmount waits for the in-flight callbacks to complete.
                 Service.RepositoryActionPerformed += (s1, e1) =>
                 {
-                    Dispatcher.Invoke(() => ItemsToLog.Add(e1));
+                    Dispatcher.BeginInvoke(new Action(() => ItemsToLog.Add(e1)));
                     if (!e1.Result.Equals("STATUS_SUCCESS"))
                     {
-                        if (!e1.AllowRetryOrRecover) Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed", System.Windows.Forms.ToolTipIcon.Warning));
-                        else Dispatcher.Invoke(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed. You can recover this file via the LOG menu", System.Windows.Forms.ToolTipIcon.Warning));
+                        if (!e1.AllowRetryOrRecover) Dispatcher.BeginInvoke(new Action(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed", System.Windows.Forms.ToolTipIcon.Warning)));
+                        else Dispatcher.BeginInvoke(new Action(() => AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"The action {e1.Method} for the file {e1.File} failed. You can recover this file via the LOG menu", System.Windows.Forms.ToolTipIcon.Warning)));
                     };
                 };
 
                 Service.RepositoryAuthenticationFailed += (s2, e2) =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", $"Your credentials are invalid. Please update them in the Configuration panel", System.Windows.Forms.ToolTipIcon.Error);
-                    });
+                    Dispatcher.BeginInvoke(new Action(OnRepositoryAuthenticationFailed));
                 };
 
                 #endregion
@@ -183,6 +182,21 @@ namespace KS2Drive
             IsMounted = false;
             ((MenuItem)AppMenu.Items[2]).IsEnabled = true;
             ((MenuItem)AppMenu.Items[2]).ToolTip = null;
+        }
+
+        /// <summary>
+        /// Handles credentials rejected by the server (HTTP 401) while the drive is mounted: unmounts the drive,
+        /// tells the user, then opens the configuration window so the credentials can be updated.
+        /// Must run on the UI thread, asynchronously from the WinFSP callback that detected the error.
+        /// </summary>
+        private void OnRepositoryAuthenticationFailed()
+        {
+            if (!IsMounted) return; //Already unmounted (by the user or a previous notification)
+
+            UnmountDrive();
+            AppNotificationIcon.ShowBalloonTip(3000, "KS² Drive", "Your credentials have been rejected by the server. The drive has been unmounted.", System.Windows.Forms.ToolTipIcon.Error);
+            MessageBox.Show("Your credentials have been rejected by the server.\n\nThe drive has been unmounted. Files that could not be saved can be recovered from the LOG menu.\n\nPlease update your credentials, then mount the drive again.", "KS² Drive", MessageBoxButton.OK, MessageBoxImage.Error);
+            MenuConfigure_Click(this, null);
         }
 
         /// <summary>
