@@ -68,8 +68,8 @@ namespace KS2Drive.FS
         private static object CacheLock = new object();
 
         //TODO : Add periodic MissingFileCache cleanup
-        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(); //Store the files that we know for sure that they do not exist
-        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
+        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase); //Store the files that we know for sure that they do not exist
+        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>(StringComparer.OrdinalIgnoreCase); //Case-insensitive, like the file system (CaseSensitiveSearch = false)
 
         /// <summary>
         /// Looks in the cache for the FileNode matching the local path. Does not take the cache lock:
@@ -103,18 +103,22 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Adds a node to the cache (ignored if its path is already cached) and removes the path from the
-        /// known-missing list. Does not take the cache lock: the caller is expected to hold it.
+        /// Adds a node to the cache and removes its path from the known-missing list. If a node is already cached for
+        /// this path, the cached node is kept and returned instead: callers must use the returned node, so that a given
+        /// path is always represented by a single <see cref="FileNode"/> (single handle count, content and lock).
+        /// Does not take the cache lock: the caller is expected to hold it.
         /// </summary>
-        public void AddFileNodeNoLock(FileNode node)
+        /// <returns>The node that represents the path in the cache (<paramref name="node"/> itself if it was added, or if the cache is disabled).</returns>
+        public FileNode AddFileNodeNoLock(FileNode node)
         {
-            if (_mode == CacheMode.Disabled) return;
+            if (_mode == CacheMode.Disabled) return node;
 
-            if (FileNodeCache.ContainsKey(node.LocalPath)) return; //TODO : monitor which condition can lead to this
+            if (FileNodeCache.TryGetValue(node.LocalPath, out FileNode CachedNode)) return CachedNode;
 
             FileNodeCache.Add(node.LocalPath, node);
             MissingFileCache.Remove(node.LocalPath); //Remove the file from the known missing files list
             CacheRefreshed?.Invoke(this, null);
+            return node;
         }
 
         /// <summary>
@@ -144,7 +148,7 @@ namespace KS2Drive.FS
 
             lock (CacheLock)
             {
-                foreach (var FolderSubElement in FileNodeCache.Where(x => x.Key.StartsWith(OldFolderName + "\\")).ToList())
+                foreach (var FolderSubElement in FileNodeCache.Where(x => x.Key.StartsWith(OldFolderName + "\\", StringComparison.OrdinalIgnoreCase)).ToList())
                 {
                     String OldKeyName = FolderSubElement.Key;
                     FolderSubElement.Value.LocalPath = NewFolderName + FolderSubElement.Value.LocalPath.Substring(OldFolderName.Length);
@@ -170,7 +174,7 @@ namespace KS2Drive.FS
                 FileNodeCache.Remove(node.LocalPath);
                 if ((node.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
                 {
-                    foreach (var s in FileNodeCache.Where(x => x.Key.StartsWith(node.LocalPath + "\\")).ToList())
+                    foreach (var s in FileNodeCache.Where(x => x.Key.StartsWith(node.LocalPath + "\\", StringComparison.OrdinalIgnoreCase)).ToList())
                     {
                         FileNodeCache.Remove(s.Key);
                     }
@@ -244,10 +248,12 @@ namespace KS2Drive.FS
                     CurrentFolder.IsParsed = true;
                     CurrentFolder.LastRefresh = DateTime.Now;
 
-                    //Caching the folder content
-                    foreach (var Node in Result.Content)
+                    //Caching the folder content. Return the cached instances, not the freshly built ones, so that an element
+                    //already known (e.g. opened before its folder was listed) keeps a single FileNode
+                    for (int i = 0; i < Result.Content.Count; i++)
                     {
-                        this.AddFileNodeNoLock(Node.Item2);
+                        FileNode CachedNode = this.AddFileNodeNoLock(Result.Content[i].Item2);
+                        if (!Object.ReferenceEquals(CachedNode, Result.Content[i].Item2)) Result.Content[i] = new Tuple<String, FileNode>(Result.Content[i].Item1, CachedNode);
                     }
 
                     //Handling . & ..
@@ -278,7 +284,7 @@ namespace KS2Drive.FS
                     ReturnList = new List<Tuple<String, FileNode>>();
                     ReturnList.Add(new Tuple<string, FileNode>(".", CurrentFolder));
                     //TODO : Add .. from cache
-                    ReturnList.AddRange(FileNodeCache.Where(x => x.Key != CurrentFolder.LocalPath && x.Key.StartsWith($"{FolderNameForSearch}") && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
+                    ReturnList.AddRange(FileNodeCache.Where(x => !String.Equals(x.Key, CurrentFolder.LocalPath, StringComparison.OrdinalIgnoreCase) && x.Key.StartsWith(FolderNameForSearch, StringComparison.OrdinalIgnoreCase) && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
                     if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) FileNodeToRefreshList.Add(CurrentFolder); //Refresh current directory if the cache is too old
                 }
 
@@ -374,9 +380,9 @@ namespace KS2Drive.FS
                 }
 
                 //Remove the FileNodeCache entries that are no longer in Result.Content
-                foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
+                foreach (var s in FileNodeCache.Where(x => !String.Equals(x.Key, CFN.LocalPath, StringComparison.OrdinalIgnoreCase) && x.Key.StartsWith(Filter, StringComparison.OrdinalIgnoreCase) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
                 {
-                    if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
+                    if (Result.Content.FirstOrDefault(x => String.Equals(x.Item2.LocalPath, s.Value.LocalPath, StringComparison.OrdinalIgnoreCase)) == null)
                     {
                         DeleteFileNode(s.Value);
                     }

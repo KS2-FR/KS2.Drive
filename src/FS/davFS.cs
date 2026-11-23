@@ -251,10 +251,9 @@ namespace KS2Drive.FS
                         return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
-                    var D = new FileNode(FoundElement);
+                    var D = Cache.AddFileNodeNoLock(new FileNode(FoundElement)); //Use the cached instance if the path is already known (e.g. with another case)
                     if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
                     FileAttributes = D.FileInfo.FileAttributes;
-                    Cache.AddFileNodeNoLock(D);
                     TraceEnd(OperationId, D, "STATUS_SUCCESS - From Repository");
                     return STATUS_SUCCESS;
 
@@ -355,8 +354,7 @@ namespace KS2Drive.FS
                         return STATUS_OBJECT_NAME_NOT_FOUND;
                     }
 
-                    KnownNode.node = new FileNode(RepositoryObject);
-                    Cache.AddFileNodeNoLock(KnownNode.node);
+                    KnownNode.node = Cache.AddFileNodeNoLock(new FileNode(RepositoryObject)); //Use the cached instance if the path is already known (e.g. with another case)
 
                     Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
                     DebugEnd(OperationId, KnownNode.node, $"STATUS_SUCCESS - From Repository - Handle {i}");
@@ -697,6 +695,8 @@ namespace KS2Drive.FS
             Cache.Lock();
             try
             {
+                //The element did not exist on the server before this creation: a node still cached for this path is stale, replace it
+                Cache.DeleteFileEntry(CFN.LocalPath);
                 Cache.AddFileNodeNoLock(CFN);
             }
             finally
