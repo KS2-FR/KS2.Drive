@@ -13,12 +13,20 @@ using System.Windows.Controls;
 
 namespace KS2Drive
 {
+    /// <summary>
+    /// Hidden main window of the tray application. Owns the notification-area icon and its context menu,
+    /// hosts the WinFSP service that mounts the remote repository as a drive, and displays the operation log.
+    /// </summary>
     public partial class MainWindow : MetroWindow
     {
+        /// <summary>WinFSP service hosting the file system.</summary>
         private FSPService Service;
+        /// <summary>Whether the drive is currently mounted.</summary>
         private bool IsMounted = false;
+        /// <summary>Background thread running the WinFSP service loop.</summary>
         private Thread T;
         private Configuration AppConfiguration;
+        /// <summary>Log entries displayed in the log list (populated from service events).</summary>
         public ObservableCollection<LogListItem> ItemsToLog = new ObservableCollection<LogListItem>();
 
         //Set the WinFSP version against which the program was built (see /Reference folder in source)
@@ -29,6 +37,12 @@ namespace KS2Drive
         private System.Windows.Forms.NotifyIcon AppNotificationIcon;
         private ContextMenu AppMenu;
 
+        /// <summary>
+        /// Initializes the main window: checks that the required WinFSP version is installed (offering
+        /// to install it, and quitting if that fails), creates the tray icon, starts the WinFSP service
+        /// on a background thread and subscribes to its events, then either auto-mounts the drive or
+        /// opens the configuration dialog when the application is not configured yet.
+        /// </summary>
         public MainWindow()
         {
             InitializeComponent();
@@ -128,6 +142,10 @@ namespace KS2Drive
             }
         }
 
+        /// <summary>
+        /// Mounts the drive with the current configuration, updates the tray menu (Mount becomes Unmount,
+        /// Configure is disabled), clears the log and opens the drive in Explorer. Shows an error on failure.
+        /// </summary>
         private void MountDrive()
         {
             try
@@ -147,6 +165,9 @@ namespace KS2Drive
             Process.Start($@"{this.AppConfiguration.DriveLetter}:\");
         }
 
+        /// <summary>
+        /// Unmounts the drive and restores the tray menu (Mount label, Configure re-enabled).
+        /// </summary>
         private void UnmountDrive()
         {
             try
@@ -165,7 +186,7 @@ namespace KS2Drive
         }
 
         /// <summary>
-        /// Hide window when minimized
+        /// Hides the window when it is minimized (the application lives in the notification area).
         /// </summary>
         protected override void OnStateChanged(EventArgs e)
         {
@@ -174,7 +195,7 @@ namespace KS2Drive
         }
 
         /// <summary>
-        /// Cleanup and shutdown the app
+        /// Removes the tray icon, stops the WinFSP service and shuts down the application.
         /// </summary>
         private void QuitApp()
         {
@@ -189,12 +210,18 @@ namespace KS2Drive
 
         #region Menu actions
 
+        /// <summary>
+        /// Toggles the drive between mounted and unmounted.
+        /// </summary>
         private void MenuMount_Click(object sender, RoutedEventArgs e)
         {
             if (IsMounted) UnmountDrive();
             else MountDrive();
         }
 
+        /// <summary>
+        /// Opens the configuration dialog and enables the Mount menu item once the application is configured.
+        /// </summary>
         private void MenuConfigure_Click(object sender, RoutedEventArgs e)
         {
             ConfigurationUI OptionWindow = new ConfigurationUI();
@@ -202,16 +229,25 @@ namespace KS2Drive
             if (AppConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
         }
 
+        /// <summary>
+        /// Shows the log window.
+        /// </summary>
         private void MenuLog_Click(object sender, RoutedEventArgs e)
         {
             if (!this.IsVisible) this.Show();
         }
 
+        /// <summary>
+        /// Quits the application.
+        /// </summary>
         private void MenuExit_Click(object sender, RoutedEventArgs e)
         {
             QuitApp();
         }
 
+        /// <summary>
+        /// Shows the About dialog.
+        /// </summary>
         private void MenuAbout_Click(object sender, RoutedEventArgs e)
         {
             About.About A = new About.About();
@@ -222,11 +258,17 @@ namespace KS2Drive
 
         #region Log actions
 
+        /// <summary>
+        /// Clears all log entries.
+        /// </summary>
         private void bt_ClearLog_Click(object sender, RoutedEventArgs e)
         {
             ItemsToLog.Clear();
         }
 
+        /// <summary>
+        /// Exports the log entries to a semicolon-separated CSV file chosen by the user.
+        /// </summary>
         private void bt_ExportLog_Click(object sender, RoutedEventArgs e)
         {
             StringBuilder SB = new StringBuilder();
@@ -254,6 +296,10 @@ namespace KS2Drive
             }
         }
 
+        /// <summary>
+        /// Recovers a file whose remote operation failed by copying its local temporary copy
+        /// (from the clicked log entry) to a location chosen by the user.
+        /// </summary>
         private void bt_FileRecover_Click(object sender, RoutedEventArgs e)
         {
             var SenderButton = (Button)sender;

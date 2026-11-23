@@ -13,10 +13,22 @@ using System.Windows.Controls;
 
 namespace KS2Drive.Config
 {
+    /// <summary>
+    /// Configuration dialog: server URL/type and credentials, drive letter, WinFSP cache and flush
+    /// options, client certificate, proxy and auto-start settings.
+    /// </summary>
     public partial class ConfigurationUI : MetroWindow
     {
+        /// <summary>
+        /// The application configuration edited by this window (also the binding source for proxy settings).
+        /// </summary>
         public Configuration AppConfiguration { get; set; }
 
+        /// <summary>
+        /// Initializes the dialog: fills the combo boxes (free drive letters, server mode, kernel cache,
+        /// flush mode and yes/no options), then preselects values from the current configuration,
+        /// including the client certificate subject if the stored certificate can be found.
+        /// </summary>
         public ConfigurationUI()
         {
             this.DataContext = this;
@@ -118,6 +130,11 @@ namespace KS2Drive.Config
             }
         }
 
+        /// <summary>
+        /// Validates the mandatory fields (URL, login, password), updates the Windows "Run" registry key
+        /// for auto-start, copies the form values into the configuration, saves it, closes the window,
+        /// marks the application as configured and reloads the proxy settings.
+        /// </summary>
         private void bt_Save_Click(object sender, RoutedEventArgs e)
         {
             if (String.IsNullOrEmpty(txtURL.Text))
@@ -194,11 +211,19 @@ namespace KS2Drive.Config
             Tools.LoadProxy(this.AppConfiguration);
         }
 
+        /// <summary>
+        /// Copies the proxy password into the configuration (PasswordBox.Password cannot be data-bound).
+        /// </summary>
         private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
         {
             this.AppConfiguration.ProxyPassword = ProxyPassword.Password;
         }
 
+        /// <summary>
+        /// Opens the Windows certificate picker on the store named by the clicked button's content
+        /// ("StoreLocation.StoreName", e.g. "CurrentUser.My") and stores the selected certificate's
+        /// store name, location and serial number in the configuration.
+        /// </summary>
         private void bt_UserClientCertSelect_Click(object sender, RoutedEventArgs e)
         {
             var SeachScope = ((Button)sender).Content.ToString();

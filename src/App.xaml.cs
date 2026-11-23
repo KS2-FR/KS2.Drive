@@ -15,14 +15,37 @@ using System.Windows;
 
 namespace KS2Drive
 {
+    /// <summary>
+    /// WPF application entry point. Enforces a single running instance and loads the
+    /// user configuration (and proxy settings) from %LocalAppData%\KS2Drive\config.json.
+    /// </summary>
     public partial class App : Application
     {
+        /// <summary>
+        /// Application-wide configuration shared by the main window and the configuration dialog.
+        /// </summary>
         public Configuration AppConfiguration { get; set; }
+
+        /// <summary>
+        /// Folder holding the configuration file (%LocalAppData%\KS2Drive).
+        /// </summary>
         public String ConfigurationFolderPath { get; set; }
+
+        /// <summary>
+        /// Full path of the JSON configuration file.
+        /// </summary>
         public String ConfigurationFilePath { get; set; }
 
+        /// <summary>
+        /// Named mutex used to prevent more than one instance of the application from running.
+        /// </summary>
         private Mutex UnicityMutex = null;
 
+        /// <summary>
+        /// Initializes the application: acquires the single-instance mutex (shutting down if another
+        /// instance owns it), ensures the configuration folder exists, loads the configuration
+        /// and applies the configured proxy.
+        /// </summary>
         public App()
         {
             bool MutexAcquisitionSuccess = false;
@@ -59,6 +82,9 @@ namespace KS2Drive
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
         }
 
+        /// <summary>
+        /// Releases the single-instance mutex when the application exits.
+        /// </summary>
         private void Application_Exit(object sender, ExitEventArgs e)
         {
             UnicityMutex?.Dispose();

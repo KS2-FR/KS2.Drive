@@ -6,8 +6,16 @@ using System.Web;
 
 namespace KS2Drive.FS
 {
+    /// <summary>
+    /// A file or folder of the remote repository as seen by the file system. Holds its local and repository paths,
+    /// its WinFSP file information and security descriptor, and (for opened files) its content in memory.
+    /// Also provides static helpers to convert between local (Windows) paths and repository (WebDAV URL) paths.
+    /// </summary>
     public class FileNode
     {
+        /// <summary>
+        /// Lock used to serialize file system operations (read, write, cleanup, close...) on this node.
+        /// </summary>
         public object OperationLock = new object();
 
         [JsonIgnore]
@@ -15,23 +23,63 @@ namespace KS2Drive.FS
         [JsonIgnore]
         private static object _handlelock = new object();
 
+        /// <summary>
+        /// Number of currently open handles on this node (updated with Interlocked).
+        /// </summary>
         public Int32 OpenCount;
+        /// <summary>
+        /// Process-unique sequential identifier of this node instance, used in logs.
+        /// </summary>
         public String ObjectId;
+        /// <summary>
+        /// Display name of the file or folder.
+        /// </summary>
         public string Name;
+        /// <summary>
+        /// Path of the item on the server (URL path, without trailing slash), including the document library base path.
+        /// </summary>
         public String RepositoryPath;
+        /// <summary>
+        /// URL-decoded Windows path of the item relative to the drive root (e.g. "\folder\file.txt"). Used as the cache key.
+        /// </summary>
         public String LocalPath;
+        /// <summary>
+        /// WinFSP file information (attributes, timestamps, sizes).
+        /// </summary>
         public FileInfo FileInfo;
 
+        /// <summary>
+        /// Binary security descriptor returned to Windows for this node.
+        /// </summary>
         [JsonIgnore]
         public Byte[] FileSecurity;
+        /// <summary>
+        /// In-memory content of the file, loaded from the server on open. May be larger than <c>FileInfo.FileSize</c>.
+        /// </summary>
         [JsonIgnore]
         public Byte[] FileData;
 
+        /// <summary>
+        /// True when <see cref="FileData"/> contains local modifications not yet uploaded to the server.
+        /// </summary>
         public bool HasUnflushedData { get; set; } = false;
+        /// <summary>
+        /// Date of the last refresh of this node (or of its folder content) from the server.
+        /// </summary>
         public DateTime LastRefresh { get; set; }
+        /// <summary>
+        /// Path to the temporary local file containing the binary content of this FileNode (used in case of upload error
+        /// in order not to lose data). Empty when no copy has been made, null when the copy could not be written.
+        /// </summary>
         public string TemporaryLocalCopyPath { get; internal set; } = ""; //Path to the temporary local file containing the binary information of this FileNode (used in case of error in order not to lose data)
 
+        /// <summary>
+        /// For a folder: true once its content has been listed from the server and stored in the cache.
+        /// </summary>
         public bool IsParsed = false;
+        /// <summary>
+        /// True once the item has been deleted on the server; pending data is then no longer flushed.
+        /// </summary>
         public bool IsDeleted = false;
 
         private static String _DocumentLibraryPath;
@@ -39,6 +87,11 @@ namespace KS2Drive.FS
 
         private static bool _IsInited = false;
 
+        /// <summary>
+        /// Sets the static parameters shared by all nodes. Must be called before any FileNode is created.
+        /// </summary>
+        /// <param name="DocumentLibraryPath">Server-side base path of the mounted library; it maps to the drive root.</param>
+        /// <param name="webDavMode">Server type, which drives how folders are detected.</param>
         public static void Init(String DocumentLibraryPath, WebDAVMode webDavMode)
         {
             FileNode._DocumentLibraryPath = DocumentLibraryPath;
@@ -46,6 +99,11 @@ namespace KS2Drive.FS
             FileNode._IsInited = true;
         }
 
+        /// <summary>
+        /// Builds a node from a WebDAV item: computes its repository and local paths, detects whether it is a folder,
+        /// and fills the file information from the item properties. A default security descriptor is assigned.
+        /// </summary>
+        /// <exception cref="InvalidOperationException"><see cref="Init"/> has not been called.</exception>
         public FileNode(WebDAVClient.Model.Item WebDavObject)
         {
             if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
@@ -105,6 +163,10 @@ namespace KS2Drive.FS
             this.FileSecurity = GetDefaultSecurity();
         }
 
+        /// <summary>
+        /// Converts a repository path to a local path: strips the trailing slash and the document library path,
+        /// replaces '/' by '\' and makes sure the result starts with '\'. The result is not URL-decoded.
+        /// </summary>
         public static String ConvertRepositoryPathToLocalPath(String CMISPath)
         {
             if (CMISPath.EndsWith("/")) CMISPath = CMISPath.Substring(0, CMISPath.Length - 1);
@@ -114,6 +176,10 @@ namespace KS2Drive.FS
             return ReworkdPath;
         }
 
+        /// <summary>
+        /// Converts a local path to a repository path: prefixes it with the document library path, replaces '\' by '/'
+        /// and strips the trailing slash. The result is not URL-encoded.
+        /// </summary>
         public static String ConvertLocalPathToRepositoryPath(String LocalPath)
         {
             String ReworkdPath = _DocumentLibraryPath + LocalPath.Replace(System.IO.Path.DirectorySeparatorChar, '/');
@@ -121,6 +187,10 @@ namespace KS2Drive.FS
             return ReworkdPath;
         }
 
+        /// <summary>
+        /// Builds the binary security descriptor applied to every node: owner and group Administrators,
+        /// protected DACL granting full access to LocalSystem, Administrators and Everyone.
+        /// </summary>
         public static Byte[] GetDefaultSecurity()
         {
             //https://blogs.technet.microsoft.com/askds/2008/04/18/the-security-descriptor-definition-language-of-love-part-1/
@@ -166,11 +236,17 @@ namespace KS2Drive.FS
         //    }
         //}
 
+        /// <summary>
+        /// Returns true when the repository path is the document library path, i.e. the drive root.
+        /// </summary>
         internal static bool IsRepositoryRootPath(String RepositoryPath)
         {
             return RepositoryPath.Equals(_DocumentLibraryPath);
         }
 
+        /// <summary>
+        /// Returns the last segment (file or folder name) of a repository path, or "\" for the library root.
+        /// </summary>
         internal static String GetRepositoryDocumentName(String DocumentPath)
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
@@ -179,6 +255,9 @@ namespace KS2Drive.FS
             return DocumentPath.Substring(DocumentPath.LastIndexOf('/') + 1);
         }
 
+        /// <summary>
+        /// Returns the repository path of the parent folder, or null for the library root (or a path above it).
+        /// </summary>
         internal static String GetRepositoryParentPath(String DocumentPath)
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
@@ -188,7 +267,10 @@ namespace KS2Drive.FS
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
         }
 
-        //Generate a local copy of the FileNode
+        /// <summary>
+        /// Writes <see cref="FileData"/> to a temporary file (created on first call) so that the content is not lost
+        /// when it cannot be uploaded. On failure, <see cref="TemporaryLocalCopyPath"/> is set to null.
+        /// </summary>
         internal void GenerateLocalCopy()
         {
             if (String.IsNullOrEmpty(TemporaryLocalCopyPath)) TemporaryLocalCopyPath = System.IO.Path.GetTempFileName();

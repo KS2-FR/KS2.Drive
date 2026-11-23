@@ -11,20 +11,36 @@ using System.Windows.Controls;
 namespace KS2Drive
 {
     //From : https://stackoverflow.com/questions/2006729/how-can-i-have-a-listbox-auto-scroll-when-a-new-item-is-added
+    /// <summary>
+    /// Attached behavior that makes a <see cref="ListBox"/> automatically scroll to (and select)
+    /// each item added to its <see cref="INotifyCollectionChanged"/> items source.
+    /// </summary>
     public class ListBoxBehavior
     {
+        /// <summary>
+        /// Active collection-change subscriptions, one per list box that has the behavior enabled.
+        /// </summary>
         static readonly Dictionary<ListBox, Capture> Associations = new Dictionary<ListBox, Capture>();
 
+        /// <summary>
+        /// Gets the value of the ScrollOnNewItem attached property.
+        /// </summary>
         public static bool GetScrollOnNewItem(DependencyObject obj)
         {
             return (bool)obj.GetValue(ScrollOnNewItemProperty);
         }
 
+        /// <summary>
+        /// Sets the value of the ScrollOnNewItem attached property.
+        /// </summary>
         public static void SetScrollOnNewItem(DependencyObject obj, bool value)
         {
             obj.SetValue(ScrollOnNewItemProperty, value);
         }
 
+        /// <summary>
+        /// Attached property enabling auto-scroll to newly added items (default <c>false</c>).
+        /// </summary>
         public static readonly DependencyProperty ScrollOnNewItemProperty =
             DependencyProperty.RegisterAttached(
                 "ScrollOnNewItem",
@@ -32,6 +48,10 @@ namespace KS2Drive
                 typeof(ListBoxBehavior),
                 new UIPropertyMetadata(false, OnScrollOnNewItemChanged));
 
+        /// <summary>
+        /// Hooks or unhooks the list box Loaded/Unloaded and ItemsSource change notifications
+        /// when the ScrollOnNewItem property is turned on or off.
+        /// </summary>
         public static void OnScrollOnNewItemChanged(
             DependencyObject d,
             DependencyPropertyChangedEventArgs e)
@@ -58,6 +78,9 @@ namespace KS2Drive
             }
         }
 
+        /// <summary>
+        /// Re-subscribes to the new items source when the list box ItemsSource changes.
+        /// </summary>
         private static void ListBox_ItemsSourceChanged(object sender, EventArgs e)
         {
             var listBox = (ListBox)sender;
@@ -66,6 +89,9 @@ namespace KS2Drive
             Associations[listBox] = new Capture(listBox);
         }
 
+        /// <summary>
+        /// Drops the collection-change subscription when the list box is unloaded.
+        /// </summary>
         static void ListBox_Unloaded(object sender, RoutedEventArgs e)
         {
             var listBox = (ListBox)sender;
@@ -74,6 +100,9 @@ namespace KS2Drive
             listBox.Unloaded -= ListBox_Unloaded;
         }
 
+        /// <summary>
+        /// Subscribes to collection changes once the list box is loaded.
+        /// </summary>
         static void ListBox_Loaded(object sender, RoutedEventArgs e)
         {
             var listBox = (ListBox)sender;
@@ -83,11 +112,18 @@ namespace KS2Drive
             Associations[listBox] = new Capture(listBox);
         }
 
+        /// <summary>
+        /// Subscription to a list box items source that scrolls to and selects each added item.
+        /// Disposing it removes the subscription.
+        /// </summary>
         class Capture : IDisposable
         {
             private readonly ListBox listBox;
             private readonly INotifyCollectionChanged incc;
 
+            /// <summary>
+            /// Subscribes to the CollectionChanged event of the list box ItemsSource, if it supports notifications.
+            /// </summary>
             public Capture(ListBox listBox)
             {
                 this.listBox = listBox;
@@ -98,6 +134,9 @@ namespace KS2Drive
                 }
             }
 
+            /// <summary>
+            /// Scrolls to and selects the first newly added item.
+            /// </summary>
             void incc_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
             {
                 if (e.Action == NotifyCollectionChangedAction.Add)
@@ -107,6 +146,9 @@ namespace KS2Drive
                 }
             }
 
+            /// <summary>
+            /// Unsubscribes from the items source CollectionChanged event.
+            /// </summary>
             public void Dispose()
             {
                 if (incc != null)

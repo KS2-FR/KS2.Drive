@@ -11,10 +11,15 @@ using WebDAVClient.Helpers;
 namespace KS2Drive.FS
 {
     /// <summary>
-    /// Handle the file system caching
+    /// In-memory cache of the remote repository tree, keyed by local path.
+    /// Keeps the known <see cref="FileNode"/> objects, remembers paths recently found to be missing,
+    /// and refreshes folder listings from the WebDAV server in background threads.
     /// </summary>
     public class CacheManager
     {
+        /// <summary>
+        /// Raised whenever the cache content changes (node added, renamed or removed).
+        /// </summary>
         public EventHandler CacheRefreshed;
 
         private Int32 CacheDurationInSeconds = 15; //Amount of seconds the information stored in the cache in considered as still valid
@@ -24,6 +29,11 @@ namespace KS2Drive.FS
         private object RunningRefreshActionListLock = new object();
         private List<String> RunningRefreshActionList = new List<string>();
 
+        /// <summary>
+        /// Creates a cache manager.
+        /// </summary>
+        /// <param name="mode">When <see cref="CacheMode.Disabled"/>, every cache operation is a no-op and listings always go to the server.</param>
+        /// <param name="PreLoadFoldersInCache">When true, listing a folder also schedules a background listing of its not-yet-parsed sub-folders.</param>
         public CacheManager(CacheMode mode, bool PreLoadFoldersInCache)
         {
             this._mode = mode;
@@ -31,7 +41,8 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Run a cache refresh action for a specific FileNode
+        /// Starts a background thread that refreshes the cached content of the given folder from the server,
+        /// unless a refresh for the same path is already planned or running.
         /// </summary>
         private void AddRefreshTask(FileNode CFN)
         {
@@ -44,7 +55,7 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Remove the cache refresh action from the list
+        /// Removes the folder from the list of running refresh actions so that it can be refreshed again.
         /// </summary>
         private void RemoveRefreshTask(FileNode CFN)
         {
@@ -61,16 +72,20 @@ namespace KS2Drive.FS
         private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>();
 
         /// <summary>
-        /// Look in the cache for the FileNode matching the path
-        /// Return the FileNode if found or an information notifying that the path is known to be non-existent
+        /// Looks in the cache for the FileNode matching the local path. Does not take the cache lock:
+        /// the caller is expected to hold it (see <see cref="Lock"/>).
         /// </summary>
+        /// <returns>
+        /// The cached node if found; otherwise a null node with <c>IsNonExistent</c> set to true when the path
+        /// was recorded as missing less than <c>CacheDurationInSeconds</c> ago, false when its state is unknown.
+        /// </returns>
         public (FileNode node, bool IsNonExistent) GetFileNodeNoLock(String FileOrFolderLocalPath)
         {
             if (_mode == CacheMode.Disabled) return (null, false);
 
             if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath))
             {
-                //Is there a valid mising file entry for this file
+                //Is there a valid missing file entry for this file
                 if (MissingFileCache.ContainsKey(FileOrFolderLocalPath) && (DateTime.Now - MissingFileCache[FileOrFolderLocalPath]).TotalSeconds <= CacheDurationInSeconds)
                 {
                     //Less than (CacheDurationInSeconds) seconds ago, the file was not existing. We send the same answer
@@ -87,6 +102,10 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Adds a node to the cache (ignored if its path is already cached) and removes the path from the
+        /// known-missing list. Does not take the cache lock: the caller is expected to hold it.
+        /// </summary>
         public void AddFileNodeNoLock(FileNode node)
         {
             if (_mode == CacheMode.Disabled) return;
@@ -99,7 +118,8 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Rename a key in the FileNode dictionnary
+        /// Re-keys a cached node from its previous local path to its new local path.
+        /// Only the dictionary key is changed; the node's own path properties are not updated.
         /// </summary>
         public void RenameFileNodeKey(String PreviousKey, String NewKey)
         {
@@ -112,6 +132,12 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// After a folder rename, updates the local path, repository path and cache key of every cached
+        /// descendant of the folder. The folder's own entry is not handled here (see <see cref="RenameFileNodeKey"/>).
+        /// </summary>
+        /// <param name="OldFolderName">Previous local path of the folder.</param>
+        /// <param name="NewFolderName">New local path of the folder.</param>
         public void RenameFolderSubElements(String OldFolderName, String NewFolderName)
         {
             if (_mode == CacheMode.Disabled) return;
@@ -132,6 +158,9 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Removes a node from the cache. If the node is a directory, all its cached descendants are removed too.
+        /// </summary>
         public void DeleteFileNode(FileNode node)
         {
             if (_mode == CacheMode.Disabled) return;
@@ -150,6 +179,9 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Removes a single cache entry by its key (local path). Descendants are not removed.
+        /// </summary>
         public void DeleteFileEntry(String EntryCode)
         {
             if (_mode == CacheMode.Disabled) return;
@@ -161,6 +193,10 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Removes a node from the cache and marks its parent folder as not parsed, so that the next
+        /// listing of the parent is fetched from the server again.
+        /// </summary>
         public void InvalidateFileNode(FileNode node)
         {
             if (_mode == CacheMode.Disabled) return;
@@ -174,10 +210,16 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Return folder content in the form of a list fo FileNodes
-        /// If the folder as not already been parsed, we parse it from the server
-        /// If the folder has been parsed, we serve content from the cache and update the cache from the server in a background task. So that we have a refreshed view for next call
+        /// Returns the folder content as a list of (entry name, FileNode) tuples, sorted by name, including the "." and ".." entries
+        /// when applicable.
+        /// If the folder has not been parsed yet, its content is listed from the server and cached.
+        /// If it has already been parsed, the content is served from the cache and, when older than <c>CacheDurationInSeconds</c>,
+        /// refreshed from the server in a background thread so that the next call gets an up-to-date view.
+        /// When sub-folder pre-loading is enabled, unparsed sub-folders are also listed in the background.
         /// </summary>
+        /// <param name="CurrentFolder">Folder to list.</param>
+        /// <param name="Marker">Name of the last entry already returned to WinFSP; only entries sorted after it are returned. Null or empty to start from the beginning.</param>
+        /// <returns>Success flag, the entries, and an error message on failure ("401" when authentication failed).</returns>
         public (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) GetFolderContent(FileNode CurrentFolder, String Marker)
         {
             List<FileNode> FileNodeToRefreshList = new List<FileNode>();
@@ -267,22 +309,37 @@ namespace KS2Drive.FS
             return (true, ReturnList, null);
         }
 
+        /// <summary>
+        /// Empties the node cache and releases it (the dictionary is set to null).
+        /// Background refresh threads check for this and stop updating the cache.
+        /// </summary>
         public void Clear()
         {
             FileNodeCache.Clear();
             FileNodeCache = null;
         }
 
+        /// <summary>
+        /// Acquires the cache lock. Must be paired with <see cref="Unlock"/>; required around the *NoLock methods.
+        /// </summary>
         public void Lock()
         {
             Monitor.Enter(CacheLock);
         }
 
+        /// <summary>
+        /// Releases the cache lock acquired with <see cref="Lock"/>.
+        /// </summary>
         public void Unlock()
         {
             Monitor.Exit(CacheLock);
         }
 
+        /// <summary>
+        /// Background refresh of a folder: lists it from the server, adds new children to the cache, updates the
+        /// file information of known children (unless they hold unflushed data) and removes cached children that
+        /// no longer exist on the server.
+        /// </summary>
         private void InternalRefreshFolderCacheContent(FileNode CFN)
         {
             var Result = ListRemoteServerFolderContent(CFN);
@@ -314,7 +371,7 @@ namespace KS2Drive.FS
                     }
                 }
 
-                //Supprimer les entrées de FileNodeCache qui ne sont plus dans Result.Content
+                //Remove the FileNodeCache entries that are no longer in Result.Content
                 foreach (var s in FileNodeCache.Where(x => x.Key != CFN.LocalPath && x.Key.StartsWith(Filter) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
                 {
                     if (Result.Content.FirstOrDefault(x => x.Item2.LocalPath.Equals(s.Value.LocalPath)) == null)
@@ -327,6 +384,10 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Lists the direct children of a folder on the WebDAV server (the folder's own entry is excluded).
+        /// </summary>
+        /// <returns>Success flag, the (name, FileNode) children, and an error message on failure ("401" when authentication failed).</returns>
         private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) ListRemoteServerFolderContent(FileNode CFN)
         {
             var Proxy = new WebDavClient2();
@@ -350,13 +411,17 @@ namespace KS2Drive.FS
             foreach (var Child in ItemsInFolder)
             {
                 var Element = new FileNode(Child);
-                if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue; //Bypass l'entrée correspondant à l'élément appelant
+                if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue; //Skip the entry matching the listed folder itself
                 ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
             }
 
             return (true, ChildrenFileNames, null);
         }
 
+        /// <summary>
+        /// Records (or re-timestamps) a local path as known to be missing on the server, so that lookups within
+        /// <c>CacheDurationInSeconds</c> can answer "not found" without a server round-trip. Does not take the cache lock.
+        /// </summary>
         public void AddMissingFileNoLock(String FileOrFolderPath)
         {
             if (_mode == CacheMode.Disabled) return;

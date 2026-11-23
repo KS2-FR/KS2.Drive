@@ -18,6 +18,14 @@ using VolumeInfo = Fsp.Interop.VolumeInfo;
 
 namespace KS2Drive.FS
 {
+    /// <summary>
+    /// WinFSP user-mode file system that exposes a remote WebDAV repository as a Windows drive.
+    /// Each WinFSP callback is translated into WebDAV calls through <see cref="WebDavClient2"/>; file metadata
+    /// (<see cref="FileNode"/>) is kept in a <see cref="CacheManager"/>, and file contents are held in memory
+    /// (<c>FileNode.FileData</c>) while the file has open handles. Modified contents are uploaded either on every
+    /// <see cref="Write"/> (<see cref="FlushMode.FlushAtWrite"/>) or at <see cref="Cleanup"/>/<see cref="Close"/>
+    /// (<see cref="FlushMode.FlushAtCleanup"/>).
+    /// </summary>
     public class DavFS : FileSystemBase
     {
         public event EventHandler<LogListItem> RepositoryActionPerformed;
@@ -42,6 +50,13 @@ namespace KS2Drive.FS
         private const UInt16 MEMFS_SECTOR_SIZE = 4096;
         private const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
+        /// <summary>
+        /// Creates the file system from the user configuration: parses the server URL into server, host and
+        /// document library path, initializes <see cref="FileNode"/> and <see cref="WebDavClient2"/> (with an optional
+        /// client certificate), creates the metadata cache, then tests the connection by listing the repository root.
+        /// </summary>
+        /// <param name="config">Mount configuration (server URL and type, credentials, flush and kernel cache modes, etc.).</param>
+        /// <exception cref="Exception">Thrown when the test listing fails, with a dedicated message for invalid credentials (HTTP 401).</exception>
         public DavFS(Configuration config)
         {
             WebDAVMode webDAVMode = (WebDAVMode)config.ServerType;
@@ -84,8 +99,12 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Define the general parameters of the file system
+        /// WinFSP callback invoked before mounting: sets the general parameters of the file system on the host
+        /// (kernel FileInfo cache timeout, optional network-drive prefix, sector size, case-insensitive search,
+        /// no ACL/reparse point/named stream support, cleanup and flush behaviour).
         /// </summary>
+        /// <param name="Host0">The <see cref="FileSystemHost"/> being configured.</param>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 Init(Object Host0)
         {
             FileSystemHost Host = (FileSystemHost)Host0;
@@ -111,8 +130,11 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Information on the volume (sizes, names)
+        /// WinFSP callback returning volume information. The repository size is unknown, so total and free sizes are
+        /// both reported as a fixed theoretical maximum (<c>MaxFileNodes * MaxFileSize</c>); the label is the one set by
+        /// <see cref="SetVolumeLabel"/>.
         /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 GetVolumeInfo(
             out VolumeInfo VolumeInfo)
         {
@@ -123,6 +145,10 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        /// <summary>
+        /// WinFSP callback that changes the volume label. The label is only kept in memory (not sent to the server).
+        /// </summary>
+        /// <returns>The result of <see cref="GetVolumeInfo"/> (always <c>STATUS_SUCCESS</c>).</returns>
         public override Int32 SetVolumeLabel(
             String VolumeLabel,
             out VolumeInfo VolumeInfo)
@@ -132,8 +158,17 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// GetSecurityByName is used by WinFsp to retrieve essential metadata about a file to be opened, such as its attributes and security descriptor.
+        /// WinFSP callback used to retrieve essential metadata about a file before it is opened, such as its attributes and security descriptor.
+        /// <c>desktop.ini</c> and <c>autorun.inf</c> are always reported as missing. Otherwise the node is looked up in the cache;
+        /// if unknown, it is fetched from the repository and added to the cache, and a missing element is recorded in the cache as
+        /// non-existent so later lookups do not hit the server. On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised
+        /// and the cache is cleared.
         /// </summary>
+        /// <param name="FileName">Local path of the file (relative to the volume root).</param>
+        /// <param name="FileAttributes">Receives the file attributes.</param>
+        /// <param name="SecurityDescriptor">If not null on input, receives the node's security descriptor.</param>
+        /// <returns><c>STATUS_SUCCESS</c> if the element exists, <c>STATUS_OBJECT_NAME_NOT_FOUND</c> if it does not (or on 401 / WebDAV errors),
+        /// <c>STATUS_NETWORK_UNREACHABLE</c> on HTTP transport errors.</returns>
         public override Int32 GetSecurityByName(
             String FileName,
             out UInt32 FileAttributes/* or ReparsePointIndex */,
@@ -228,6 +263,19 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback that opens an existing file or directory. The node is taken from the cache or, if unknown, fetched from the
+        /// repository and cached (missing elements are cached as non-existent). The node's open handle count is incremented.
+        /// File contents are not downloaded here; they are downloaded lazily by <see cref="Read"/>.
+        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised and the cache is cleared.
+        /// </summary>
+        /// <param name="FileName">Local path of the file to open.</param>
+        /// <param name="FileNode0">Receives the <see cref="FileNode"/> used as file context by subsequent callbacks.</param>
+        /// <param name="FileDesc">Unused (always null).</param>
+        /// <param name="FileInfo">Receives the file information.</param>
+        /// <param name="NormalizedName">Receives the file name unchanged.</param>
+        /// <returns><c>STATUS_SUCCESS</c>, <c>STATUS_OBJECT_NAME_NOT_FOUND</c> (missing element, 401 or WebDAV error) or
+        /// <c>STATUS_NETWORK_UNREACHABLE</c> on HTTP transport errors.</returns>
         public override Int32 Open(
             String FileName,
             UInt32 CreateOptions,
@@ -322,6 +370,10 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        /// <summary>
+        /// WinFSP callback returning the cached file information of an open node. No server call is made.
+        /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 GetFileInfo(
             Object FileNode0,
             Object FileDesc,
@@ -341,6 +393,10 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        /// <summary>
+        /// WinFSP callback returning the security descriptor stored on the open node. No server call is made.
+        /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 GetSecurity(
             Object FileNode0,
             Object FileDesc,
@@ -360,11 +416,23 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        /// <summary>
+        /// WinFSP callback that enumerates a directory one entry per call. On the first call (<paramref name="Context"/> is null) the folder
+        /// content is obtained from <see cref="CacheManager.GetFolderContent"/> (which may query the server) starting after
+        /// <paramref name="Marker"/>, and an enumerator is stored in <paramref name="Context"/>; subsequent calls advance that enumerator.
+        /// <paramref name="Pattern"/> is not applied. If the listing fails with a 401, <see cref="RepositoryAuthenticationFailed"/> is raised
+        /// and the cache is cleared.
+        /// </summary>
+        /// <param name="FileNode0">The directory node.</param>
+        /// <param name="Context">Enumeration state (<see cref="DirectoryEnumeratorContext"/>) kept between calls.</param>
+        /// <param name="FileName">Receives the entry name.</param>
+        /// <param name="FileInfo">Receives the entry file information.</param>
+        /// <returns><c>true</c> if an entry was returned; <c>false</c> at the end of the enumeration or on error.</returns>
         public override Boolean ReadDirectoryEntry(
             Object FileNode0,
             Object FileDesc,
             String Pattern,
-            String Marker, //Détermine à partir de quel fichier dans le répertoire, on commence à lire (exclusif) (null = start from the beginning)
+            String Marker, //Determines from which file in the directory reading starts (exclusive) (null = start from the beginning)
             ref Object Context,
             out String FileName,
             out FileInfo FileInfo)
@@ -423,6 +491,11 @@ namespace KS2Drive.FS
         }
 
 
+        /// <summary>
+        /// WinFSP callback asking whether a file or directory may be deleted. Deletion is always allowed here; the actual
+        /// deletion on the server happens in <see cref="Cleanup"/> when the delete flag is set.
+        /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 CanDelete(
             Object FileNode0,
             Object FileDesc,
@@ -431,6 +504,21 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        /// <summary>
+        /// WinFSP callback that creates a new file or directory directly on the server. It first checks that the element does not
+        /// already exist, then either uploads an empty file (marked as having unflushed data) or creates the folder, re-reads the
+        /// created element from the repository, adds it to the cache and increments its open handle count.
+        /// <paramref name="AllocationSize"/>, <paramref name="SecurityDescriptor"/> and <paramref name="CreateOptions"/> are ignored.
+        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised and the cache is cleared.
+        /// </summary>
+        /// <param name="FileName">Local path of the element to create.</param>
+        /// <param name="FileAttributes">Attributes requested; only the Directory flag is used to choose between file and folder creation.</param>
+        /// <param name="FileNode0">Receives the new <see cref="FileNode"/>.</param>
+        /// <param name="FileInfo">Receives the new element's file information.</param>
+        /// <param name="NormalizedName">Receives the file name unchanged.</param>
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_OBJECT_NAME_COLLISION</c> if the element exists; <c>STATUS_ACCESS_DENIED</c> on a WebDAV
+        /// conflict or unexpected error; <c>STATUS_CANNOT_MAKE</c> if the server refuses the creation; <c>STATUS_NETWORK_UNREACHABLE</c>
+        /// on transport errors or 401.</returns>
         public override Int32 Create(
             String FileName,
             UInt32 CreateOptions,
@@ -656,6 +744,12 @@ namespace KS2Drive.FS
             */
         }
 
+        /// <summary>
+        /// WinFSP callback invoked when an existing file is opened with overwrite/supersede semantics. Resizes the in-memory
+        /// allocation to <paramref name="AllocationSize"/>, replaces or merges the attributes (always adding Archive), resets the
+        /// file size to 0 and updates the timestamps. Only the local node is changed; nothing is sent to the server here.
+        /// </summary>
+        /// <returns><c>STATUS_SUCCESS</c>, the error returned by <see cref="SetFileSizeInternal"/>, or <c>STATUS_UNEXPECTED_IO_ERROR</c> on exception.</returns>
         public override Int32 Overwrite(
             Object FileNode0,
             Object FileDesc,
@@ -732,6 +826,12 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback invoked when a file handle is closed. In <see cref="FlushMode.FlushAtCleanup"/> mode, if the node still has
+        /// unflushed data and is not deleted, its in-memory content (up to <c>FileSize</c>) is uploaded to the server; on upload failure a
+        /// local temporary copy is generated, a failure is reported and the method returns without decrementing the handle count.
+        /// Otherwise the open handle count is decremented and, when it reaches zero, the in-memory content is released.
+        /// </summary>
         public override void Close(
             Object FileNode0,
             Object FileDesc)
@@ -781,6 +881,17 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback invoked when the last handle of a file object is cleaned up (before <see cref="Close"/>). Does nothing for the
+        /// repository root. Depending on <paramref name="Flags"/>:
+        /// <list type="bullet">
+        /// <item><c>CleanupSetAllocationSize</c>: shrinks the in-memory allocation to the file size rounded up to the allocation unit.</item>
+        /// <item><c>CleanupDelete</c>: deletes the file or folder on the server, removes it from the cache and marks the node as deleted.</item>
+        /// <item>Otherwise, if allocation size, archive bit or last write time changed and the mode is <see cref="FlushMode.FlushAtCleanup"/>:
+        /// uploads the in-memory content if the node has unflushed data (a local temporary copy is generated if the upload is refused).</item>
+        /// </list>
+        /// Results are reported through <see cref="RepositoryActionPerformed"/>.
+        /// </summary>
         public override void Cleanup(
             Object FileNode0,
             Object FileDesc,
@@ -812,7 +923,7 @@ namespace KS2Drive.FS
                     {
                         try
                         {
-                            //Fichier
+                            //File
                             Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
                             Cache.DeleteFileNode(CFN);
                             CFN.IsDeleted = true;
@@ -831,7 +942,7 @@ namespace KS2Drive.FS
                     {
                         try
                         {
-                            //Répertoire
+                            //Directory
                             Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
                             Cache.DeleteFileNode(CFN);
                             CFN.IsDeleted = true;
@@ -930,6 +1041,17 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback that reads file content. On the first read of an open node (<c>FileData</c> is null) the whole file is downloaded
+        /// from the server and kept in memory; the requested range is then copied from memory into <paramref name="Buffer"/>.
+        /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised and the cache is cleared.
+        /// </summary>
+        /// <param name="Buffer">Destination buffer.</param>
+        /// <param name="Offset">Offset in the file where reading starts.</param>
+        /// <param name="Length">Number of bytes requested.</param>
+        /// <param name="BytesTransferred">Receives the number of bytes copied.</param>
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_END_OF_FILE</c> if <paramref name="Offset"/> is past the end of the data;
+        /// <c>STATUS_OBJECT_NAME_NOT_FOUND</c> if no content could be obtained; <c>STATUS_NETWORK_UNREACHABLE</c> if the download fails (including 401).</returns>
         public override Int32 Read(
             Object FileNode0,
             Object FileDesc,
@@ -1018,6 +1140,20 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback that writes data into the in-memory content of the file. With <paramref name="ConstrainedIo"/> the write is
+        /// truncated to the current file size; otherwise the file is grown as needed (and <paramref name="WriteToEndOfFile"/> appends).
+        /// In <see cref="FlushMode.FlushAtWrite"/> mode the whole content (up to <c>FileSize</c>) is uploaded after each write and the node
+        /// is invalidated in the cache on failure; in other modes the node is only marked as having unflushed data, to be uploaded at
+        /// <see cref="Cleanup"/>/<see cref="Close"/>. The file content is not downloaded here.
+        /// </summary>
+        /// <param name="Buffer">Source buffer.</param>
+        /// <param name="Offset">Offset in the file where writing starts (ignored if <paramref name="WriteToEndOfFile"/> is set).</param>
+        /// <param name="Length">Number of bytes to write.</param>
+        /// <param name="BytesTransferred">Receives the number of bytes written.</param>
+        /// <param name="FileInfo">Receives the updated file information.</param>
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_UNEXPECTED_IO_ERROR</c> if the node is deleted, resizing or copying fails, or the upload
+        /// fails; <c>STATUS_ACCESS_DENIED</c> on a WebDAV conflict during upload; <c>STATUS_NETWORK_UNREACHABLE</c> on transport errors.</returns>
         public override Int32 Write(
             Object FileNode0,
             Object FileDesc,
@@ -1207,6 +1343,18 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback that renames or moves a file or directory on the server (WebDAV MOVE). If the target exists and
+        /// <paramref name="ReplaceIfExists"/> is set, the target is deleted first, but only for files in <see cref="WebDAVMode.AOS"/> mode;
+        /// otherwise a collision is returned. On success the node's paths are updated and the cache keys are renamed (including the
+        /// sub-elements of a renamed folder).
+        /// </summary>
+        /// <param name="FileName">Current local path.</param>
+        /// <param name="NewFileName">New local path.</param>
+        /// <param name="ReplaceIfExists">Whether an existing target may be replaced.</param>
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_OBJECT_NAME_COLLISION</c>; <c>STATUS_ACCESS_DENIED</c> if the move is refused or fails;
+        /// <c>STATUS_CANNOT_MAKE</c> if the target existence check fails; <c>STATUS_NETWORK_UNREACHABLE</c> on transport errors or 401
+        /// (which also raises <see cref="RepositoryAuthenticationFailed"/> and clears the cache).</returns>
         public override Int32 Rename(
             Object FileNode0,
             Object FileDesc,
@@ -1271,7 +1419,7 @@ namespace KS2Drive.FS
 
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                 {
-                    //Fichier
+                    //File
                     try
                     {
                         if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
@@ -1305,7 +1453,7 @@ namespace KS2Drive.FS
                 }
                 else
                 {
-                    //Répertoire
+                    //Directory
                     try
                     {
                         if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
@@ -1383,6 +1531,11 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback for FlushFileBuffers. Does not upload anything (uploads happen in <see cref="Write"/>, <see cref="Cleanup"/>
+        /// or <see cref="Close"/> depending on the flush mode); it only returns the current file information.
+        /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 Flush(
             Object FileNode0,
             Object FileDesc,
@@ -1404,6 +1557,11 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback that sets attributes and timestamps. Values are only applied to the cached node (a value of -1 for attributes
+        /// or 0 for a timestamp means "unchanged"); they are not sent to the server.
+        /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
         public override Int32 SetBasicInfo(
             Object FileNode0,
             Object FileDesc,
@@ -1458,6 +1616,14 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// WinFSP callback that changes the file size or the allocation size of the in-memory content through
+        /// <see cref="SetFileSizeInternal"/>. Nothing is sent to the server here.
+        /// </summary>
+        /// <param name="NewSize">New file size or allocation size.</param>
+        /// <param name="SetAllocationSize"><c>true</c> to change the allocation size, <c>false</c> to change the file size.</param>
+        /// <param name="FileInfo">Receives the updated file information, or a default value if resizing failed.</param>
+        /// <returns>Always <c>STATUS_SUCCESS</c>, even if resizing failed.</returns>
         public override Int32 SetFileSize(
             Object FileNode0,
             Object FileDesc,
@@ -1489,6 +1655,17 @@ namespace KS2Drive.FS
             }
         }
 
+        /// <summary>
+        /// Resizes the in-memory content of a node. When <paramref name="SetAllocationSize"/> is <c>true</c>, reallocates <c>FileData</c>
+        /// to <paramref name="NewSize"/> bytes (keeping existing data, truncating <c>FileSize</c> if needed). Otherwise changes
+        /// <c>FileSize</c>, growing the allocation to the next allocation unit if necessary and zero-filling the extended range.
+        /// Exceptions are logged and swallowed.
+        /// </summary>
+        /// <param name="FileNode">Node to resize.</param>
+        /// <param name="NewSize">New allocation size or file size.</param>
+        /// <param name="SetAllocationSize"><c>true</c> to set the allocation size, <c>false</c> to set the file size.</param>
+        /// <returns><c>STATUS_SUCCESS</c> (also when an exception was swallowed), <c>STATUS_DISK_FULL</c> if the size exceeds the maximum
+        /// file size, or <c>STATUS_INSUFFICIENT_RESOURCES</c> if the buffer cannot be allocated.</returns>
         private Int32 SetFileSizeInternal(
             FileNode FileNode,
             UInt64 NewSize,
@@ -1552,6 +1729,10 @@ namespace KS2Drive.FS
             return STATUS_SUCCESS;
         }
 
+        /// <summary>
+        /// WinFSP callback to change a security descriptor. Not supported.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
         public override Int32 SetSecurity(
             Object FileNode0,
             Object FileDesc,
@@ -1570,6 +1751,10 @@ namespace KS2Drive.FS
             return STATUS_INVALID_DEVICE_REQUEST;
         }
 
+        /// <summary>
+        /// WinFSP callback enumerating named streams. Not implemented (named streams are disabled in <see cref="Init"/>).
+        /// </summary>
+        /// <returns>Always <c>false</c> (no stream entries).</returns>
         public override Boolean GetStreamEntry(
             Object FileNode0,
             Object FileDesc,
@@ -1621,6 +1806,10 @@ namespace KS2Drive.FS
 
         #region Reparse points
 
+        /// <summary>
+        /// WinFSP callback to get a reparse point by file name. Not implemented (reparse points are disabled in <see cref="Init"/>).
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
         public override Int32 GetReparsePointByName(
             String FileName,
             Boolean IsDirectory,
@@ -1643,6 +1832,10 @@ namespace KS2Drive.FS
             return STATUS_INVALID_DEVICE_REQUEST;
         }
 
+        /// <summary>
+        /// WinFSP callback to get the reparse point of an open file. Not implemented.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
         public override Int32 GetReparsePoint(
             Object FileNode0,
             Object FileDesc,
@@ -1665,6 +1858,10 @@ namespace KS2Drive.FS
             return STATUS_INVALID_DEVICE_REQUEST;
         }
 
+        /// <summary>
+        /// WinFSP callback to set a reparse point. Not implemented.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
         public override Int32 SetReparsePoint(
             Object FileNode0,
             Object FileDesc,
@@ -1696,6 +1893,10 @@ namespace KS2Drive.FS
             return STATUS_INVALID_DEVICE_REQUEST;
         }
 
+        /// <summary>
+        /// WinFSP callback to delete a reparse point. Not implemented.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
         public override Int32 DeleteReparsePoint(
             Object FileNode0,
             Object FileDesc,
@@ -1728,45 +1929,97 @@ namespace KS2Drive.FS
 
         #endregion
 
+        /// <summary>
+        /// WinFSP callback invoked after the volume is unmounted: clears the metadata cache, then calls the base implementation.
+        /// </summary>
         public override void Unmounted(object Host)
         {
             Cache.Clear();
             base.Unmounted(Host);
         }
 
+        /// <summary>
+        /// Logs (Trace level) the start of an operation, with the node serialized as JSON.
+        /// </summary>
+        /// <param name="OperationId">Identifier correlating the start and end log entries.</param>
+        /// <param name="CFN">Node the operation applies to.</param>
+        /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void TraceStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
             logger.Trace($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
         }
 
+        /// <summary>
+        /// Logs (Trace level) the start of an operation on a file name.
+        /// </summary>
+        /// <param name="OperationId">Identifier correlating the start and end log entries.</param>
+        /// <param name="FileName">Local path the operation applies to.</param>
+        /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void TraceStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
             logger.Trace($"{OperationId}|{Caller}|Start|{FileName}");
         }
 
+        /// <summary>
+        /// Logs (Trace level) the end of an operation with its result. <paramref name="CFN"/> is not logged.
+        /// </summary>
+        /// <param name="OperationId">Identifier correlating the start and end log entries.</param>
+        /// <param name="CFN">Node the operation applied to (unused).</param>
+        /// <param name="Result">Result text (usually the NTSTATUS name).</param>
+        /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void TraceEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
             logger.Trace($"{OperationId}|{Caller}|End|{Result}");
         }
 
+        /// <summary>
+        /// Logs (Debug level) the start of an operation, with the node serialized as JSON.
+        /// </summary>
+        /// <param name="OperationId">Identifier correlating the start and end log entries.</param>
+        /// <param name="CFN">Node the operation applies to.</param>
+        /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void DebugStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
             logger.Debug($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
         }
 
+        /// <summary>
+        /// Logs (Debug level) the start of an operation on a file name.
+        /// </summary>
+        /// <param name="OperationId">Identifier correlating the start and end log entries.</param>
+        /// <param name="FileName">Local path the operation applies to.</param>
+        /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void DebugStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
             logger.Debug($"{OperationId}|{Caller}|Start|{FileName}");
         }
 
+        /// <summary>
+        /// Logs (Debug level) the end of an operation with its result. <paramref name="CFN"/> is not logged.
+        /// </summary>
+        /// <param name="OperationId">Identifier correlating the start and end log entries.</param>
+        /// <param name="CFN">Node the operation applied to (unused).</param>
+        /// <param name="Result">Result text (usually the NTSTATUS name).</param>
+        /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void DebugEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
             logger.Debug($"{OperationId}|{Caller}|End|{Result}");
         }
     }
 
+    /// <summary>
+    /// Miscellaneous extension methods.
+    /// </summary>
     public static class Extension
     {
+        /// <summary>
+        /// Moves the value stored under <paramref name="fromKey"/> to <paramref name="toKey"/> in a dictionary.
+        /// An existing value under <paramref name="toKey"/> is overwritten.
+        /// </summary>
+        /// <param name="dic">Dictionary to modify.</param>
+        /// <param name="fromKey">Current key.</param>
+        /// <param name="toKey">New key.</param>
+        /// <exception cref="KeyNotFoundException">Thrown if <paramref name="fromKey"/> is not present.</exception>
         public static void RenameKey<TKey, TValue>(this IDictionary<TKey, TValue> dic,
                                       TKey fromKey, TKey toKey)
         {
@@ -1776,6 +2029,8 @@ namespace KS2Drive.FS
         }
     }
 
+    // LogWriter (disabled): accumulated timestamped log lines for a single operation and computed its total duration
+    // in Write(); the actual logging call was already commented out.
     /*
     public class LogWriter
     {

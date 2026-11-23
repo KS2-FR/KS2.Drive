@@ -8,10 +8,21 @@ using System.Threading.Tasks;
 
 namespace KS2Drive.Config
 {
+    /// <summary>
+    /// Application settings, persisted as JSON encrypted with DPAPI for the current user (see <see cref="Tools.Protect"/>).
+    /// </summary>
     public class Configuration
     {
+        /// <summary>
+        /// Path of the configuration file this instance was loaded from and is saved to.
+        /// </summary>
         public String Path;
 
+        /// <summary>
+        /// Loads and decrypts the configuration file. If the file does not exist or cannot be read/decrypted/parsed,
+        /// returns a default configuration with <see cref="IsConfigured"/> set to false.
+        /// </summary>
+        /// <param name="ConfigurationFilePath">Path of the encrypted configuration file.</param>
         public static Configuration Load(String ConfigurationFilePath)
         {
             if (File.Exists(ConfigurationFilePath))
@@ -33,41 +44,110 @@ namespace KS2Drive.Config
             }
         }
 
+        /// <summary>
+        /// Serializes the configuration to JSON, encrypts it and writes it to <see cref="Path"/>.
+        /// </summary>
         public void Save()
         {
             File.WriteAllText(Path, Tools.Protect(JsonConvert.SerializeObject(this)));
         }
 
+        /// <summary>
+        /// False when no valid configuration file could be loaded. Not persisted.
+        /// </summary>
         [JsonIgnore]
         public bool IsConfigured { get; set; } = true;
 
         //Startup
+        /// <summary>
+        /// Mount the drive automatically when the application starts.
+        /// </summary>
         public bool AutoMount { get; set; }
+        /// <summary>
+        /// Start the application with Windows.
+        /// </summary>
         public bool AutoStart { get; set; }
 
         //Drive Parameter
+        /// <summary>
+        /// Drive letter to mount on, without the colon (e.g. "Z").
+        /// </summary>
         public String DriveLetter { get; set; }
+        /// <summary>
+        /// Full URL of the WebDAV root to mount (server and document library path).
+        /// </summary>
         public String ServerURL { get; set; }
+        /// <summary>
+        /// Server type, as an integer value of <see cref="KS2Drive.FS.WebDAVMode"/> (0 = WebDAV, 1 = AOS).
+        /// </summary>
         public Int32 ServerType { get; set; } = 0;
+        /// <summary>
+        /// Login used to authenticate on the server.
+        /// </summary>
         public String ServerLogin { get; set; }
+        /// <summary>
+        /// Password used to authenticate on the server.
+        /// </summary>
         public String ServerPassword { get; set; }
+        /// <summary>
+        /// Windows kernel cache mode, as an integer value of <see cref="KS2Drive.FS.KernelCacheMode"/> (default -1 = data and metadata).
+        /// </summary>
         public Int32 KernelCacheMode { get; set; } = -1;
+        /// <summary>
+        /// When written data is uploaded, as an integer value of <see cref="KS2Drive.FS.FlushMode"/> (default 1 = at cleanup).
+        /// </summary>
         public Int32 FlushMode { get; set; } = 1;
+        /// <summary>
+        /// Passed to WinFSP's FileSystemHost.Mount as the Synchronized flag: when true, file system operations are serialized.
+        /// </summary>
         public bool SyncOps { get; set; } = false;
+        /// <summary>
+        /// Pre-load sub-folder listings in the background when a folder is listed.
+        /// </summary>
         public bool PreLoading { get; set; } = true;
+        /// <summary>
+        /// Mount the drive as a network drive (UNC prefix) instead of a local disk.
+        /// </summary>
         public bool MountAsNetworkDrive { get; set; } = false;
 
         //Proxy
+        /// <summary>
+        /// HTTP proxy mode: 0 = no proxy, 1 = system default proxy, 2 = user defined proxy (<see cref="ProxyURL"/>).
+        /// </summary>
         public Int16 HTTPProxyMode { get; set; } = 0; //0 = no proxy, 1 = default proxy, 2 = user defined proxy
+        /// <summary>
+        /// URL of the user defined proxy (used when <see cref="HTTPProxyMode"/> is 2).
+        /// </summary>
         public String ProxyURL { get; set; } = "";
+        /// <summary>
+        /// Authenticate on the user defined proxy with <see cref="ProxyLogin"/> / <see cref="ProxyPassword"/>.
+        /// </summary>
         public bool UseProxyAuthentication { get; set; } = false;
+        /// <summary>
+        /// Login for the user defined proxy.
+        /// </summary>
         public String ProxyLogin { get; set; } = "";
+        /// <summary>
+        /// Password for the user defined proxy.
+        /// </summary>
         public String ProxyPassword { get; set; } = "";
 
         //Client cert
+        /// <summary>
+        /// Authenticate on the server with a client certificate from the Windows certificate store.
+        /// </summary>
         public bool UseClientCertForAuthentication { get; set; } = false;
+        /// <summary>
+        /// Name of the certificate store, as a <see cref="System.Security.Cryptography.X509Certificates.StoreName"/> value name (e.g. "My").
+        /// </summary>
         public String CertStoreName { get; set; }
+        /// <summary>
+        /// Location of the certificate store, as a <see cref="System.Security.Cryptography.X509Certificates.StoreLocation"/> value name (e.g. "CurrentUser").
+        /// </summary>
         public String CertStoreLocation { get; set; }
+        /// <summary>
+        /// Serial number of the client certificate.
+        /// </summary>
         public String CertSerial { get; set; }
     }
 }
