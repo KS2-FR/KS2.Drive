@@ -47,6 +47,14 @@ namespace KS2Drive.Config
                 FreeDrives.Remove(drive[0]); // removed used drive letters from possible drive letters
             }
 
+            //Keep the configured letter selectable even if it is currently in use (e.g. by another device): otherwise the
+            //first free letter would be selected silently and the configured letter replaced at the next save
+            if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter) && !FreeDrives.Contains(Char.ToUpperInvariant(this.AppConfiguration.DriveLetter[0])))
+            {
+                FreeDrives.Add(Char.ToUpperInvariant(this.AppConfiguration.DriveLetter[0]));
+                FreeDrives.Sort();
+            }
+
             foreach (char drive in FreeDrives)
             {
                 CBFreeDrives.Items.Add(drive); // add unused drive letters to the combo box
@@ -93,7 +101,7 @@ namespace KS2Drive.Config
 
             //Reload values from config
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
-            if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]) == -1 ? 0 : CBFreeDrives.Items.IndexOf(this.AppConfiguration.DriveLetter[0]);
+            if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(Char.ToUpperInvariant(this.AppConfiguration.DriveLetter[0])) == -1 ? 0 : CBFreeDrives.Items.IndexOf(Char.ToUpperInvariant(this.AppConfiguration.DriveLetter[0]));
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerURL)) txtURL.Text = this.AppConfiguration.ServerURL;
 
             var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType));
@@ -117,15 +125,15 @@ namespace KS2Drive.Config
             var MountAsNetworkDriveMatchingItem = CBMountAsNetworkDrive.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.MountAsNetworkDrive)));
             if (!MountAsNetworkDriveMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMountAsNetworkDrive.SelectedItem = MountAsNetworkDriveMatchingItem;
 
-            //Look for certificate
-            if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = false;
+            //Look for certificate: the option is shown as checked only if it is enabled and the certificate can still be found
+            Chk_UserClientCert.IsChecked = false;
             if (!String.IsNullOrEmpty(this.AppConfiguration.CertSerial) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreLocation) && !String.IsNullOrEmpty(this.AppConfiguration.CertStoreName))
             {
                 var FoundCertificate = Tools.FindCertificate(this.AppConfiguration.CertStoreName, this.AppConfiguration.CertStoreLocation, this.AppConfiguration.CertSerial);
                 if (FoundCertificate != null)
                 {
                     txt_ClientCertSubject.Text = FoundCertificate.Subject;
-                    if (this.AppConfiguration.UseClientCertForAuthentication) Chk_UserClientCert.IsChecked = true;
+                    Chk_UserClientCert.IsChecked = this.AppConfiguration.UseClientCertForAuthentication;
                 }
             }
         }
@@ -166,23 +174,33 @@ namespace KS2Drive.Config
             }
 
             //From : https://stackoverflow.com/questions/5089601/how-to-run-a-c-sharp-application-at-windows-startup
-            RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-            if (chk_AutoStart.IsChecked == true)
+            try
             {
-                if (ApplicationDeployment.IsNetworkDeployed) //If running from Click-Once link, autostart the Click-Once bootstrap
+                using (RegistryKey rkApp = Registry.CurrentUser.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"))
                 {
-                    rkApp.SetValue("KS2Drive", Environment.GetFolderPath(Environment.SpecialFolder.Programs) + @"\KS2\KS2.WorkflowClient.appref-ms");
-                }
-                else //If portable, autostart the program itself
-                {
-                    rkApp.SetValue("KS2Drive", System.Reflection.Assembly.GetEntryAssembly().Location);
+                    if (chk_AutoStart.IsChecked == true)
+                    {
+                        if (ApplicationDeployment.IsNetworkDeployed) //If running from Click-Once link, autostart the Click-Once bootstrap
+                        {
+                            //Click-Once shortcut: Start menu\Programs\<PublisherName>\<ProductName>.appref-ms (see the publish settings of the project)
+                            rkApp.SetValue("KS2Drive", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "KS2", "KS2 Drive.appref-ms"));
+                        }
+                        else //If portable, autostart the program itself
+                        {
+                            rkApp.SetValue("KS2Drive", System.Reflection.Assembly.GetEntryAssembly().Location);
+                        }
+                    }
+                    else
+                    {
+                        rkApp.DeleteValue("KS2Drive", false);
+                    }
                 }
             }
-            else
+            catch (Exception ex)
             {
-                rkApp.DeleteValue("KS2Drive", false);
+                //Not blocking: the rest of the configuration can still be saved
+                MessageBox.Show($"Cannot update the \"Start with Windows\" setting : {ex.Message}");
             }
-            rkApp.Close();
 
             this.AppConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
             this.AppConfiguration.ServerURL = txtURL.Text;
@@ -199,16 +217,17 @@ namespace KS2Drive.Config
             try
             {
                 this.AppConfiguration.Save();
-                this.Close();
             }
             catch (Exception ex)
             {
+                //Keep the window open and the previous state: the configuration has not been saved
                 MessageBox.Show($"Cannot save configuration : {ex.Message}");
+                return;
             }
 
             this.AppConfiguration.IsConfigured = true;
-
             Tools.LoadProxy(this.AppConfiguration);
+            this.Close();
         }
 
         /// <summary>

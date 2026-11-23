@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using WebDAVClient.Helpers;
@@ -21,7 +22,6 @@ namespace KS2Drive.FS
         private static String _Server;
         private static String _Login;
         private static String _Password;
-        private static bool _IsInited = false;
         private static X509Certificate2 _ClientCert;
 
         /// <summary>
@@ -38,19 +38,27 @@ namespace KS2Drive.FS
             WebDavClient2._Server = Server;
             WebDavClient2._Login = Login;
             WebDavClient2._Password = Password;
-            WebDavClient2._IsInited = true;
             WebDavClient2._ClientCert = ClientCert;
+
+            //One HttpClient shared by all the instances: connections are reused instead of opening (and leaking) a new
+            //handler and connection for each file system operation. It is recreated at each mount, with the new parameters.
+            HttpClient PreviousClient = WebDavClient2._SharedHttpClient;
+            WebDavClient2._SharedHttpClient = CreateHttpClient(new NetworkCredential { UserName = Login, Password = Password }, null, ClientCert);
+            PreviousClient?.Dispose();
         }
 
         /// <summary>
-        /// Creates a client using the parameters given to <see cref="Init"/>.
+        /// HttpClient shared by all the instances, created by <see cref="Init"/>.
         /// </summary>
-        /// <param name="uploadTimeout">Optional timeout for uploads; the base client default is used when null.</param>
+        private static HttpClient _SharedHttpClient;
+
+        /// <summary>
+        /// Creates a client using the parameters given to <see cref="Init"/>. All the instances share the same HttpClient
+        /// (and therefore the same connections); creating an instance is cheap. Requests use the default HttpClient timeout (100 s).
+        /// </summary>
         /// <exception cref="InvalidOperationException"><see cref="Init"/> has not been called.</exception>
-        public WebDavClient2(TimeSpan? uploadTimeout = null) :
-            base(new NetworkCredential { UserName = WebDavClient2._Login, Password = WebDavClient2._Password }, uploadTimeout, null, WebDavClient2._ClientCert)
+        public WebDavClient2() : base(WebDavClient2._SharedHttpClient ?? throw new InvalidOperationException("Please Call Init First"))
         {
-            if (!WebDavClient2._IsInited) throw new InvalidOperationException("Please Call Init First");
             base.Server = WebDavClient2._Server;
             base.BasePath = WebDavClient2._RootPath;
         }
@@ -60,7 +68,8 @@ namespace KS2Drive.FS
         /// </summary>
         private String ParameterConvert(String input)
         {
-            if (input.StartsWith(WebDavClient2._RootPath)) return input.Substring(WebDavClient2._RootPath.Length);
+            //Only strip a whole path segment: "/dav" must not be stripped from "/davfolder"
+            if (input.StartsWith(WebDavClient2._RootPath) && (input.Length == WebDavClient2._RootPath.Length || input[WebDavClient2._RootPath.Length] == '/')) return input.Substring(WebDavClient2._RootPath.Length);
             else return input;
         }
 
@@ -160,76 +169,39 @@ namespace KS2Drive.FS
 
         /// <summary>
         /// Retrieves a file or folder from the remote repository from its local path.
-        /// A path containing a '.' is first looked up as a file; otherwise it is looked up as a folder, then as a file.
+        /// The element is first looked up as a file if its name (last segment of the path only, not its parent folders)
+        /// contains a '.', as a folder otherwise; if that lookup answers 404, the other kind is tried. A folder named
+        /// "v1.2" or a file without extension is therefore found as well, at the cost of one more request.
         /// For the library root, the display name is set to an empty string.
         /// </summary>
         /// <param name="LocalFileName">Local (Windows) path of the item.</param>
-        /// <returns>The WebDAV item, or null when the server answers 404.</returns>
-        /// <exception cref="WebDAVException">Any other WebDAV error is rethrown.</exception>
+        /// <returns>The WebDAV item, or null when the server answers 404 for both kinds.</returns>
+        /// <exception cref="WebDAVException">Any other WebDAV error is propagated with its original stack trace.</exception>
         public WebDAVClient.Model.Item GetRepositoryElement(String LocalFileName)
         {
             String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
-            WebDAVClient.Model.Item RepositoryElement = null;
+            bool LooksLikeFile = Path.GetFileName(LocalFileName.TrimEnd('\\')).Contains(".");
 
-            if (RepositoryDocumentName.Contains("."))
+            WebDAVClient.Model.Item RepositoryElement = LooksLikeFile ? TryGet(RepositoryDocumentName, false) : TryGet(RepositoryDocumentName, true);
+            if (RepositoryElement == null) RepositoryElement = LooksLikeFile ? TryGet(RepositoryDocumentName, true) : TryGet(RepositoryDocumentName, false);
+
+            if (RepositoryElement != null && FileNode.IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
+            return RepositoryElement;
+        }
+
+        /// <summary>
+        /// Looks up an element as a folder (URL with a trailing slash) or as a file.
+        /// </summary>
+        /// <returns>The WebDAV item, or null when the server answers 404. Any other error is propagated.</returns>
+        private WebDAVClient.Model.Item TryGet(String RepositoryDocumentName, bool AsFolder)
+        {
+            try
             {
-                //We assume the FileName refers to a file
-                try
-                {
-                    RepositoryElement = this.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
-                    return RepositoryElement;
-                }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
-                {
-                    return null;
-                }
-                catch (WebDAVException ex)
-                {
-                    throw ex;
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
+                return AsFolder ? this.GetFolder(RepositoryDocumentName).GetAwaiter().GetResult() : this.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
             }
-            else
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
             {
-                //We assume it's a folder
-                try
-                {
-                    RepositoryElement = this.GetFolder(RepositoryDocumentName).GetAwaiter().GetResult();
-                    if (FileNode.IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
-                    return RepositoryElement;
-                }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
-                {
-                    //Try as a file
-                    try
-                    {
-                        RepositoryElement = this.GetFile(RepositoryDocumentName).GetAwaiter().GetResult();
-                        return RepositoryElement;
-                    }
-                    catch (WebDAVException ex1) when (ex1.GetHttpCode() == 404)
-                    {
-                        return null;
-                    }
-                    catch (WebDAVException ex1)
-                    {
-                        throw ex1;
-                    }
-                    catch (Exception ex1)
-                    {
-                        throw ex1;
-                    }
-                }
-                catch (WebDAVException ex)
-                {
-                    throw ex;
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
+                return null;
             }
         }
     }

@@ -26,8 +26,10 @@ namespace KS2Drive.FS
         private CacheMode _mode;
         private bool _PreLoadFoldersInCache;
 
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+
         private object RunningRefreshActionListLock = new object();
-        private List<String> RunningRefreshActionList = new List<string>();
+        private HashSet<String> RunningRefreshActionList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Creates a cache manager.
@@ -41,8 +43,9 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Starts a background thread that refreshes the cached content of the given folder from the server,
-        /// unless a refresh for the same path is already planned or running.
+        /// Queues a refresh of the cached content of the given folder from the server on the thread pool,
+        /// unless a refresh for the same path is already planned or running. The thread pool limits the number of
+        /// concurrent refreshes, whereas a dedicated thread per folder could start hundreds of threads when pre-loading.
         /// </summary>
         private void AddRefreshTask(FileNode CFN)
         {
@@ -50,7 +53,7 @@ namespace KS2Drive.FS
             {
                 if (RunningRefreshActionList.Contains(CFN.LocalPath)) return; //An action is already planned or in progress for this path
                 RunningRefreshActionList.Add(CFN.LocalPath);
-                new Thread(() => InternalRefreshFolderCacheContent(CFN)).Start();
+                ThreadPool.QueueUserWorkItem(_ => InternalRefreshFolderCacheContent(CFN));
             }
         }
 
@@ -67,7 +70,6 @@ namespace KS2Drive.FS
 
         private static object CacheLock = new object();
 
-        //TODO : Add periodic MissingFileCache cleanup
         private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase); //Store the files that we know for sure that they do not exist
         private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>(StringComparer.OrdinalIgnoreCase); //Case-insensitive, like the file system (CaseSensitiveSearch = false)
 
@@ -356,8 +358,28 @@ namespace KS2Drive.FS
         /// </summary>
         private void InternalRefreshFolderCacheContent(FileNode CFN)
         {
+            try
+            {
+                RefreshFolderCacheContent(CFN);
+            }
+            catch (Exception ex)
+            {
+                //A background refresh must never crash the application
+                logger.Error($"Refresh of {CFN.LocalPath} failed : {ex.Message}");
+            }
+            finally
+            {
+                //Removed only once the cache has been updated, so that no duplicate refresh can start in between
+                RemoveRefreshTask(CFN);
+            }
+        }
+
+        /// <summary>
+        /// Lists the folder on the server and updates the cache with the result (see <see cref="InternalRefreshFolderCacheContent"/>).
+        /// </summary>
+        private void RefreshFolderCacheContent(FileNode CFN)
+        {
             var Result = ListRemoteServerFolderContent(CFN);
-            RemoveRefreshTask(CFN); //Server parsing operation has been made. The filenode status is now parsed
             if (!Result.Success) return;
 
             lock (CacheLock)
@@ -425,7 +447,7 @@ namespace KS2Drive.FS
             foreach (var Child in ItemsInFolder)
             {
                 var Element = new FileNode(Child);
-                if (Element.RepositoryPath.Equals(CFN.RepositoryPath)) continue; //Skip the entry matching the listed folder itself
+                if (FileNode.IsSameRepositoryPath(Element.RepositoryPath, CFN.RepositoryPath)) continue; //Skip the entry matching the listed folder itself
                 ChildrenFileNames.Add(new Tuple<string, FileNode>(Element.Name, Element));
             }
 
@@ -439,8 +461,24 @@ namespace KS2Drive.FS
         public void AddMissingFileNoLock(String FileOrFolderPath)
         {
             if (_mode == CacheMode.Disabled) return;
-            MissingFileCache.Remove(FileOrFolderPath);
-            MissingFileCache.Add(FileOrFolderPath, DateTime.Now);
+
+            //Expired entries are useless: purge them from time to time so that the dictionary does not grow forever
+            //(Explorer and applications probe many non-existent files: desktop.ini, thumbs.db, temporary files...)
+            if (MissingFileCache.Count >= MissingFileCachePurgeThreshold)
+            {
+                DateTime Now = DateTime.Now;
+                foreach (var ExpiredEntry in MissingFileCache.Where(x => (Now - x.Value).TotalSeconds > CacheDurationInSeconds).Select(x => x.Key).ToList())
+                {
+                    MissingFileCache.Remove(ExpiredEntry);
+                }
+            }
+
+            MissingFileCache[FileOrFolderPath] = DateTime.Now;
         }
+
+        /// <summary>
+        /// Number of entries in the known-missing files list above which expired entries are purged.
+        /// </summary>
+        private const Int32 MissingFileCachePurgeThreshold = 1000;
     }
 }

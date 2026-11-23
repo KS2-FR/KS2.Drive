@@ -6,6 +6,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -38,6 +39,16 @@ namespace KS2Drive
         private ContextMenu AppMenu;
 
         /// <summary>
+        /// "Mount/Unmount" entry of the tray menu, found by its Tag (not by its position, which would break if the menu is reordered).
+        /// </summary>
+        private MenuItem MountMenuItem => AppMenu.Items.OfType<MenuItem>().First(x => "Mount".Equals(x.Tag));
+
+        /// <summary>
+        /// "Configure" entry of the tray menu, found by its Tag.
+        /// </summary>
+        private MenuItem ConfigureMenuItem => AppMenu.Items.OfType<MenuItem>().First(x => "Configure".Equals(x.Tag));
+
+        /// <summary>
         /// Initializes the main window: checks that the required WinFSP version is installed (offering
         /// to install it, and quitting if that fails), creates the tray icon, starts the WinFSP service
         /// on a background thread and subscribes to its events, then either auto-mounts the drive or
@@ -50,7 +61,7 @@ namespace KS2Drive
             AppConfiguration = ((App)Application.Current).AppConfiguration;
 
             AppMenu = (ContextMenu)this.FindResource("NotifierContextMenu");
-            ((MenuItem)AppMenu.Items[0]).IsEnabled = AppConfiguration.IsConfigured;
+            MountMenuItem.IsEnabled = AppConfiguration.IsConfigured;
 
             this.Hide();
 
@@ -158,9 +169,9 @@ namespace KS2Drive
             }
 
             ItemsToLog.Clear();
-            ((MenuItem)AppMenu.Items[0]).Header = "_UNMOUNT";
+            MountMenuItem.Header = "_UNMOUNT";
             IsMounted = true;
-            ((MenuItem)AppMenu.Items[2]).IsEnabled = false;
+            ConfigureMenuItem.IsEnabled = false;
             Process.Start($@"{this.AppConfiguration.DriveLetter}:\");
         }
 
@@ -178,10 +189,10 @@ namespace KS2Drive
                 MessageBox.Show(ex.Message);
             }
 
-            ((MenuItem)AppMenu.Items[0]).Header = "_MOUNT";
+            MountMenuItem.Header = "_MOUNT";
             IsMounted = false;
-            ((MenuItem)AppMenu.Items[2]).IsEnabled = true;
-            ((MenuItem)AppMenu.Items[2]).ToolTip = null;
+            ConfigureMenuItem.IsEnabled = true;
+            ConfigureMenuItem.ToolTip = null;
         }
 
         /// <summary>
@@ -240,7 +251,7 @@ namespace KS2Drive
         {
             ConfigurationUI OptionWindow = new ConfigurationUI();
             OptionWindow.ShowDialog();
-            if (AppConfiguration.IsConfigured) ((MenuItem)AppMenu.Items[0]).IsEnabled = true;
+            if (AppConfiguration.IsConfigured) MountMenuItem.IsEnabled = true;
         }
 
         /// <summary>
@@ -295,9 +306,9 @@ namespace KS2Drive
             SFD.Filter = "CSV File|*.csv";
             SFD.Title = "Save a CSV File";
             SFD.FileName = "LogExport.csv";
-            SFD.ShowDialog();
 
-            if (!String.IsNullOrEmpty(SFD.FileName))
+            //FileName keeps its default value when the dialog is cancelled: only write when the user confirmed
+            if (SFD.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 try
                 {
@@ -325,12 +336,13 @@ namespace KS2Drive
             {
                 try
                 {
-                    File.Copy(FileInfo.LocalTemporaryPath, saveFileDialog.FileName);
+                    //The dialog has already asked the user to confirm the overwrite of an existing file
+                    File.Copy(FileInfo.LocalTemporaryPath, saveFileDialog.FileName, true);
                     MessageBox.Show("File has been saved");
                 }
-                catch
+                catch (Exception ex)
                 {
-                    MessageBox.Show("Failed to save file");
+                    MessageBox.Show($"Failed to save file : {ex.Message}");
                 }
             }
         }

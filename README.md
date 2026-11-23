@@ -23,4 +23,4 @@ AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfres
 <br/>
 
 Based on WinFSP by Bill Zissimopoulos (https://github.com/billziss-gh/winfsp)<br/>
-Based on the WebdavClient library by Sagui Itay (https://github.com/saguiitay/WebDAVClient)
+Based on the WebdavClient library by Sagui Itay (https://github.com/saguiitay/WebDAVClient). A modified copy of it is included in the WebDAVClient folder: it is not a git submodule, changes are made directly in this repository

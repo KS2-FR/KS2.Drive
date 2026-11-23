@@ -101,6 +101,46 @@ namespace WebDAVClient
         #endregion
 
 
+        /// <summary>
+        /// Creates a client that sends its requests through an existing <see cref="HttpClient"/>, which can be shared by many
+        /// <see cref="Client"/> instances (HttpClient is thread-safe). This avoids creating a handler and new connections for
+        /// every instance. The shared HttpClient is not disposed by this class.
+        /// </summary>
+        protected Client(HttpClient sharedClient)
+        {
+            _client = sharedClient ?? throw new ArgumentNullException(nameof(sharedClient));
+            _uploadClient = null;
+        }
+
+        /// <summary>
+        /// Creates an <see cref="HttpClient"/> configured like the one built by the public constructor
+        /// (credentials with pre-authentication, optional proxy and client certificate, no Expect: 100-continue),
+        /// to be shared through <see cref="Client(HttpClient)"/>.
+        /// </summary>
+        public static HttpClient CreateHttpClient(NetworkCredential credential = null, IWebProxy proxy = null, X509Certificate clientCert = null)
+        {
+            var handler = new WebRequestHandler();
+            if (proxy != null && handler.SupportsProxy)
+                handler.Proxy = proxy;
+            if (handler.SupportsAutomaticDecompression)
+                handler.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
+            if (credential != null)
+            {
+                handler.Credentials = credential;
+                handler.PreAuthenticate = true;
+            }
+
+            if (clientCert != null)
+            {
+                handler.ClientCertificateOptions = ClientCertificateOption.Manual;
+                handler.ClientCertificates.Add(clientCert);
+            }
+
+            var client = new HttpClient(handler);
+            client.DefaultRequestHeaders.ExpectContinue = false;
+            return client;
+        }
+
         public Client(NetworkCredential credential = null, TimeSpan? uploadTimeout = null, IWebProxy proxy = null, X509Certificate clientCert = null)
         {
             var handler = new WebRequestHandler();

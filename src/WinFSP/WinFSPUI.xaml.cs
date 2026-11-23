@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -69,7 +70,7 @@ namespace KS2Drive.WinFSP
             InstallingPanel.Visibility = Visibility.Visible;
             btn_Install.IsEnabled = false;
 
-            await IntallWinFSPAsync();
+            await InstallWinFSPAsync();
             this.Close();
         }
 
@@ -78,17 +79,22 @@ namespace KS2Drive.WinFSP
         /// to finish and deletes the package. Sets <see cref="IsInstallSuccessFull"/> when the installer
         /// exits with code 0. Cancellation and errors are handled internally.
         /// </summary>
-        private async Task IntallWinFSPAsync()
+        private async Task InstallWinFSPAsync()
         {
             try
             {
                 using (HttpClient client = new HttpClient())
                 {
                     var Response = await client.GetAsync(RequiredWinFSP.PackageURL, CT);
+                    //Never run an error page (404, proxy error...) as an installer
+                    Response.EnsureSuccessStatusCode();
                     var ResponseContent = Response.Content;
                     var FileContent = await ResponseContent.ReadAsByteArrayAsync();
-                    //Save a temporary file
-                    String TemporaryFilePath = Path.Combine(Path.GetTempPath(), "winFSP.msi");
+                    //An MSI package is an OLE compound file: check its signature before running it
+                    byte[] MsiSignature = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };
+                    if (FileContent.Length < MsiSignature.Length || !FileContent.Take(MsiSignature.Length).SequenceEqual(MsiSignature)) throw new InvalidDataException("The downloaded file is not an MSI package");
+                    //Save a temporary file, with a unique name so that an existing file cannot be run instead
+                    String TemporaryFilePath = Path.Combine(Path.GetTempPath(), $"winFSP_{Guid.NewGuid()}.msi");
                     File.WriteAllBytes(TemporaryFilePath, FileContent);
                     CT.ThrowIfCancellationRequested();
                     //msiexec parameters : https://stackoverflow.com/questions/11947909/how-to-report-msi-installation-status-on-quiet-install
@@ -109,7 +115,7 @@ namespace KS2Drive.WinFSP
             }
             catch (Exception ex)
             {
-                MessageBox.Show("An error occur when installing WinFSP");
+                MessageBox.Show($"An error occurred while installing WinFSP : {ex.Message}");
             }
         }
     }

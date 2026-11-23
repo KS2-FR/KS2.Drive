@@ -125,7 +125,7 @@ namespace KS2Drive.FS
                 this.RepositoryPath = WebDavObject.Href;
             }
 
-            this.LocalPath = HttpUtility.UrlDecode(ConvertRepositoryPathToLocalPath(this.RepositoryPath));
+            this.LocalPath = ConvertRepositoryPathToLocalPath(this.RepositoryPath); //Already URL-decoded
 
             if (this.RepositoryPath[this.RepositoryPath.Length - 1] == '/' && this.RepositoryPath.Length > 1) this.RepositoryPath = this.RepositoryPath.Remove(this.RepositoryPath.Length - 1);
 
@@ -164,16 +164,37 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Converts a repository path to a local path: strips the trailing slash and the document library path,
-        /// replaces '/' by '\' and makes sure the result starts with '\'. The result is not URL-decoded.
+        /// Converts a repository path (URL-encoded or not) to a local path: URL-decodes it, strips the trailing slash and the
+        /// document library path prefix, replaces '/' by '\' and makes sure the result starts with '\'.
+        /// The library path is only removed as a prefix (not elsewhere in the path), and the comparison is done on decoded,
+        /// case-insensitive paths since servers may encode or case the library path differently from the configured URL.
+        /// '+' is kept as is: it is a valid character in a path and does not mean a space there.
         /// </summary>
         public static String ConvertRepositoryPathToLocalPath(String CMISPath)
         {
-            if (CMISPath.EndsWith("/")) CMISPath = CMISPath.Substring(0, CMISPath.Length - 1);
+            String DecodedPath = Uri.UnescapeDataString(CMISPath);
+            if (DecodedPath.EndsWith("/")) DecodedPath = DecodedPath.Substring(0, DecodedPath.Length - 1);
 
-            String ReworkdPath = CMISPath.Replace(_DocumentLibraryPath, "").Replace('/', System.IO.Path.DirectorySeparatorChar);
+            String DecodedLibraryPath = Uri.UnescapeDataString(_DocumentLibraryPath);
+            if (DecodedPath.StartsWith(DecodedLibraryPath, StringComparison.OrdinalIgnoreCase) && (DecodedPath.Length == DecodedLibraryPath.Length || DecodedPath[DecodedLibraryPath.Length] == '/'))
+            {
+                DecodedPath = DecodedPath.Substring(DecodedLibraryPath.Length);
+            }
+
+            String ReworkdPath = DecodedPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
+        }
+
+        /// <summary>
+        /// Returns true if two repository paths designate the same element, whatever their URL encoding, trailing slash or case.
+        /// </summary>
+        internal static bool IsSameRepositoryPath(String Path1, String Path2)
+        {
+            if (Path1 == null || Path2 == null) return Path1 == Path2;
+            String Normalized1 = Uri.UnescapeDataString(Path1).TrimEnd('/');
+            String Normalized2 = Uri.UnescapeDataString(Path2).TrimEnd('/');
+            return String.Equals(Normalized1, Normalized2, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -237,11 +258,12 @@ namespace KS2Drive.FS
         //}
 
         /// <summary>
-        /// Returns true when the repository path is the document library path, i.e. the drive root.
+        /// Returns true when the repository path is the document library path, i.e. the drive root
+        /// (whatever the URL encoding, trailing slash or case).
         /// </summary>
         internal static bool IsRepositoryRootPath(String RepositoryPath)
         {
-            return RepositoryPath.Equals(_DocumentLibraryPath);
+            return IsSameRepositoryPath(RepositoryPath, _DocumentLibraryPath);
         }
 
         /// <summary>
@@ -251,7 +273,7 @@ namespace KS2Drive.FS
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (DocumentPath.Equals(_DocumentLibraryPath)) return "\\";
+            if (IsSameRepositoryPath(DocumentPath, _DocumentLibraryPath)) return "\\";
             return DocumentPath.Substring(DocumentPath.LastIndexOf('/') + 1);
         }
 
@@ -262,9 +284,27 @@ namespace KS2Drive.FS
         {
             if (DocumentPath.EndsWith("/")) DocumentPath = DocumentPath.Substring(0, DocumentPath.Length - 1);
 
-            if (DocumentPath.Equals(_DocumentLibraryPath)) return null;
+            if (IsSameRepositoryPath(DocumentPath, _DocumentLibraryPath)) return null;
             if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
+        }
+
+        /// <summary>
+        /// Deletes the temporary recovery file created by <see cref="GenerateLocalCopy"/>, if any. Called once the content has
+        /// been uploaded successfully: the copy is then obsolete and would otherwise stay in the temporary folder forever.
+        /// </summary>
+        internal void DeleteLocalCopy()
+        {
+            if (String.IsNullOrEmpty(TemporaryLocalCopyPath)) return;
+            try
+            {
+                System.IO.File.Delete(TemporaryLocalCopyPath);
+            }
+            catch
+            {
+                //Not blocking: the file stays in the temporary folder
+            }
+            TemporaryLocalCopyPath = "";
         }
 
         /// <summary>

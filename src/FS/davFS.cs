@@ -75,7 +75,7 @@ namespace KS2Drive.FS
             KernelCacheMode kernelCacheMode = (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), config.KernelCacheMode);
 
             this.MaxFileNodes = 500000;
-            this.MaxFileSize = UInt32.MaxValue;
+            this.MaxFileSize = 0x7FFFFFC7; //Largest byte array .NET can allocate (file contents are held in a byte[]): bigger files are refused with STATUS_DISK_FULL instead of failing later
             this.FlushMode = flushMode;
             this.WebDAVMode = webDAVMode;
             this.kernelCacheMode = kernelCacheMode;
@@ -1221,7 +1221,7 @@ namespace KS2Drive.FS
                     var Proxy = new WebDavClient2();
                     try
                     {
-                        if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData.Take((int)CFN.FileInfo.FileSize).ToArray()), CFN.Name).GetAwaiter().GetResult())
+                        if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
                         {
                             throw new Exception();
                         }
@@ -1260,6 +1260,7 @@ namespace KS2Drive.FS
                     }
 
                     CFN.HasUnflushedData = false; //The whole content has been uploaded, including any previous resize
+                    CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
@@ -1575,6 +1576,7 @@ namespace KS2Drive.FS
                 }
 
                 CFN.HasUnflushedData = false;
+                CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = Method, File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                 RepositoryActionPerformed?.Invoke(this, L);
                 DebugEnd(OperationId, null, $"{Method} : STATUS_SUCCESS");

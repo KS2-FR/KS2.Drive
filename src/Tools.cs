@@ -131,27 +131,32 @@ namespace KS2Drive
 
         /// <summary>
         /// Checks whether an MSI product is installed by looking for its product code under the Uninstall registry keys
-        /// (current user, local machine, and local machine WOW6432Node).
+        /// of the current user and of the local machine, in both the 64-bit and the 32-bit registry views (whatever the
+        /// bitness of this process). Missing keys are ignored.
         /// </summary>
         /// <param name="ProductCode">MSI product code, including braces (e.g. "{...}").</param>
         public static bool IsMsiIntalled(String ProductCode)
         {
-            // search in: CurrentUser
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
-            {
-                if (key.GetSubKeyNames().FirstOrDefault(x => x.Equals(ProductCode)) != null) return true;
-            }
+            const String UninstallKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
 
-            // search in: LocalMachine_32
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+            foreach (RegistryHive Hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
             {
-                if (key.GetSubKeyNames().FirstOrDefault(x => x.Equals(ProductCode)) != null) return true;
-            }
-
-            // search in: LocalMachine_64
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"))
-            {
-                if (key.GetSubKeyNames().FirstOrDefault(x => x.Equals(ProductCode)) != null) return true;
+                foreach (RegistryView View in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+                {
+                    try
+                    {
+                        using (RegistryKey BaseKey = RegistryKey.OpenBaseKey(Hive, View))
+                        using (RegistryKey UninstallKey = BaseKey.OpenSubKey(UninstallKeyPath))
+                        {
+                            if (UninstallKey == null) continue; //The key may not exist (e.g. for the current user)
+                            if (UninstallKey.GetSubKeyNames().Any(x => x.Equals(ProductCode, StringComparison.OrdinalIgnoreCase))) return true;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        //Unreadable view or key: try the next one
+                    }
+                }
             }
 
             return false;

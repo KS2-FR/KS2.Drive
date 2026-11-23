@@ -42,9 +42,9 @@ namespace KS2Drive
         private Mutex UnicityMutex = null;
 
         /// <summary>
-        /// Initializes the application: acquires the single-instance mutex (shutting down if another
-        /// instance owns it), ensures the configuration folder exists, loads the configuration
-        /// and applies the configured proxy.
+        /// Initializes the application: acquires the single-instance mutex (exiting the process if another
+        /// instance owns it), ensures the configuration folder exists (exiting the process if it cannot be created),
+        /// loads the configuration and applies the configured proxy.
         /// </summary>
         public App()
         {
@@ -52,8 +52,10 @@ namespace KS2Drive
             UnicityMutex = new Mutex(true, "KS2.Drive", out MutexAcquisitionSuccess);
             if (!MutexAcquisitionSuccess)
             {
-                MessageBox.Show("Another instance of this program is already runnning.", "KS² Drive");
-                App.Current.Shutdown();
+                MessageBox.Show("Another instance of this program is already running.", "KS² Drive");
+                //Exit right away: Shutdown() would let the startup continue (configuration loading, main window, WinFSP service...)
+                UnicityMutex.Dispose();
+                Environment.Exit(0);
             }
 
             #region Loading configuration
@@ -67,8 +69,10 @@ namespace KS2Drive
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message);
-                    return;
+                    //Without a configuration the main window cannot start: exit instead of crashing on a null configuration
+                    MessageBox.Show($"Cannot create the configuration folder {ConfigurationFolderPath} : {ex.Message}\n\nKS² Drive will now close.", "KS² Drive", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UnicityMutex.Dispose();
+                    Environment.Exit(1);
                 }
             }
 

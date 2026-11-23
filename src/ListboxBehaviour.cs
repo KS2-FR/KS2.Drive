@@ -72,7 +72,10 @@ namespace KS2Drive
                 listBox.Loaded -= ListBox_Loaded;
                 listBox.Unloaded -= ListBox_Unloaded;
                 if (Associations.ContainsKey(listBox))
+                {
                     Associations[listBox].Dispose();
+                    Associations.Remove(listBox); //The static dictionary must not keep the list box alive
+                }
                 var itemsSourcePropertyDescriptor = TypeDescriptor.GetProperties(listBox)["ItemsSource"];
                 itemsSourcePropertyDescriptor.RemoveValueChanged(listBox, ListBox_ItemsSourceChanged);
             }
@@ -90,13 +93,16 @@ namespace KS2Drive
         }
 
         /// <summary>
-        /// Drops the collection-change subscription when the list box is unloaded.
+        /// Drops the collection-change subscription when the list box is unloaded and forgets the list box.
         /// </summary>
         static void ListBox_Unloaded(object sender, RoutedEventArgs e)
         {
             var listBox = (ListBox)sender;
             if (Associations.ContainsKey(listBox))
+            {
                 Associations[listBox].Dispose();
+                Associations.Remove(listBox); //The static dictionary must not keep the list box alive
+            }
             listBox.Unloaded -= ListBox_Unloaded;
         }
 
