@@ -839,9 +839,8 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// WinFSP callback invoked when a file handle is closed. Whatever the flush mode, if the node still has unflushed data and is
-        /// not deleted, its in-memory content (up to <c>FileSize</c>) is uploaded to the server; on upload failure a local temporary
-        /// copy is generated and a failure is reported. The open handle count is then decremented and, when it reaches zero,
+        /// WinFSP callback invoked when a file handle is closed. Whatever the flush mode, pending changes are uploaded
+        /// (see <see cref="UploadPendingChanges"/>). The open handle count is then decremented and, when it reaches zero,
         /// the in-memory content is released.
         /// </summary>
         public override void Close(
@@ -849,49 +848,23 @@ namespace KS2Drive.FS
             Object FileDesc)
         {
             FileNode CFN = (FileNode)FileNode0;
-            LogListItem L;
 
             lock (CFN.OperationLock)
             {
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
-                //Pending changes are uploaded whatever the flush mode: in FlushAtWrite mode a resize without a following write
-                //(e.g. a truncation) also leaves unflushed data
-                {
-                    if (CFN.HasUnflushedData && !CFN.IsDeleted)
-                    {
-                        try
-                        {
-                            if (CFN.FileData != null)
-                            {
-                                var Proxy = new WebDavClient2();
-                                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
-                                {
-                                    throw new Exception("Upload failed");
-                                }
-                            }
-                            CFN.HasUnflushedData = false;
-                            L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Close Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
-                            RepositoryActionPerformed?.Invoke(this, L);
-                            DebugEnd(OperationId, null, "STATUS_SUCCESS");
-                        }
-                        catch (Exception ex)
-                        {
-                            //Whatever the failure (refused upload, network error, 401...), keep a local copy so the user can recover the data
-                            if (CFN.FileData != null) CFN.GenerateLocalCopy();
-                            if (IsAuthenticationError(ex)) OnAuthenticationFailed();
-                            L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Close Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
-                            RepositoryActionPerformed?.Invoke(this, L);
-                            //Cache.DeleteFileNode(CFN); //TODO : ??
-                            DebugEnd(OperationId, null, "STATUS_FAILED");
-                            //Do not return here: the handle must still be released below
-                        }
-                    }
-                }
+                //Last chance to upload pending changes (whatever the flush mode). On failure, the handle is still released below
+                UploadPendingChanges(CFN, "Close Flush", OperationId);
 
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
-                if (HandleCount == 0) CFN.FileData = null; //No more handle on the file, we free its content
+                if (HandleCount == 0)
+                {
+                    //No more handle on the file, we free its content. Changes that could not be uploaded are only kept in the
+                    //local recovery copy: the flag is cleared so that the node can be refreshed from the server again
+                    CFN.FileData = null;
+                    CFN.HasUnflushedData = false;
+                }
                 DebugEnd(OperationId, CFN, $"STATUS_SUCCESS  - Handle {HandleCount}");
             }
         }
@@ -902,8 +875,8 @@ namespace KS2Drive.FS
         /// <list type="bullet">
         /// <item><c>CleanupSetAllocationSize</c>: shrinks the in-memory allocation to the file size rounded up to the allocation unit.</item>
         /// <item><c>CleanupDelete</c>: deletes the file or folder on the server, removes it from the cache and marks the node as deleted.</item>
-        /// <item>Otherwise, if allocation size, archive bit or last write time changed (whatever the flush mode):
-        /// uploads the in-memory content if the node has unflushed data (a local temporary copy is generated if the upload fails).</item>
+        /// <item>Otherwise: uploads the in-memory content if the node has unflushed data, whatever the flags and the flush mode
+        /// (see <see cref="UploadPendingChanges"/>).</item>
         /// </list>
         /// Results are reported through <see cref="RepositoryActionPerformed"/>.
         /// </summary>
@@ -976,40 +949,11 @@ namespace KS2Drive.FS
                         }
                     }
                 }
-                else if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
+                else
                 {
-                    if (!CFN.IsDeleted) //Whatever the flush mode, see Close
-                    {
-                        var Proxy = new WebDavClient2();
-                        if (CFN.HasUnflushedData)
-                        {
-                            try
-                            {
-                                if (CFN.FileData != null)
-                                {
-                                    if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
-                                    {
-                                        throw new Exception("Upload failed");
-                                    }
-                                }
-                                CFN.HasUnflushedData = false;
-                                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
-                                RepositoryActionPerformed?.Invoke(this, L);
-                                DebugEnd(OperationId, null, "STATUS_SUCCESS");
-                            }
-                            catch (Exception ex)
-                            {
-                                //Whatever the failure (refused upload, network error, 401...), keep a local copy so the user can recover the data
-                                if (CFN.FileData != null) CFN.GenerateLocalCopy();
-                                if (IsAuthenticationError(ex)) OnAuthenticationFailed();
-                                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Cleanup Flush", File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
-                                RepositoryActionPerformed?.Invoke(this, L);
-                                DebugEnd(OperationId, null, "STATUS_FAILED");
-                                //TODO : Remove from Cache ??
-                                return;
-                            }
-                        }
-                    }
+                    //Upload pending changes whatever the cleanup flags: the flags only tell which metadata changed, while
+                    //HasUnflushedData tells whether the content differs from the server (writes, truncation, overwrite)
+                    UploadPendingChanges(CFN, "Cleanup Flush", OperationId);
                 }
 
                 /*
@@ -1554,28 +1498,81 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// WinFSP callback for FlushFileBuffers. Does not upload anything (uploads happen in <see cref="Write"/>, <see cref="Cleanup"/>
-        /// or <see cref="Close"/> depending on the flush mode); it only returns the current file information.
+        /// WinFSP callback for FlushFileBuffers (e.g. an application saving a document and asking for the data to be persisted).
+        /// Uploads the pending changes of the file, whatever the flush mode (see <see cref="UploadPendingChanges"/>).
+        /// A volume flush (<paramref name="FileNode0"/> is null) does nothing.
         /// </summary>
-        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
+        /// <returns><c>STATUS_SUCCESS</c> if there was nothing to upload or the upload succeeded, <c>STATUS_UNEXPECTED_IO_ERROR</c> otherwise.</returns>
         public override Int32 Flush(
             Object FileNode0,
             Object FileDesc,
             out FileInfo FileInfo)
         {
-            DateTime StartTime = DateTime.Now;
             FileNode CFN = (FileNode)FileNode0;
+            if (CFN == null)
+            {
+                //Flush of the whole volume: pending changes of each file are uploaded by its own Flush/Cleanup/Close
+                FileInfo = default(FileInfo);
+                return STATUS_SUCCESS;
+            }
 
             lock (CFN.OperationLock)
             {
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
-                FileInfo = (null != CFN ? CFN.FileInfo : default(FileInfo));
+                bool Success = UploadPendingChanges(CFN, "Flush", OperationId);
+                FileInfo = CFN.FileInfo;
 
-                DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
+                DebugEnd(OperationId, CFN, Success ? "STATUS_SUCCESS" : "STATUS_UNEXPECTED_IO_ERROR");
+                return Success ? STATUS_SUCCESS : STATUS_UNEXPECTED_IO_ERROR;
+            }
+        }
 
-                return STATUS_SUCCESS;
+        /// <summary>
+        /// Uploads the in-memory content of a node (up to <c>FileSize</c>) if it has unflushed data and is not deleted.
+        /// Must be called with the node's <c>OperationLock</c> held. On success the unflushed flag is cleared. On failure
+        /// (refused upload, network error, 401...) a local recovery copy is generated, a 401 is reported through
+        /// <see cref="OnAuthenticationFailed"/>, and the flag is kept so that a later Flush/Cleanup/Close can try again.
+        /// The result is reported through <see cref="RepositoryActionPerformed"/>.
+        /// </summary>
+        /// <param name="CFN">Node to upload.</param>
+        /// <param name="Method">Name of the operation, used in the activity log (e.g. "Cleanup Flush").</param>
+        /// <param name="OperationId">Identifier of the calling operation, used in the debug log.</param>
+        /// <returns><c>true</c> if there was nothing to upload or the upload succeeded, <c>false</c> otherwise.</returns>
+        private bool UploadPendingChanges(FileNode CFN, String Method, String OperationId)
+        {
+            if (!CFN.HasUnflushedData || CFN.IsDeleted) return true;
+
+            LogListItem L;
+            try
+            {
+                Stream Content;
+                if (CFN.FileData != null) Content = new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize);
+                else if (CFN.FileInfo.FileSize == 0) Content = new MemoryStream(new byte[0]); //Emptied file (e.g. overwritten or truncated to 0)
+                else throw new InvalidOperationException("The content to upload is not loaded"); //Never upload an empty content in place of the real one
+
+                var Proxy = new WebDavClient2();
+                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), Content, CFN.Name).GetAwaiter().GetResult())
+                {
+                    throw new Exception("Upload failed");
+                }
+
+                CFN.HasUnflushedData = false;
+                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = Method, File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
+                RepositoryActionPerformed?.Invoke(this, L);
+                DebugEnd(OperationId, null, $"{Method} : STATUS_SUCCESS");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                //Whatever the failure, keep a local copy so the user can recover the data
+                if (CFN.FileData != null) CFN.GenerateLocalCopy();
+                if (IsAuthenticationError(ex)) OnAuthenticationFailed();
+                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = Method, File = CFN.LocalPath, Result = "STATUS_FAILED", LocalTemporaryPath = CFN.TemporaryLocalCopyPath };
+                RepositoryActionPerformed?.Invoke(this, L);
+                DebugEnd(OperationId, null, $"{Method} : STATUS_FAILED - {ex.Message}");
+                return false;
             }
         }
 
