@@ -21,8 +21,17 @@ namespace KS2Drive
                                 object parameter,
                                 System.Globalization.CultureInfo culture)
         {
-            if (System.Convert.ToInt32(values[0]) == 2 && (bool)values[1]) return true;
-            return false;
+            //While a binding source is not resolved yet, WPF passes DependencyProperty.UnsetValue (or null): treat it as "not active"
+            if (values == null || values.Length < 2) return false;
+            if (!(values[1] is bool AuthenticationRequired) || !AuthenticationRequired) return false;
+            try
+            {
+                return System.Convert.ToInt32(values[0]) == 2;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /// <summary>

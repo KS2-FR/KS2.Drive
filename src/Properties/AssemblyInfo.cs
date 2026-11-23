@@ -52,6 +52,9 @@ using System.Windows;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 
-//WARNING ! DO NOT CHANGE ASSEMBLY VERSION AS IT IS USED AS ENTROPY FOR DPADPI. CHANGING VERSION WOULD RESULT IN CONFIGURATION RESET
+//The assembly version is no longer used to encrypt the configuration (see Tools.Protect): it can be changed freely.
+//Configurations saved by releases up to 0.8.6.1 (assembly version 0.8.4.0) are still read and migrated.
 [assembly: AssemblyVersion("0.8.4.0")]
 [assembly: AssemblyFileVersion("0.8.4.0")]
+
+[assembly: InternalsVisibleTo("KS2Drive.Tests")]

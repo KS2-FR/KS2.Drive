@@ -194,77 +194,113 @@ namespace KS2Drive.FS
             String OperationId = Guid.NewGuid().ToString();
             TraceStart(OperationId, FileName);
 
+            var Lookup = LookupFileNode(FileName);
+            if (Lookup.Status != STATUS_SUCCESS)
+            {
+                FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
+                TraceEnd(OperationId, null, $"{Lookup.Status} - {Lookup.Detail}");
+                return Lookup.Status;
+            }
+
+            FileAttributes = Lookup.Node.FileInfo.FileAttributes;
+            if (null != SecurityDescriptor) SecurityDescriptor = Lookup.Node.FileSecurity;
+            TraceEnd(OperationId, Lookup.Node, $"STATUS_SUCCESS - {Lookup.Detail}");
+            return STATUS_SUCCESS;
+        }
+
+        /// <summary>
+        /// Finds the node of a local path: from the cache, or else from the server (then cached). Elements that do not exist
+        /// on the server are remembered as missing (see <see cref="CacheManager.AddMissingFileNoLock"/>).
+        /// The cache lock is only held to read and update the cache, never during the request to the server: holding it there
+        /// blocked every other file system operation (e.g. Explorer listing a folder) for the duration of each request,
+        /// which froze Explorer while Office was saving a document (Office probes many temporary file names).
+        /// </summary>
+        /// <returns>The status (<c>STATUS_SUCCESS</c>, <c>STATUS_OBJECT_NAME_NOT_FOUND</c> — also on 401, which raises
+        /// <see cref="RepositoryAuthenticationFailed"/> — or <c>STATUS_NETWORK_UNREACHABLE</c> on a transport error), the node on
+        /// success, and a short description for the logs.</returns>
+        private (Int32 Status, FileNode Node, String Detail) LookupFileNode(String FileName)
+        {
+            Cache.Lock();
             try
             {
-                Cache.Lock();
-
                 var KnownNode = Cache.GetFileNodeNoLock(FileName);
-                if (KnownNode.node == null)
-                {
-                    if (KnownNode.IsNonExistent)
-                    {
-                        //The file is known to be non-existent
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        TraceEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND");
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
+                if (KnownNode.node != null) return (STATUS_SUCCESS, KnownNode.node, "From Cache");
+                if (KnownNode.IsNonExistent) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Known to be non-existent");
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
 
-                    WebDAVClient.Model.Item FoundElement;
+            WebDAVClient.Model.Item RepositoryElement;
+            try
+            {
+                var Proxy = new WebDavClient2();
+                RepositoryElement = Proxy.GetRepositoryElement(FileName);
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                OnAuthenticationFailed();
+                return (STATUS_OBJECT_NAME_NOT_FOUND, null, "401");
+            }
+            catch (HttpRequestException ex)
+            {
+                return (STATUS_NETWORK_UNREACHABLE, null, ex.Message); //Not remembered as missing: it may exist
+            }
+            catch (Exception ex)
+            {
+                AddMissingFile(FileName);
+                return (STATUS_OBJECT_NAME_NOT_FOUND, null, ex.Message);
+            }
 
-                    try
-                    {
-                        var Proxy = new WebDavClient2();
-                        FoundElement = Proxy.GetRepositoryElement(FileName);
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        OnAuthenticationFailed();
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-                    catch (WebDAVException ex)
-                    {
-                        Cache.AddMissingFileNoLock(FileName);
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        TraceEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        TraceEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception ex)
-                    {
-                        Cache.AddMissingFileNoLock(FileName);
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        TraceEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                        return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
+            if (RepositoryElement == null)
+            {
+                AddMissingFile(FileName);
+                return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Not found on the server");
+            }
 
-                    if (FoundElement == null)
-                    {
-                        Cache.AddMissingFileNoLock(FileName);
-                        FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                        TraceEnd(OperationId, null, "STATUS_OBJECT_NAME_NOT_FOUND");
-                        return FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
+            Cache.Lock();
+            try
+            {
+                //Another operation may have cached the same element meanwhile: the cached instance is returned in that case
+                return (STATUS_SUCCESS, Cache.AddFileNodeNoLock(new FileNode(RepositoryElement)), "From Repository");
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+        }
 
-                    var D = Cache.AddFileNodeNoLock(new FileNode(FoundElement)); //Use the cached instance if the path is already known (e.g. with another case)
-                    if (SecurityDescriptor != null) SecurityDescriptor = D.FileSecurity;
-                    FileAttributes = D.FileInfo.FileAttributes;
-                    TraceEnd(OperationId, D, "STATUS_SUCCESS - From Repository");
-                    return STATUS_SUCCESS;
+        /// <summary>
+        /// Returns whether an element exists at a local path. When the cache knows the path is missing (e.g. Office probed its
+        /// temporary file name just before), no request is sent; otherwise the server is asked. Used by <see cref="Create"/> and
+        /// <see cref="Rename"/>, which run while WinFSP holds a lock on the parent folder or on the volume: every request avoided
+        /// there shortens the time Explorer is blocked. Errors (401, network...) are propagated to the caller.
+        /// </summary>
+        private bool ElementExists(String FileName, WebDavClient2 Proxy)
+        {
+            Cache.Lock();
+            try
+            {
+                if (Cache.GetFileNodeNoLock(FileName).IsNonExistent) return false;
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
 
-                }
-                else
-                {
-                    FileAttributes = KnownNode.node.FileInfo.FileAttributes;
-                    if (null != SecurityDescriptor) SecurityDescriptor = KnownNode.node.FileSecurity;
-                    TraceEnd(OperationId, KnownNode.node, "STATUS_SUCCESS - From Cache");
-                    return STATUS_SUCCESS;
-                }
+            return Proxy.GetRepositoryElement(FileName) != null;
+        }
+
+        /// <summary>
+        /// Remembers that a path does not exist on the server, taking the cache lock.
+        /// </summary>
+        private void AddMissingFile(String FileName)
+        {
+            Cache.Lock();
+            try
+            {
+                Cache.AddMissingFileNoLock(FileName);
             }
             finally
             {
@@ -302,78 +338,20 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             NormalizedName = default(String);
 
-            try
+            //The cache lock is not held during the request to the server (see LookupFileNode)
+            var Lookup = LookupFileNode(FileName);
+            if (Lookup.Status != STATUS_SUCCESS)
             {
-                Cache.Lock();
-
-                var KnownNode = Cache.GetFileNodeNoLock(FileName);
-
-                if (KnownNode.node == null)
-                {
-                    if (KnownNode.IsNonExistent)
-                    {
-                        //The file is known to be non-existent
-                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND");
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-
-                    WebDAVClient.Model.Item RepositoryObject;
-
-                    try
-                    {
-                        var Proxy = new WebDavClient2();
-                        RepositoryObject = Proxy.GetRepositoryElement(FileName);
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        OnAuthenticationFailed();
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-                    catch (WebDAVException ex)
-                    {
-                        Cache.AddMissingFileNoLock(FileName);
-                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        DebugEnd(OperationId, null, $"STATUS_NETWORK_UNREACHABLE - {ex.Message}");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception ex)
-                    {
-                        Cache.AddMissingFileNoLock(FileName);
-                        DebugEnd(OperationId, null, $"STATUS_OBJECT_NAME_NOT_FOUND - {ex.Message}");
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-
-                    if (RepositoryObject == null)
-                    {
-                        Cache.AddMissingFileNoLock(FileName);
-                        DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_NOT_FOUND");
-                        return STATUS_OBJECT_NAME_NOT_FOUND;
-                    }
-
-                    KnownNode.node = Cache.AddFileNodeNoLock(new FileNode(RepositoryObject)); //Use the cached instance if the path is already known (e.g. with another case)
-
-                    Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
-                    DebugEnd(OperationId, KnownNode.node, $"STATUS_SUCCESS - From Repository - Handle {i}");
-                }
-                else
-                {
-                    Int32 i = Interlocked.Increment(ref KnownNode.node.OpenCount);
-                    DebugEnd(OperationId, KnownNode.node, $"STATUS_SUCCESS - From cache - Handle {i}");
-                }
-
-                FileNode0 = KnownNode.node;
-                FileInfo = KnownNode.node.FileInfo;
-                NormalizedName = FileName;
-            }
-            finally
-            {
-                Cache.Unlock();
+                DebugEnd(OperationId, null, $"{Lookup.Status} - {Lookup.Detail}");
+                return Lookup.Status;
             }
 
+            Int32 HandleCount = Interlocked.Increment(ref Lookup.Node.OpenCount);
+            DebugEnd(OperationId, Lookup.Node, $"STATUS_SUCCESS - {Lookup.Detail} - Handle {HandleCount}");
+
+            FileNode0 = Lookup.Node;
+            FileInfo = Lookup.Node.FileInfo;
+            NormalizedName = FileName;
             return STATUS_SUCCESS;
         }
 
@@ -552,8 +530,9 @@ namespace KS2Drive.FS
 
             try
             {
-                WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(FileName);
-                if (KnownRepositoryElement != null)
+                //WinFSP holds a lock on the parent folder during Create (Explorer cannot list it meanwhile): skip the existence check
+                //when the cache already knows the name is free (it was probed just before, which is what Office and Explorer do)
+                if (ElementExists(FileName, Proxy))
                 {
                     DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_COLLISION");
                     return STATUS_OBJECT_NAME_COLLISION;
@@ -781,7 +760,7 @@ namespace KS2Drive.FS
                 try
                 {
                     //The previous content is discarded: start from an empty file instead of downloading or copying the old content
-                    CFN.FileData = null;
+                    CFN.FileData = new byte[0]; //Loaded and empty (null would mean "not loaded" and the old content would be downloaded again)
                     CFN.FileInfo.FileSize = 0;
                     CFN.FileInfo.AllocationSize = 0;
 
@@ -1192,8 +1171,8 @@ namespace KS2Drive.FS
                             logger.Trace($"{CFN.ObjectId} ***Write*** {CFN.Name} [{Path.GetFileName(CFN.Name)}] Case 2");
                             BytesTransferred = default(UInt32);
                             FileInfo = default(FileInfo);
-                            DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR : " + Result.ToString());
-                            return STATUS_UNEXPECTED_IO_ERROR;
+                            DebugEnd(OperationId, CFN, "Resize failed : " + Result.ToString());
+                            return Result; //Keep the precise status (e.g. STATUS_DISK_FULL beyond the maximum file size)
                         }
                     }
                 }
@@ -1353,10 +1332,16 @@ namespace KS2Drive.FS
 
                 var Proxy = new WebDavClient2();
 
+                //A case-only rename (a.txt -> A.txt) targets the element itself on a case-insensitive server: the target must not
+                //be looked up, otherwise it is found and reported as a collision, or even deleted with ReplaceIfExists (data loss)
+                bool IsCaseOnlyRename = String.Equals(FileName, NewFileName, StringComparison.OrdinalIgnoreCase);
+
                 try
                 {
-                    WebDAVClient.Model.Item KnownRepositoryElement = Proxy.GetRepositoryElement(NewFileName);
-                    if (KnownRepositoryElement != null)
+                    //The cache answers when it knows the target is missing (Office probes its temporary names just before renaming):
+                    //WinFSP blocks the whole volume during a rename, so every request avoided here unfreezes Explorer sooner
+                    bool TargetExists = !IsCaseOnlyRename && ElementExists(NewFileName, Proxy);
+                    if (TargetExists)
                     {
                         if (!ReplaceIfExists)
                         {
@@ -1393,9 +1378,17 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE");
                     return STATUS_NETWORK_UNREACHABLE;
                 }
-                catch (Exception ex)
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                 {
-                    if (IsAuthenticationError(ex)) OnAuthenticationFailed();
+                    //Same result as a 401 during the MOVE itself
+                    OnAuthenticationFailed();
+                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_NETWORK_UNREACHABLE" };
+                    RepositoryActionPerformed?.Invoke(this, L);
+                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE");
+                    return STATUS_NETWORK_UNREACHABLE;
+                }
+                catch (Exception)
+                {
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_CANNOT_MAKE" };
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, CFN, $"STATUS_CANNOT_MAKE");
@@ -1407,13 +1400,23 @@ namespace KS2Drive.FS
                     //File
                     try
                     {
-                        if (!Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
+                        //"Overwrite: F": the target is not expected to exist (missing, or deleted above). If it exists after all (e.g. created
+                        //by another client, or the cache was stale), the server answers 412 instead of silently replacing it
+                        if (!(IsCaseOnlyRename ? Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName) : Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName, false)).GetAwaiter().GetResult())
                         {
                             L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_ACCESS_DENIED" };
                             RepositoryActionPerformed?.Invoke(this, L);
                             DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
                             return STATUS_ACCESS_DENIED;
                         }
+                    }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 412)
+                    {
+                        //"Overwrite: F" and the target exists on the server after all
+                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_OBJECT_NAME_COLLISION" };
+                        RepositoryActionPerformed?.Invoke(this, L);
+                        DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_COLLISION");
+                        return STATUS_OBJECT_NAME_COLLISION;
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
@@ -1440,13 +1443,21 @@ namespace KS2Drive.FS
                     //Directory
                     try
                     {
-                        if (!Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName).GetAwaiter().GetResult())
+                        if (!(IsCaseOnlyRename ? Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName) : Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName, false)).GetAwaiter().GetResult())
                         {
                             L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_ACCESS_DENIED" };
                             RepositoryActionPerformed?.Invoke(this, L);
                             DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
                             return STATUS_ACCESS_DENIED;
                         }
+                    }
+                    catch (WebDAVException ex) when (ex.GetHttpCode() == 412)
+                    {
+                        //"Overwrite: F" and the target exists on the server after all
+                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_OBJECT_NAME_COLLISION" };
+                        RepositoryActionPerformed?.Invoke(this, L);
+                        DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_COLLISION");
+                        return STATUS_OBJECT_NAME_COLLISION;
                     }
                     catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
                     {
@@ -1473,6 +1484,7 @@ namespace KS2Drive.FS
                 CFN.Name = FileNode.GetRepositoryDocumentName(RepositoryTargetDocumentName);
                 CFN.LocalPath = NewFileName;
                 Cache.RenameFileNodeKey(FileName, NewFileName);
+                if (!IsCaseOnlyRename) AddMissingFile(FileName); //The old name no longer exists: later probes of it need no request
 
                 if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0)
                 {
@@ -1700,31 +1712,16 @@ namespace KS2Drive.FS
 
         /// <summary>
         /// Builds the <see cref="FileNode"/> of an element that has just been created on the server by <see cref="Create"/>.
-        /// The element is read back from the server; if it cannot be found (server not yet consistent, folder name containing
-        /// a dot...) the node is built locally, since the server has already confirmed the creation. This avoids reporting a
-        /// failure for an element that exists on the server, which would then make every retry fail with a name collision.
+        /// The node is built locally, without reading the element back from the server: the server has already confirmed the
+        /// creation, and WinFSP holds a lock on the parent folder during Create (Explorer cannot list it meanwhile), so the extra
+        /// request would only lengthen that freeze. Reading it back could also fail (server not yet consistent...) for an element
+        /// that does exist. The server metadata (dates, etag) is picked up by the next refresh of the folder.
         /// </summary>
-        /// <param name="Proxy">WebDAV client used for the creation.</param>
+        /// <param name="Proxy">WebDAV client used for the creation (not used any more, kept for the call sites).</param>
         /// <param name="FileName">Local path of the created element.</param>
         /// <param name="IsDirectory">True for a folder, false for a file.</param>
-        /// <exception cref="WebDAVException">HTTP 401 while reading the element back (handled by the caller).</exception>
         private FileNode GetCreatedFileNode(WebDavClient2 Proxy, String FileName, bool IsDirectory)
         {
-            try
-            {
-                WebDAVClient.Model.Item CreatedElement = Proxy.GetRepositoryElement(FileName);
-                if (CreatedElement != null) return new FileNode(CreatedElement);
-                logger.Trace($"Create {FileName} : created element not found on the server, building it locally");
-            }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                logger.Trace($"Create {FileName} : cannot read the created element back ({ex.Message}), building it locally");
-            }
-
             DateTime Now = DateTime.Now;
             var LocalElement = new WebDAVClient.Model.Item()
             {
@@ -1809,7 +1806,8 @@ namespace KS2Drive.FS
                     {
                         if (NewSize > MaxFileSize) return STATUS_DISK_FULL;
 
-                        byte[] FileData = null;
+                        //An empty array, not null: null means "content not loaded yet" and would make the next read download the old content again
+                        byte[] FileData = new byte[0];
                         if (NewSize != 0)
                         {
                             try
@@ -2174,11 +2172,12 @@ namespace KS2Drive.FS
         /// <param name="dic">Dictionary to modify.</param>
         /// <param name="fromKey">Current key.</param>
         /// <param name="toKey">New key.</param>
-        /// <exception cref="KeyNotFoundException">Thrown if <paramref name="fromKey"/> is not present.</exception>
+        /// Does nothing if <paramref name="fromKey"/> is not present.
         public static void RenameKey<TKey, TValue>(this IDictionary<TKey, TValue> dic,
                                       TKey fromKey, TKey toKey)
         {
-            TValue value = dic[fromKey];
+            //The key may be missing (e.g. a node invalidated after a failed upload, then renamed): nothing to rename then
+            if (!dic.TryGetValue(fromKey, out TValue value)) return;
             dic.Remove(fromKey);
             dic[toKey] = value;
         }

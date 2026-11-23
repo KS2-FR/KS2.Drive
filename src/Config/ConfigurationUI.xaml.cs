@@ -14,7 +14,7 @@ using System.Windows.Controls;
 namespace KS2Drive.Config
 {
     /// <summary>
-    /// Configuration dialog: server URL/type and credentials, drive letter, WinFSP cache and flush
+    /// Configuration dialog: server URL (standard WebDAV only) and credentials, drive letter, WinFSP cache and flush
     /// options, client certificate, proxy and auto-start settings.
     /// </summary>
     public partial class ConfigurationUI : MetroWindow
@@ -62,12 +62,6 @@ namespace KS2Drive.Config
 
             CBFreeDrives.SelectedIndex = 0;
 
-            CBMode.SelectedValuePath = "Key";
-            CBMode.DisplayMemberPath = "Value";
-            CBMode.Items.Add(new KeyValuePair<int, string>(0, "webDAV"));
-            CBMode.Items.Add(new KeyValuePair<int, string>(1, "AOS"));
-            CBMode.SelectedIndex = 0;
-
             CBKernelCache.SelectedValuePath = "Key";
             CBKernelCache.DisplayMemberPath = "Value";
             CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.Disabled, KernelCacheMode.Disabled.ToString()));
@@ -103,9 +97,6 @@ namespace KS2Drive.Config
             this.AppConfiguration = ((App)Application.Current).AppConfiguration;
             if (!String.IsNullOrEmpty(this.AppConfiguration.DriveLetter)) CBFreeDrives.SelectedIndex = CBFreeDrives.Items.IndexOf(Char.ToUpperInvariant(this.AppConfiguration.DriveLetter[0])) == -1 ? 0 : CBFreeDrives.Items.IndexOf(Char.ToUpperInvariant(this.AppConfiguration.DriveLetter[0]));
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerURL)) txtURL.Text = this.AppConfiguration.ServerURL;
-
-            var ServerTypeMatchingItem = CBMode.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.ServerType));
-            if (!ServerTypeMatchingItem.Equals(default(KeyValuePair<int, string>))) CBMode.SelectedItem = ServerTypeMatchingItem;
 
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerLogin)) txtLogin.Text = this.AppConfiguration.ServerLogin;
             if (!String.IsNullOrEmpty(this.AppConfiguration.ServerPassword)) txtPassword.Password = this.AppConfiguration.ServerPassword;
@@ -204,7 +195,7 @@ namespace KS2Drive.Config
 
             this.AppConfiguration.DriveLetter = CBFreeDrives.SelectedValue.ToString();
             this.AppConfiguration.ServerURL = txtURL.Text;
-            this.AppConfiguration.ServerType = (Int32)CBMode.SelectedValue;
+            this.AppConfiguration.ServerType = (Int32)WebDAVMode.WebDAV; //AOS is no longer offered: the drive always uses standard WebDAV
             this.AppConfiguration.ServerLogin = txtLogin.Text;
             this.AppConfiguration.ServerPassword = txtPassword.Password;
             this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);

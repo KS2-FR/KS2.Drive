@@ -114,15 +114,25 @@ namespace KS2Drive
         /// <returns>The first matching certificate (validity is not checked), or null if none is found or the store names are invalid.</returns>
         public static X509Certificate2 FindCertificate(String CertStoreName, String CertStoreLocation, String Serial)
         {
-            if (Enum.TryParse(CertStoreName, out StoreName StoreNameParsed) && Enum.TryParse(CertStoreLocation, out StoreLocation StoreLocationParsed))
+            if (String.IsNullOrEmpty(Serial)) return null;
+
+            //Enum.TryParse also accepts any number (e.g. "999"), which is not a valid store: check that the value is defined
+            if (Enum.TryParse(CertStoreName, out StoreName StoreNameParsed) && Enum.IsDefined(typeof(StoreName), StoreNameParsed)
+                && Enum.TryParse(CertStoreLocation, out StoreLocation StoreLocationParsed) && Enum.IsDefined(typeof(StoreLocation), StoreLocationParsed))
             {
                 X509Store store = new X509Store(StoreNameParsed, StoreLocationParsed);
-                store.Open(OpenFlags.ReadOnly);
-                var CertificateCollection = store.Certificates.Find(X509FindType.FindBySerialNumber, Serial, false);
-                store.Close();
-                if (CertificateCollection.Count > 0)
+                try
                 {
-                    return CertificateCollection[0];
+                    store.Open(OpenFlags.ReadOnly);
+                    var CertificateCollection = store.Certificates.Find(X509FindType.FindBySerialNumber, Serial, false);
+                    if (CertificateCollection.Count > 0)
+                    {
+                        return CertificateCollection[0];
+                    }
+                }
+                finally
+                {
+                    store.Close();
                 }
             }
 

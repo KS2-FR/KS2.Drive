@@ -42,8 +42,12 @@ namespace WebDAVClient.Helpers
             {
                 
                 Item itemInfo = null;
-                while (reader.Read())
+                //After reader.Skip() the reader is already positioned on the next node: it must be processed without calling Read() again,
+                //otherwise the property following a skipped one is lost
+                bool NodeAlreadyRead = false;
+                while (NodeAlreadyRead || reader.Read())
                 {
+                    NodeAlreadyRead = false;
                     if (reader.NodeType == XmlNodeType.Element)
                     {
                         switch (reader.LocalName.ToLower())
@@ -131,11 +135,22 @@ namespace WebDAVClient.Helpers
                                 break;
                             case "hidden":
                             case "ishidden":
-                                itemInfo.IsHidden = true;
+                                //<hidden/> or a true value (1, true) means hidden; IIS sends <ishidden>0</ishidden> for every visible item
+                                if (reader.IsEmptyElement)
+                                {
+                                    itemInfo.IsHidden = true;
+                                }
+                                else
+                                {
+                                    reader.Read();
+                                    String HiddenValue = reader.Value.Trim();
+                                    itemInfo.IsHidden = !(HiddenValue == "0" || HiddenValue.Equals("false", StringComparison.OrdinalIgnoreCase));
+                                }
                                 break;
                             case "checked-in":
                             case "version-controlled-configuration":
                                 reader.Skip();
+                                NodeAlreadyRead = true;
                                 break;
                             default:
                             {
@@ -155,7 +170,7 @@ namespace WebDAVClient.Helpers
                         if (string.IsNullOrEmpty(itemInfo.DisplayName) )
                         {
                             var name = href.Substring(href.LastIndexOf('/') + 1);
-                            itemInfo.DisplayName = WebUtility.UrlDecode(name);
+                            itemInfo.DisplayName = Uri.UnescapeDataString(name); //Not WebUtility.UrlDecode: a "+" in a path is a plus, not a space
                         }
                         items.Add(itemInfo);
                     }

@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 
 namespace WebDAVClient.Helpers
 {
+    [Serializable]
     public class WebDAVConflictException : WebDAVException
     {
         public WebDAVConflictException()

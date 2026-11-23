@@ -43,9 +43,17 @@ namespace KS2Drive.FS
             //One HttpClient shared by all the instances: connections are reused instead of opening (and leaking) a new
             //handler and connection for each file system operation. It is recreated at each mount, with the new parameters.
             HttpClient PreviousClient = WebDavClient2._SharedHttpClient;
-            WebDavClient2._SharedHttpClient = CreateHttpClient(new NetworkCredential { UserName = Login, Password = Password }, null, ClientCert);
-            PreviousClient?.Dispose();
+            WebDavClient2._SharedHttpClient = TestHttpMessageHandler != null
+                ? CreateHttpClient(TestHttpMessageHandler)
+                : CreateHttpClient(new NetworkCredential { UserName = Login, Password = Password }, null, ClientCert);
+            if (!Object.ReferenceEquals(PreviousClient, WebDavClient2._SharedHttpClient)) PreviousClient?.Dispose();
         }
+
+        /// <summary>
+        /// Unit tests only: when set before <see cref="Init"/>, requests are sent to this handler (e.g. an in-memory fake
+        /// WebDAV server) instead of the network. Always null in the application.
+        /// </summary>
+        internal static HttpMessageHandler TestHttpMessageHandler { get; set; }
 
         /// <summary>
         /// HttpClient shared by all the instances, created by <see cref="Init"/>.
@@ -69,7 +77,7 @@ namespace KS2Drive.FS
         private String ParameterConvert(String input)
         {
             //Only strip a whole path segment: "/dav" must not be stripped from "/davfolder"
-            if (input.StartsWith(WebDavClient2._RootPath) && (input.Length == WebDavClient2._RootPath.Length || input[WebDavClient2._RootPath.Length] == '/')) return input.Substring(WebDavClient2._RootPath.Length);
+            if (input.StartsWith(WebDavClient2._RootPath, StringComparison.OrdinalIgnoreCase) && (input.Length == WebDavClient2._RootPath.Length || input[WebDavClient2._RootPath.Length] == '/')) return input.Substring(WebDavClient2._RootPath.Length);
             else return input;
         }
 
@@ -155,6 +163,24 @@ namespace KS2Drive.FS
             srcFolderPath = ParameterConvert(srcFolderPath);
             dstFolderPath = ParameterConvert(dstFolderPath);
             return base.MoveFolder(srcFolderPath, dstFolderPath);
+        }
+
+        /// <summary>
+        /// Moves or renames a folder; both paths are repository paths. With <paramref name="overwrite"/> false, the server
+        /// answers 412 (WebDAVException) instead of replacing an existing destination.
+        /// </summary>
+        public new Task<bool> MoveFolder(string srcFolderPath, string dstFolderPath, bool overwrite)
+        {
+            return base.MoveFolder(ParameterConvert(srcFolderPath), ParameterConvert(dstFolderPath), overwrite);
+        }
+
+        /// <summary>
+        /// Moves or renames a file; both paths are repository paths. With <paramref name="overwrite"/> false, the server
+        /// answers 412 (WebDAVException) instead of replacing an existing destination.
+        /// </summary>
+        public new Task<bool> MoveFile(string srcFilePath, string dstFilePath, bool overwrite)
+        {
+            return base.MoveFile(ParameterConvert(srcFilePath), ParameterConvert(dstFilePath), overwrite);
         }
 
         /// <summary>

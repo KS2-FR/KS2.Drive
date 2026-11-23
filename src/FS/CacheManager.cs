@@ -240,14 +240,24 @@ namespace KS2Drive.FS
                 else return (true, BuildDirectoryListing(CurrentFolder, Result.Content, Marker), null);
             }
 
+            //A folder that has never been listed is listed on the server BEFORE taking the cache lock: holding the lock during
+            //the request would block every other file system operation (and freeze Explorer) for the duration of the request
+            (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) ServerListing = (false, null, null);
+            bool ListedFromServer = false;
+            if (!CurrentFolder.IsParsed)
+            {
+                ServerListing = ListRemoteServerFolderContent(CurrentFolder);
+                if (!ServerListing.Success) return ServerListing;
+                ListedFromServer = true;
+            }
+
             lock (CacheLock)
             {
                 List<Tuple<String, FileNode>> Children;
 
-                if (!CurrentFolder.IsParsed)
+                if (ListedFromServer)
                 {
-                    var Result = ListRemoteServerFolderContent(CurrentFolder);
-                    if (!Result.Success) return Result;
+                    var Result = ServerListing;
 
                     CurrentFolder.IsParsed = true;
                     CurrentFolder.LastRefresh = DateTime.Now;

@@ -141,6 +141,17 @@ namespace WebDAVClient
             return client;
         }
 
+        /// <summary>
+        /// Creates an <see cref="HttpClient"/> sending its requests through the given handler (e.g. a fake server in unit tests),
+        /// configured like <see cref="CreateHttpClient(NetworkCredential, IWebProxy, X509Certificate)"/> otherwise.
+        /// </summary>
+        public static HttpClient CreateHttpClient(HttpMessageHandler handler)
+        {
+            var client = new HttpClient(handler ?? throw new ArgumentNullException(nameof(handler)));
+            client.DefaultRequestHeaders.ExpectContinue = false;
+            return client;
+        }
+
         public Client(NetworkCredential credential = null, TimeSpan? uploadTimeout = null, IWebProxy proxy = null, X509Certificate clientCert = null)
         {
             var handler = new WebRequestHandler();
@@ -363,19 +374,22 @@ namespace WebDAVClient
             // Should not have a trailing slash.
             var uploadUri = /*await*/ GetServerUrl(remoteFilePath.TrimEnd('/') + "/" + name.TrimStart('/'), false)/*.ConfigureAwait(false)*/;
 
-            HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content).ConfigureAwait(false);
-
-            if (response.StatusCode == HttpStatusCode.Conflict)
-                throw new WebDAVConflictException((int)response.StatusCode, "Failed uploading file.");
-
-            if (response.StatusCode != HttpStatusCode.OK &&
-                response.StatusCode != HttpStatusCode.NoContent &&
-                response.StatusCode != HttpStatusCode.Created)
+            //The response is always disposed: an undisposed response keeps its HTTP connection busy, and .NET Framework allows only
+            //2 connections per server, so a few failed requests were enough to block every following request
+            using (HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content).ConfigureAwait(false))
             {
-                throw new WebDAVException((int)response.StatusCode, "Failed uploading file.");
-            }
+                if (response.StatusCode == HttpStatusCode.Conflict)
+                    throw new WebDAVConflictException((int)response.StatusCode, "Failed uploading file.");
 
-            return response.IsSuccessStatusCode;
+                if (response.StatusCode != HttpStatusCode.OK &&
+                    response.StatusCode != HttpStatusCode.NoContent &&
+                    response.StatusCode != HttpStatusCode.Created)
+                {
+                    throw new WebDAVException((int)response.StatusCode, "Failed uploading file.");
+                }
+
+                return response.IsSuccessStatusCode;
+            }
         }
 
 
@@ -391,20 +405,21 @@ namespace WebDAVClient
             // Should not have a trailing slash.
             var dirUri = /*await*/ GetServerUrl(remotePath.TrimEnd('/') + "/" + name.TrimStart('/'), false)/*.ConfigureAwait(false)*/;
 
-            HttpResponseMessage response = await HttpRequest(dirUri.Uri, MkCol).ConfigureAwait(false);
-
-            if (response.StatusCode == HttpStatusCode.Conflict)
-                throw new WebDAVConflictException((int)response.StatusCode, "Failed creating folder.");
-
-            if (response.StatusCode != HttpStatusCode.OK &&
-                response.StatusCode != HttpStatusCode.NoContent &&
-                response.StatusCode != HttpStatusCode.Created)
+            //Always disposed, see Upload
+            using (HttpResponseMessage response = await HttpRequest(dirUri.Uri, MkCol).ConfigureAwait(false))
             {
-                throw new WebDAVException((int)response.StatusCode, "Failed creating folder.");
+                if (response.StatusCode == HttpStatusCode.Conflict)
+                    throw new WebDAVConflictException((int)response.StatusCode, "Failed creating folder.");
+
+                if (response.StatusCode != HttpStatusCode.OK &&
+                    response.StatusCode != HttpStatusCode.NoContent &&
+                    response.StatusCode != HttpStatusCode.Created)
+                {
+                    throw new WebDAVException((int)response.StatusCode, "Failed creating folder.");
+                }
+
+                return response.IsSuccessStatusCode;
             }
-
-            return response.IsSuccessStatusCode;
-
         }
 
         public async Task DeleteFolder(string href)
@@ -425,12 +440,14 @@ namespace WebDAVClient
 
             try
             {
-                var response = await HttpRequest(listUri, HttpMethod.Delete).ConfigureAwait(false);
-
-                if (response.StatusCode != HttpStatusCode.OK &&
-                    response.StatusCode != HttpStatusCode.NoContent)
+                //Always disposed, see Upload
+                using (var response = await HttpRequest(listUri, HttpMethod.Delete).ConfigureAwait(false))
                 {
-                    throw new WebDAVException((int)response.StatusCode, "Failed deleting item.");
+                    if (response.StatusCode != HttpStatusCode.OK &&
+                        response.StatusCode != HttpStatusCode.NoContent)
+                    {
+                        throw new WebDAVException((int)response.StatusCode, "Failed deleting item.");
+                    }
                 }
             }
             catch (Exception ex)
@@ -445,7 +462,19 @@ namespace WebDAVClient
             var srcUri = /*await*/ GetServerUrl(srcFolderPath, true)/*.ConfigureAwait(false)*/;
             var dstUri = /*await*/ GetServerUrl(dstFolderPath, false)/*.ConfigureAwait(false)*/;
 
-            return await Move(srcUri.Uri, dstUri.Uri).ConfigureAwait(false);
+            return await Move(srcUri.Uri, dstUri.Uri, null).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Moves a folder, telling the server whether an existing destination may be replaced (WebDAV "Overwrite" header).
+        /// With <paramref name="overwrite"/> false, an existing destination makes the server answer 412 (WebDAVException) instead
+        /// of being replaced: the existence check and the move are a single atomic request.
+        /// </summary>
+        public async Task<bool> MoveFolder(string srcFolderPath, string dstFolderPath, bool overwrite)
+        {
+            var srcUri = GetServerUrl(srcFolderPath, true);
+            var dstUri = GetServerUrl(dstFolderPath, false);
+            return await Move(srcUri.Uri, dstUri.Uri, overwrite).ConfigureAwait(false);
         }
 
         public async Task<bool> MoveFile(string srcFilePath, string dstFilePath)
@@ -454,30 +483,46 @@ namespace WebDAVClient
             var srcUri = /*await*/ GetServerUrl(srcFilePath, false)/*.ConfigureAwait(false)*/;
             var dstUri = /*await*/ GetServerUrl(dstFilePath, false)/*.ConfigureAwait(false)*/;
 
-            return await Move(srcUri.Uri, dstUri.Uri).ConfigureAwait(false);
+            return await Move(srcUri.Uri, dstUri.Uri, null).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Moves a file, telling the server whether an existing destination may be replaced (WebDAV "Overwrite" header).
+        /// With <paramref name="overwrite"/> false, an existing destination makes the server answer 412 (WebDAVException) instead
+        /// of being replaced: the existence check and the move are a single atomic request.
+        /// </summary>
+        public async Task<bool> MoveFile(string srcFilePath, string dstFilePath, bool overwrite)
+        {
+            var srcUri = GetServerUrl(srcFilePath, false);
+            var dstUri = GetServerUrl(dstFilePath, false);
+            return await Move(srcUri.Uri, dstUri.Uri, overwrite).ConfigureAwait(false);
         }
 
 
-        private async Task<bool> Move(Uri srcUri, Uri dstUri)
+        /// <param name="overwrite">Value of the WebDAV "Overwrite" header (T or F); null to omit it (the server default is T).</param>
+        private async Task<bool> Move(Uri srcUri, Uri dstUri, bool? overwrite)
         {
             //logger.Trace($"WEBDAVCLIENT Move {srcUri}");
 
             const string requestContent = "MOVE";
 
             IDictionary<string, string> headers = new Dictionary<string, string>();
-            headers.Add("Destination", HttpUtility.UrlPathEncode(dstUri.ToString()));
+            //AbsoluteUri is the escaped form; ToString() unescapes characters like %23, which would truncate the destination at the "#"
+            headers.Add("Destination", HttpUtility.UrlPathEncode(dstUri.AbsoluteUri));
+            if (overwrite.HasValue) headers.Add("Overwrite", overwrite.Value ? "T" : "F");
 
-            var response = await HttpRequest(srcUri, MoveMethod, headers, Encoding.UTF8.GetBytes(requestContent)).ConfigureAwait(false);
-
-            if (response.StatusCode != HttpStatusCode.OK &&
-                response.StatusCode != HttpStatusCode.Created &&
-                response.StatusCode != HttpStatusCode.NoContent)
+            //Always disposed, see Upload
+            using (var response = await HttpRequest(srcUri, MoveMethod, headers, Encoding.UTF8.GetBytes(requestContent)).ConfigureAwait(false))
             {
-                throw new WebDAVException((int)response.StatusCode, "Failed moving file.");
+                if (response.StatusCode != HttpStatusCode.OK &&
+                    response.StatusCode != HttpStatusCode.Created &&
+                    response.StatusCode != HttpStatusCode.NoContent)
+                {
+                    throw new WebDAVException((int)response.StatusCode, "Failed moving file.");
+                }
+
+                return response.IsSuccessStatusCode;
             }
-
-            return response.IsSuccessStatusCode;
-
         }
 
         #endregion
@@ -579,8 +624,13 @@ namespace WebDAVClient
 
             if (path == "/") URL = _server + _basePath;
             else if (path.StartsWith(_server)) URL = path;
-            else if (path.StartsWith(_basePath)) URL = _server + _basePath + path.Replace(_basePath, "");
+            //The base path is already at the start of the path: keep the path as is. Only this leading occurrence is the base path
+            //(a folder named like it deeper in the path must be kept), and a "/" base path matches every path, so it is excluded here
+            else if (_basePath != "/" && path.StartsWith(_basePath)) URL = _server + path;
             else URL = _server + _basePath + (path.StartsWith("/") ? path.Substring(1) : path);
+
+            //A "#" in a (decoded) file name would start a URL fragment and truncate the path: it must be sent encoded
+            URL = URL.Replace("#", "%23");
 
             if (appendTrailingSlash && !URL.EndsWith("/")) URL += "/";
 

@@ -4,6 +4,7 @@ using System.Web;
 
 namespace WebDAVClient.Helpers
 {
+    [Serializable]
     public class WebDAVException : HttpException
     {
         public WebDAVException()

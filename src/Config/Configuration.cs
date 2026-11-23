@@ -34,6 +34,10 @@ namespace KS2Drive.Config
                     var C = JsonConvert.DeserializeObject<Configuration>(Tools.Unprotect(File.ReadAllText(ConfigurationFilePath), out bool IsLegacyFormat));
                     C.Path = ConfigurationFilePath;
 
+                    //AOS is no longer offered (the server type cannot be chosen in the configuration window any more):
+                    //a configuration saved in AOS mode switches to standard WebDAV (KS2Drive.FS.WebDAVMode.WebDAV = 0)
+                    C.ServerType = 0;
+
                     if (IsLegacyFormat)
                     {
                         //Encrypt it again in the current format, which does not depend on the application version
@@ -102,7 +106,8 @@ namespace KS2Drive.Config
         /// </summary>
         public String ServerURL { get; set; }
         /// <summary>
-        /// Server type, as an integer value of <see cref="KS2Drive.FS.WebDAVMode"/> (0 = WebDAV, 1 = AOS).
+        /// Server type, as an integer value of <see cref="KS2Drive.FS.WebDAVMode"/> (0 = WebDAV, 1 = AOS). Always 0 (WebDAV): AOS is no
+        /// longer offered and <see cref="Load"/> switches configurations saved in AOS mode to WebDAV.
         /// </summary>
         public Int32 ServerType { get; set; } = 0;
         /// <summary>
