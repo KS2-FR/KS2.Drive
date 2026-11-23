@@ -752,7 +752,8 @@ namespace KS2Drive.FS
         /// <summary>
         /// WinFSP callback invoked when an existing file is opened with overwrite/supersede semantics. Discards the in-memory
         /// content (nothing is downloaded), allocates an empty buffer of <paramref name="AllocationSize"/> bytes, replaces or merges the attributes (always adding Archive), resets the
-        /// file size to 0 and updates the timestamps. Only the local node is changed; nothing is sent to the server here.
+        /// file size to 0 and updates the timestamps. Nothing is sent to the server here: the node is marked as having unflushed data,
+        /// so the (possibly empty) new content is uploaded at <see cref="Cleanup"/>/<see cref="Close"/>.
         /// </summary>
         /// <returns><c>STATUS_SUCCESS</c>, the error returned by <see cref="SetFileSizeInternal"/>, or <c>STATUS_UNEXPECTED_IO_ERROR</c> on exception.</returns>
         public override Int32 Overwrite(
@@ -791,6 +792,7 @@ namespace KS2Drive.FS
                     CFN.FileInfo.LastAccessTime =
                     CFN.FileInfo.LastWriteTime =
                     CFN.FileInfo.ChangeTime = (UInt64)DateTime.Now.ToFileTimeUtc();
+                    CFN.HasUnflushedData = true; //The file is now empty: this must reach the server even if nothing is written afterwards
 
                     FileInfo = CFN.FileInfo;
 
@@ -837,10 +839,10 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// WinFSP callback invoked when a file handle is closed. In <see cref="FlushMode.FlushAtCleanup"/> mode, if the node still has
-        /// unflushed data and is not deleted, its in-memory content (up to <c>FileSize</c>) is uploaded to the server; on upload failure a
-        /// local temporary copy is generated, a failure is reported and the method returns without decrementing the handle count.
-        /// Otherwise the open handle count is decremented and, when it reaches zero, the in-memory content is released.
+        /// WinFSP callback invoked when a file handle is closed. Whatever the flush mode, if the node still has unflushed data and is
+        /// not deleted, its in-memory content (up to <c>FileSize</c>) is uploaded to the server; on upload failure a local temporary
+        /// copy is generated and a failure is reported. The open handle count is then decremented and, when it reaches zero,
+        /// the in-memory content is released.
         /// </summary>
         public override void Close(
             Object FileNode0,
@@ -854,7 +856,8 @@ namespace KS2Drive.FS
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
 
-                if (this.FlushMode == FlushMode.FlushAtCleanup)
+                //Pending changes are uploaded whatever the flush mode: in FlushAtWrite mode a resize without a following write
+                //(e.g. a truncation) also leaves unflushed data
                 {
                     if (CFN.HasUnflushedData && !CFN.IsDeleted)
                     {
@@ -899,8 +902,8 @@ namespace KS2Drive.FS
         /// <list type="bullet">
         /// <item><c>CleanupSetAllocationSize</c>: shrinks the in-memory allocation to the file size rounded up to the allocation unit.</item>
         /// <item><c>CleanupDelete</c>: deletes the file or folder on the server, removes it from the cache and marks the node as deleted.</item>
-        /// <item>Otherwise, if allocation size, archive bit or last write time changed and the mode is <see cref="FlushMode.FlushAtCleanup"/>:
-        /// uploads the in-memory content if the node has unflushed data (a local temporary copy is generated if the upload is refused).</item>
+        /// <item>Otherwise, if allocation size, archive bit or last write time changed (whatever the flush mode):
+        /// uploads the in-memory content if the node has unflushed data (a local temporary copy is generated if the upload fails).</item>
         /// </list>
         /// Results are reported through <see cref="RepositoryActionPerformed"/>.
         /// </summary>
@@ -975,7 +978,7 @@ namespace KS2Drive.FS
                 }
                 else if ((Flags & CleanupSetAllocationSize) != 0 || (Flags & CleanupSetArchiveBit) != 0 || (Flags & CleanupSetLastWriteTime) != 0)
                 {
-                    if (this.FlushMode == FlushMode.FlushAtCleanup && !CFN.IsDeleted)
+                    if (!CFN.IsDeleted) //Whatever the flush mode, see Close
                     {
                         var Proxy = new WebDavClient2();
                         if (CFN.HasUnflushedData)
@@ -1257,6 +1260,10 @@ namespace KS2Drive.FS
                     return STATUS_UNEXPECTED_IO_ERROR;
                 }
 
+                //The in-memory content now differs from the server. In FlushAtWrite mode the flag is cleared once the upload succeeds;
+                //if it fails, Cleanup/Close will try again and keep a local copy
+                CFN.HasUnflushedData = true;
+
                 if (this.FlushMode == FlushMode.FlushAtWrite)
                 {
                     var Proxy = new WebDavClient2();
@@ -1300,6 +1307,7 @@ namespace KS2Drive.FS
                         return STATUS_UNEXPECTED_IO_ERROR;
                     }
 
+                    CFN.HasUnflushedData = false; //The whole content has been uploaded, including any previous resize
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
@@ -1632,12 +1640,13 @@ namespace KS2Drive.FS
 
         /// <summary>
         /// WinFSP callback that changes the file size or the allocation size of the in-memory content through
-        /// <see cref="SetFileSizeInternal"/> (which downloads the content first if it is not loaded). Nothing is sent to the server here.
+        /// <see cref="SetFileSizeInternal"/> (which downloads the content first if it is not loaded). Nothing is sent to the server here:
+        /// if the file size changed, the node is marked as having unflushed data, uploaded at <see cref="Cleanup"/>/<see cref="Close"/>.
         /// </summary>
         /// <param name="NewSize">New file size or allocation size.</param>
         /// <param name="SetAllocationSize"><c>true</c> to change the allocation size, <c>false</c> to change the file size.</param>
         /// <param name="FileInfo">Receives the updated file information, or a default value if resizing failed.</param>
-        /// <returns>Always <c>STATUS_SUCCESS</c>, even if resizing failed.</returns>
+        /// <returns>The result of <see cref="SetFileSizeInternal"/>.</returns>
         public override Int32 SetFileSize(
             Object FileNode0,
             Object FileDesc,
@@ -1652,10 +1661,15 @@ namespace KS2Drive.FS
 
                 FileInfo = CFN.FileInfo;
 
+                UInt64 PreviousFileSize = CFN.FileInfo.FileSize;
                 Int32 Result = SetFileSizeInternal(CFN, NewSize, SetAllocationSize);
                 FileInfo = Result >= 0 ? CFN.FileInfo : default(FileInfo);
 
-                logger.Trace($"{CFN.ObjectId} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}");
+                //A change of the file size (truncation or extension) must be uploaded, even if no write follows.
+                //A change of the allocation size alone does not change the content.
+                if (Result >= 0 && CFN.FileInfo.FileSize != PreviousFileSize) CFN.HasUnflushedData = true;
+
+                logger.Trace($"{CFN.ObjectId} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}. Result {Result}");
 
                 /*
                 FileNode FileNode = (FileNode)FileNode0;
@@ -1665,7 +1679,7 @@ namespace KS2Drive.FS
                 FileInfo = 0 <= Result ? FileNode.GetFileInfo() : default(FileInfo);
                 */
 
-                return STATUS_SUCCESS;
+                return Result;
             }
         }
 
