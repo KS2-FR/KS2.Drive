@@ -2,7 +2,6 @@
 using Microsoft.Win32;
 using System;
 using System.Net;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -16,27 +15,66 @@ namespace KS2Drive
     public class Tools
     {
         /// <summary>
-        /// Encrypts a string with DPAPI for the current user, using the assembly full name as entropy.
-        /// The string is converted with ASCII encoding (non-ASCII characters are lost).
+        /// DPAPI entropy used to encrypt the configuration. It must never change, otherwise existing configurations can no longer be decrypted.
+        /// </summary>
+        private const String ConfigurationEntropy = "KS2Drive.Configuration";
+
+        /// <summary>
+        /// Assembly versions whose full name was used as entropy by previous releases (up to 0.8.6.1), so that their
+        /// configuration can still be decrypted and migrated. Releases 0.8.4 to 0.8.6.1 all kept the 0.8.4.0 assembly version.
+        /// This list is frozen: it must not be updated when the application version changes.
+        /// </summary>
+        private static readonly String[] LegacyAssemblyVersions = { "0.8.4.0", "0.8.3.0", "0.8.2.0", "0.8.1.0", "0.8.0.0", "1.0.0.0" };
+
+        /// <summary>
+        /// Encrypts a string with DPAPI for the current user, using a fixed entropy (independent of the application version).
+        /// The string is converted with UTF-8 encoding.
         /// </summary>
         /// <returns>The encrypted data as a Base64 string.</returns>
         public static string Protect(string str)
         {
-            byte[] entropy = Encoding.ASCII.GetBytes(Assembly.GetExecutingAssembly().FullName);
-            byte[] data = Encoding.ASCII.GetBytes(str);
+            byte[] entropy = Encoding.UTF8.GetBytes(ConfigurationEntropy);
+            byte[] data = Encoding.UTF8.GetBytes(str);
             string protectedData = Convert.ToBase64String(ProtectedData.Protect(data, entropy, DataProtectionScope.CurrentUser));
             return protectedData;
         }
 
         /// <summary>
-        /// Decrypts a Base64 string produced by <see cref="Protect"/> (same user and same assembly full name required).
+        /// Decrypts a Base64 string produced by <see cref="Protect"/> for the current user.
+        /// Also accepts the legacy format of previous releases (entropy = assembly full name, ASCII encoding).
         /// </summary>
-        public static string Unprotect(string str)
+        /// <param name="str">The encrypted data as a Base64 string.</param>
+        /// <param name="IsLegacyFormat">Receives true if the data was in the legacy format and should be encrypted again with <see cref="Protect"/>.</param>
+        /// <exception cref="CryptographicException">The data cannot be decrypted (other user, other machine, corrupted file...).</exception>
+        public static string Unprotect(string str, out bool IsLegacyFormat)
         {
             byte[] protectedData = Convert.FromBase64String(str);
-            byte[] entropy = Encoding.ASCII.GetBytes(Assembly.GetExecutingAssembly().FullName);
-            string data = Encoding.ASCII.GetString(ProtectedData.Unprotect(protectedData, entropy, DataProtectionScope.CurrentUser));
-            return data;
+
+            //Current format. UTF-8 also decodes the legacy ASCII content correctly
+            IsLegacyFormat = false;
+            try
+            {
+                return Encoding.UTF8.GetString(ProtectedData.Unprotect(protectedData, Encoding.UTF8.GetBytes(ConfigurationEntropy), DataProtectionScope.CurrentUser));
+            }
+            catch (CryptographicException)
+            {
+            }
+
+            //Legacy format of previous releases: the entropy was the full name of the assembly, which contained its version.
+            //Only the frozen list of versions already released is tried: the current version of the application is never used
+            IsLegacyFormat = true;
+            foreach (String LegacyEntropy in LegacyAssemblyVersions.Select(v => $"KS2Drive, Version={v}, Culture=neutral, PublicKeyToken=null"))
+            {
+                try
+                {
+                    return Encoding.UTF8.GetString(ProtectedData.Unprotect(protectedData, Encoding.ASCII.GetBytes(LegacyEntropy), DataProtectionScope.CurrentUser));
+                }
+                catch (CryptographicException)
+                {
+                }
+            }
+
+            throw new CryptographicException("The configuration cannot be decrypted");
         }
 
         /// <summary>
