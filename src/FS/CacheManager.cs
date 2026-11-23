@@ -235,11 +235,13 @@ namespace KS2Drive.FS
             {
                 var Result = ListRemoteServerFolderContent(CurrentFolder);
                 if (!Result.Success) return Result;
-                else return (true, Result.Content, null);
+                else return (true, BuildDirectoryListing(CurrentFolder, Result.Content, Marker), null);
             }
 
             lock (CacheLock)
             {
+                List<Tuple<String, FileNode>> Children;
+
                 if (!CurrentFolder.IsParsed)
                 {
                     var Result = ListRemoteServerFolderContent(CurrentFolder);
@@ -256,55 +258,24 @@ namespace KS2Drive.FS
                         if (!Object.ReferenceEquals(CachedNode, Result.Content[i].Item2)) Result.Content[i] = new Tuple<String, FileNode>(Result.Content[i].Item1, CachedNode);
                     }
 
-                    //Handling . & ..
-                    if (!FileNode.IsRepositoryRootPath(CurrentFolder.RepositoryPath))
-                    {
-                        //if this is not the root directory add the dot entries
-                        if (Marker == null) Result.Content.Add(new Tuple<String, FileNode>(".", CurrentFolder));
-
-                        if (Marker == null || Marker == ".")
-                        {
-                            String ParentPath = FileNode.ConvertRepositoryPathToLocalPath(FileNode.GetRepositoryParentPath(CurrentFolder.RepositoryPath));
-                            if (ParentPath != null)
-                            {
-                                if (FileNodeCache.ContainsKey(ParentPath))
-                                {
-                                    Result.Content.Add(new Tuple<String, FileNode>("..", FileNodeCache[ParentPath]));
-                                }
-                            }
-                        }
-                    }
-
-                    ReturnList = Result.Content;
+                    Children = Result.Content;
                 }
                 else
                 {
                     String FolderNameForSearch = CurrentFolder.LocalPath;
                     if (FolderNameForSearch != "\\") FolderNameForSearch += "\\";
-                    ReturnList = new List<Tuple<String, FileNode>>();
-                    ReturnList.Add(new Tuple<string, FileNode>(".", CurrentFolder));
-                    //TODO : Add .. from cache
-                    ReturnList.AddRange(FileNodeCache.Where(x => !String.Equals(x.Key, CurrentFolder.LocalPath, StringComparison.OrdinalIgnoreCase) && x.Key.StartsWith(FolderNameForSearch, StringComparison.OrdinalIgnoreCase) && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)));
+                    Children = FileNodeCache.Where(x => !String.Equals(x.Key, CurrentFolder.LocalPath, StringComparison.OrdinalIgnoreCase) && x.Key.StartsWith(FolderNameForSearch, StringComparison.OrdinalIgnoreCase) && x.Key.LastIndexOf('\\').Equals(FolderNameForSearch.Length - 1)).Select(x => new Tuple<String, FileNode>(x.Value.Name, x.Value)).ToList();
                     if ((DateTime.Now - CurrentFolder.LastRefresh).TotalSeconds > CacheDurationInSeconds) FileNodeToRefreshList.Add(CurrentFolder); //Refresh current directory if the cache is too old
                 }
 
-                //Sort list by path (mandatory if we want to handle a potential marker correctly)
-                ReturnList = ReturnList.OrderBy(x => x.Item1).ToList();
-
-                if (!String.IsNullOrEmpty(Marker)) //Dealing with potential marker
-                {
-                    var WantedTuple = ReturnList.FirstOrDefault(x => x.Item1.Equals(Marker));
-                    var WantedTupleIndex = ReturnList.IndexOf(WantedTuple);
-                    if (WantedTupleIndex + 1 < ReturnList.Count) ReturnList = ReturnList.GetRange(WantedTupleIndex + 1, ReturnList.Count - 1 - WantedTupleIndex);
-                    else ReturnList.Clear();
-                }
+                ReturnList = BuildDirectoryListing(CurrentFolder, Children, Marker);
 
                 if (this._PreLoadFoldersInCache)
                 {
                     foreach (var FolderNode in ReturnList.Where(x => (x.Item2.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0))
                     {
                         if (FolderNode.Item1 == "." || FolderNode.Item1 == "..") continue; //Bypass special folders
-                        if (!FileNodeCache[FolderNode.Item2.LocalPath].IsParsed) FileNodeToRefreshList.Add(FolderNode.Item2); //Pre-loading of sub-folders of current folder
+                        if (!FolderNode.Item2.IsParsed) FileNodeToRefreshList.Add(FolderNode.Item2); //Pre-loading of sub-folders of current folder (the listed nodes are the cached instances)
                     }
                 }
             }
@@ -315,6 +286,41 @@ namespace KS2Drive.FS
             }
 
             return (true, ReturnList, null);
+        }
+
+        /// <summary>
+        /// Builds the directory listing returned to WinFSP, the same way whatever the source of the children (server or cache):
+        /// <list type="bullet">
+        /// <item>"." and ".." come first, except for the root of the drive, which has none (like an NTFS volume root).
+        /// ".." refers to the cached parent folder, or to the current folder if the parent is not cached (only its file information is used).</item>
+        /// <item>The other entries follow, sorted by name with an ordinal case-insensitive comparison.</item>
+        /// <item>With a <paramref name="Marker"/> (name of the last entry already returned), only the entries after it are returned.
+        /// The marker does not need to be in the list (it may have been deleted meanwhile): entries are compared with it using the
+        /// same comparison as the sort, so the listing always resumes at the right place and never starts over.</item>
+        /// </list>
+        /// Must be called with the cache lock held when the cache is enabled.
+        /// </summary>
+        private List<Tuple<String, FileNode>> BuildDirectoryListing(FileNode CurrentFolder, IEnumerable<Tuple<String, FileNode>> Children, String Marker)
+        {
+            var Listing = new List<Tuple<String, FileNode>>();
+
+            if (CurrentFolder.LocalPath != "\\")
+            {
+                String ParentPath = CurrentFolder.LocalPath.Substring(0, CurrentFolder.LocalPath.LastIndexOf('\\'));
+                if (ParentPath.Length == 0) ParentPath = "\\";
+                FileNode ParentFolder = null;
+                if (FileNodeCache == null || !FileNodeCache.TryGetValue(ParentPath, out ParentFolder)) ParentFolder = CurrentFolder;
+
+                Listing.Add(new Tuple<String, FileNode>(".", CurrentFolder));
+                Listing.Add(new Tuple<String, FileNode>("..", ParentFolder));
+            }
+
+            Listing.AddRange(Children.Where(x => x.Item1 != "." && x.Item1 != "..").OrderBy(x => x.Item1, StringComparer.OrdinalIgnoreCase));
+
+            if (String.IsNullOrEmpty(Marker)) return Listing;
+            if (Marker == ".") return Listing.Where(x => x.Item1 != ".").ToList();
+            if (Marker == "..") return Listing.Where(x => x.Item1 != "." && x.Item1 != "..").ToList();
+            return Listing.Where(x => x.Item1 != "." && x.Item1 != ".." && StringComparer.OrdinalIgnoreCase.Compare(x.Item1, Marker) > 0).ToList();
         }
 
         /// <summary>
