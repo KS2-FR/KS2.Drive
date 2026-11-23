@@ -194,8 +194,9 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Removes a node from the cache and marks its parent folder as not parsed, so that the next
-        /// listing of the parent is fetched from the server again.
+        /// Removes a node from the cache and marks its parent folder (the root folder <c>\</c> for an element at the root
+        /// of the drive) as not parsed, so that the next listing of the parent is fetched from the server again.
+        /// Does nothing more if the parent folder is not cached.
         /// </summary>
         public void InvalidateFileNode(FileNode node)
         {
@@ -205,7 +206,8 @@ namespace KS2Drive.FS
             {
                 FileNodeCache.Remove(node.LocalPath);
                 String ParentFolderPath = node.LocalPath.Substring(0, node.LocalPath.LastIndexOf(@"\"));
-                FileNodeCache[ParentFolderPath].IsParsed = false;
+                if (ParentFolderPath.Length == 0) ParentFolderPath = @"\"; //Element at the root of the drive: the root folder is cached as "\"
+                if (FileNodeCache.TryGetValue(ParentFolderPath, out FileNode ParentFolder)) ParentFolder.IsParsed = false; //The parent may not be cached
             }
         }
 
