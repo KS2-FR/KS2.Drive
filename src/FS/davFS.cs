@@ -515,7 +515,7 @@ namespace KS2Drive.FS
         /// <summary>
         /// WinFSP callback that creates a new file or directory directly on the server. It first checks that the element does not
         /// already exist, then either uploads an empty file (marked as having unflushed data) or creates the folder, re-reads the
-        /// created element from the repository, adds it to the cache and increments its open handle count.
+        /// created element from the repository (see <see cref="GetCreatedFileNode"/>), adds it to the cache and increments its open handle count.
         /// <paramref name="AllocationSize"/>, <paramref name="SecurityDescriptor"/> and <paramref name="CreateOptions"/> are ignored.
         /// On HTTP 401, <see cref="RepositoryAuthenticationFailed"/> is raised (once per mount).
         /// </summary>
@@ -593,7 +593,7 @@ namespace KS2Drive.FS
                 {
                     if (Proxy.Upload(RepositoryNewDocumentParentPath, new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
                     {
-                        CFN = new FileNode(Proxy.GetRepositoryElement(FileName));
+                        CFN = GetCreatedFileNode(Proxy, FileName, false);
                         CFN.HasUnflushedData = true;
                     }
                     else
@@ -647,7 +647,7 @@ namespace KS2Drive.FS
                 {
                     if (Proxy.CreateDir(RepositoryNewDocumentParentPath, NewDocumentName).GetAwaiter().GetResult())
                     {
-                        CFN = new FileNode(Proxy.GetRepositoryElement(FileName));
+                        CFN = GetCreatedFileNode(Proxy, FileName, true);
                     }
                     else
                     {
@@ -695,8 +695,14 @@ namespace KS2Drive.FS
             }
 
             Cache.Lock();
-            Cache.AddFileNodeNoLock(CFN);
-            Cache.Unlock();
+            try
+            {
+                Cache.AddFileNodeNoLock(CFN);
+            }
+            finally
+            {
+                Cache.Unlock(); //Never leave the cache locked: it would freeze the whole drive
+            }
 
             Interlocked.Increment(ref CFN.OpenCount);
             FileNode0 = CFN;
@@ -1688,6 +1694,50 @@ namespace KS2Drive.FS
 
                 return Result;
             }
+        }
+
+        /// <summary>
+        /// Builds the <see cref="FileNode"/> of an element that has just been created on the server by <see cref="Create"/>.
+        /// The element is read back from the server; if it cannot be found (server not yet consistent, folder name containing
+        /// a dot...) the node is built locally, since the server has already confirmed the creation. This avoids reporting a
+        /// failure for an element that exists on the server, which would then make every retry fail with a name collision.
+        /// </summary>
+        /// <param name="Proxy">WebDAV client used for the creation.</param>
+        /// <param name="FileName">Local path of the created element.</param>
+        /// <param name="IsDirectory">True for a folder, false for a file.</param>
+        /// <exception cref="WebDAVException">HTTP 401 while reading the element back (handled by the caller).</exception>
+        private FileNode GetCreatedFileNode(WebDavClient2 Proxy, String FileName, bool IsDirectory)
+        {
+            try
+            {
+                WebDAVClient.Model.Item CreatedElement = Proxy.GetRepositoryElement(FileName);
+                if (CreatedElement != null) return new FileNode(CreatedElement);
+                logger.Trace($"Create {FileName} : created element not found on the server, building it locally");
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.Trace($"Create {FileName} : cannot read the created element back ({ex.Message}), building it locally");
+            }
+
+            DateTime Now = DateTime.Now;
+            var LocalElement = new WebDAVClient.Model.Item()
+            {
+                Href = FileNode.ConvertLocalPathToRepositoryPath(FileName),
+                DisplayName = Path.GetFileName(FileName),
+                IsCollection = IsDirectory,
+                ContentLength = IsDirectory ? (long?)null : 0,
+                CreationDate = Now,
+                LastModified = Now
+            };
+
+            var Node = new FileNode(LocalElement);
+            Node.LocalPath = FileName; //Do not rely on the URL decoding of the constructor: the local path is already known
+            Node.FileInfo.FileAttributes = IsDirectory ? (UInt32)FileAttributes.Directory : (UInt32)FileAttributes.Normal; //Do not rely on the WebDAV directory detection heuristic
+            return Node;
         }
 
         /// <summary>
