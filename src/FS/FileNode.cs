@@ -290,6 +290,46 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
+        /// Size and last write time of the file on the server when <see cref="FileData"/> was downloaded or last uploaded.
+        /// If a later refresh of the folder reports other values, the file changed on the server and the content kept in
+        /// memory is obsolete.
+        /// </summary>
+        internal UInt64 ContentServerFileSize;
+        internal UInt64 ContentServerLastWriteTime;
+
+        /// <summary>
+        /// When the last handle was closed while the content was kept in memory (see <see cref="CanReuseContent"/>).
+        /// </summary>
+        internal DateTime ContentRetainedAt;
+
+        /// <summary>
+        /// When the content of this node was last uploaded successfully (creation included). Used to skip a Flush that comes
+        /// right after an upload: the pending changes are uploaded by the following Flush, Cleanup or Close.
+        /// </summary>
+        internal DateTime LastUploadAt;
+
+        /// <summary>
+        /// Records that <see cref="FileData"/> is identical to the file on the server (just downloaded or uploaded).
+        /// </summary>
+        internal void MarkContentInSyncWithServer()
+        {
+            ContentServerFileSize = FileInfo.FileSize;
+            ContentServerLastWriteTime = FileInfo.LastWriteTime;
+        }
+
+        /// <summary>
+        /// Tells whether the content kept in memory after the last close can be reused by a new open: it must have been closed
+        /// less than <paramref name="MaxAgeInSeconds"/> ago, and the file must not have changed on the server since (same size
+        /// and last write time as when the content was obtained).
+        /// </summary>
+        internal bool CanReuseContent(Int32 MaxAgeInSeconds)
+        {
+            if (FileData == null) return false;
+            if ((DateTime.Now - ContentRetainedAt).TotalSeconds > MaxAgeInSeconds) return false;
+            return FileInfo.FileSize == ContentServerFileSize && FileInfo.LastWriteTime == ContentServerLastWriteTime;
+        }
+
+        /// <summary>
         /// Deletes the temporary recovery file created by <see cref="GenerateLocalCopy"/>, if any. Called once the content has
         /// been uploaded successfully: the copy is then obsolete and would otherwise stay in the temporary folder forever.
         /// </summary>

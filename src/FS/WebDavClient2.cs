@@ -47,7 +47,23 @@ namespace KS2Drive.FS
                 ? CreateHttpClient(TestHttpMessageHandler)
                 : CreateHttpClient(new NetworkCredential { UserName = Login, Password = Password }, null, ClientCert);
             if (!Object.ReferenceEquals(PreviousClient, WebDavClient2._SharedHttpClient)) PreviousClient?.Dispose();
+
+            //.NET Framework allows only 2 simultaneous connections per server by default: Office saving a document, Explorer
+            //reading thumbnails and the background folder refreshes then queue behind each other
+            try
+            {
+                ServicePointManager.FindServicePoint(new Uri(Server)).ConnectionLimit = MaxConnectionsPerServer;
+            }
+            catch (Exception)
+            {
+                //Invalid server URL: the mount fails later with an explicit message
+            }
         }
+
+        /// <summary>
+        /// Maximum number of simultaneous HTTP connections to the WebDAV server.
+        /// </summary>
+        internal const Int32 MaxConnectionsPerServer = 8;
 
         /// <summary>
         /// Unit tests only: when set before <see cref="Init"/>, requests are sent to this handler (e.g. an in-memory fake
@@ -213,6 +229,29 @@ namespace KS2Drive.FS
 
             if (RepositoryElement != null && FileNode.IsRepositoryRootPath(RepositoryDocumentName)) RepositoryElement.DisplayName = "";
             return RepositoryElement;
+        }
+
+        /// <summary>
+        /// Tells whether an element (file or folder) exists at a local path, with a single request: a PROPFIND without trailing
+        /// slash finds a file, and for a folder servers either describe it or redirect (3xx) to the URL with a slash, which also
+        /// means that the name is taken. Used to check that a name is free before a creation or a move, where
+        /// <see cref="GetRepositoryElement"/> would need 2 requests for a missing name.
+        /// </summary>
+        /// <exception cref="WebDAVException">Any error other than 404 or a redirection (e.g. 401).</exception>
+        public bool ExistsOnServer(String LocalFileName)
+        {
+            try
+            {
+                return this.GetFile(FileNode.ConvertLocalPathToRepositoryPath(LocalFileName)).GetAwaiter().GetResult() != null;
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
+            {
+                return false;
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() >= 300 && ex.GetHttpCode() < 400)
+            {
+                return true;
+            }
         }
 
         /// <summary>

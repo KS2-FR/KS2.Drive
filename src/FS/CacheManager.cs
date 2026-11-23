@@ -83,6 +83,32 @@ namespace KS2Drive.FS
         /// </returns>
         public (FileNode node, bool IsNonExistent) GetFileNodeNoLock(String FileOrFolderLocalPath)
         {
+            return GetFileNodeNoLockCore(FileOrFolderLocalPath);
+        }
+
+        /// <summary>
+        /// Returns true when the path is known to be missing because its parent folder was listed less than
+        /// <c>CacheDurationInSeconds</c> ago and the path is not in that listing. Office and Explorer probe many names that do
+        /// not exist (temporary files, desktop.ini, thumbnails...): this answers them without any request to the server.
+        /// Like a cached listing, an element created on the server by another client is not seen before the next refresh.
+        /// Does not take the cache lock: the caller is expected to hold it.
+        /// </summary>
+        public bool IsMissingFromFreshFolderListingNoLock(String FileOrFolderLocalPath)
+        {
+            if (_mode == CacheMode.Disabled || FileNodeCache == null) return false;
+            if (String.IsNullOrEmpty(FileOrFolderLocalPath) || FileOrFolderLocalPath == "\\") return false;
+            if (FileNodeCache.ContainsKey(FileOrFolderLocalPath)) return false;
+
+            int LastSeparator = FileOrFolderLocalPath.LastIndexOf('\\');
+            if (LastSeparator < 0) return false;
+            String ParentPath = LastSeparator == 0 ? "\\" : FileOrFolderLocalPath.Substring(0, LastSeparator);
+
+            if (!FileNodeCache.TryGetValue(ParentPath, out FileNode Parent)) return false;
+            return Parent.IsParsed && (DateTime.Now - Parent.LastRefresh).TotalSeconds <= CacheDurationInSeconds;
+        }
+
+        private (FileNode node, bool IsNonExistent) GetFileNodeNoLockCore(String FileOrFolderLocalPath)
+        {
             if (_mode == CacheMode.Disabled) return (null, false);
 
             if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath))

@@ -397,7 +397,7 @@ namespace KS2Drive.Tests.FS
         #region Close
 
         [TestMethod]
-        public void Close_DecrementsTheHandleCount_AndReleasesTheContentOnTheLastHandle()
+        public void Close_DecrementsTheHandleCount_AndKeepsTheContentForAShortTimeOnTheLastHandle()
         {
             using (var Ctx = CreateContext())
             {
@@ -411,7 +411,7 @@ namespace KS2Drive.Tests.FS
 
                 Ctx.Fs.Close(Node, null);
                 Assert.AreEqual(0, Node.OpenCount);
-                Assert.IsNull(Node.FileData);
+                Assert.IsNotNull(Node.FileData, "Kept to be reused by a new open (see DavFSPerformanceTests)");
             }
         }
 

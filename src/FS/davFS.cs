@@ -226,6 +226,8 @@ namespace KS2Drive.FS
                 var KnownNode = Cache.GetFileNodeNoLock(FileName);
                 if (KnownNode.node != null) return (STATUS_SUCCESS, KnownNode.node, "From Cache");
                 if (KnownNode.IsNonExistent) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Known to be non-existent");
+                //Not recorded as missing on purpose: Create still checks the server before uploading (see ElementExists)
+                if (Cache.IsMissingFromFreshFolderListingNoLock(FileName)) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Not in the folder listing");
             }
             finally
             {
@@ -277,19 +279,110 @@ namespace KS2Drive.FS
         /// <see cref="Rename"/>, which run while WinFSP holds a lock on the parent folder or on the volume: every request avoided
         /// there shortens the time Explorer is blocked. Errors (401, network...) are propagated to the caller.
         /// </summary>
-        private bool ElementExists(String FileName, WebDavClient2 Proxy)
+        /// <param name="TrustFolderListing">Also answer "missing" when the name is absent from a fresh listing of its folder
+        /// (see <see cref="CacheManager.IsMissingFromFreshFolderListingNoLock"/>). Only for Rename, whose MOVE is sent with
+        /// "Overwrite: F" and therefore never replaces an element created meanwhile by another client; Create uploads with a PUT,
+        /// which would replace it, so it relies only on names explicitly found missing on the server.</param>
+        private bool ElementExists(String FileName, WebDavClient2 Proxy, bool TrustFolderListing)
         {
             Cache.Lock();
             try
             {
                 if (Cache.GetFileNodeNoLock(FileName).IsNonExistent) return false;
+                if (TrustFolderListing && Cache.IsMissingFromFreshFolderListingNoLock(FileName)) return false;
             }
             finally
             {
                 Cache.Unlock();
             }
 
-            return Proxy.GetRepositoryElement(FileName) != null;
+            return Proxy.ExistsOnServer(FileName);
+        }
+
+        /// <summary>
+        /// How long the content of a closed file is kept in memory to be reused by a new open (Word, for instance, reopens the
+        /// same document several times while saving it: each reopen used to download it again).
+        /// </summary>
+        private const Int32 ClosedContentMaxAgeInSeconds = 15;
+
+        /// <summary>
+        /// A Flush coming less than this delay after the last successful upload of the file does not upload it again (see <see cref="Flush"/>).
+        /// </summary>
+        private const Int32 FlushMinimumIntervalInMilliseconds = 1000;
+
+        /// <summary>
+        /// Maximum memory used by the contents kept after their file was closed; the oldest are released first.
+        /// </summary>
+        private const Int64 ClosedContentMaxTotalBytes = 64L * 1024 * 1024;
+
+        private readonly object RetainedContentsLock = new object();
+
+        /// <summary>
+        /// Closed nodes whose content is kept in memory, oldest first.
+        /// </summary>
+        private readonly List<FileNode> RetainedContents = new List<FileNode>();
+
+        /// <summary>
+        /// Keeps the content of a node whose last handle was just closed (the content being identical to the server), so that
+        /// a new open within <see cref="ClosedContentMaxAgeInSeconds"/> does not download it again. Releases the contents that
+        /// expired or exceed <see cref="ClosedContentMaxTotalBytes"/>. Must be called with the node's <c>OperationLock</c> held.
+        /// </summary>
+        private void RetainClosedContent(FileNode CFN)
+        {
+            CFN.ContentRetainedAt = DateTime.Now;
+            var ToRelease = new List<FileNode>();
+
+            lock (RetainedContentsLock)
+            {
+                RetainedContents.Remove(CFN);
+                RetainedContents.Add(CFN);
+
+                //From the newest to the oldest: keep what is recent and fits in the memory budget
+                DateTime Now = DateTime.Now;
+                Int64 Total = 0;
+                for (int i = RetainedContents.Count - 1; i >= 0; i--)
+                {
+                    FileNode Node = RetainedContents[i];
+                    Byte[] Data = Node.FileData;
+                    Int64 Size = Data?.LongLength ?? 0;
+                    if (Data == null || (Now - Node.ContentRetainedAt).TotalSeconds > ClosedContentMaxAgeInSeconds || Total + Size > ClosedContentMaxTotalBytes)
+                    {
+                        ToRelease.Add(Node);
+                        RetainedContents.RemoveAt(i);
+                    }
+                    else
+                    {
+                        Total += Size;
+                    }
+                }
+            }
+
+            foreach (FileNode Node in ToRelease)
+            {
+                if (Object.ReferenceEquals(Node, CFN))
+                {
+                    ReleaseClosedContent(Node); //Its lock is already held by the caller
+                }
+                else if (Monitor.TryEnter(Node.OperationLock)) //Never wait for another node: it is busy, so it is in use anyway
+                {
+                    try
+                    {
+                        ReleaseClosedContent(Node);
+                    }
+                    finally
+                    {
+                        Monitor.Exit(Node.OperationLock);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Frees the content of a node if it is still closed and has nothing to upload.
+        /// </summary>
+        private static void ReleaseClosedContent(FileNode Node)
+        {
+            if (Node.OpenCount == 0 && !Node.HasUnflushedData) Node.FileData = null;
         }
 
         /// <summary>
@@ -347,6 +440,16 @@ namespace KS2Drive.FS
             }
 
             Int32 HandleCount = Interlocked.Increment(ref Lookup.Node.OpenCount);
+
+            //First handle on a file whose content was kept in memory after its last close: reuse it only if it is still valid
+            //(recent, and the file did not change on the server since), otherwise the next read downloads it again
+            if (HandleCount == 1 && Lookup.Node.FileData != null)
+            {
+                lock (Lookup.Node.OperationLock)
+                {
+                    if (!Lookup.Node.HasUnflushedData && !Lookup.Node.CanReuseContent(ClosedContentMaxAgeInSeconds)) Lookup.Node.FileData = null;
+                }
+            }
             DebugEnd(OperationId, Lookup.Node, $"STATUS_SUCCESS - {Lookup.Detail} - Handle {HandleCount}");
 
             FileNode0 = Lookup.Node;
@@ -532,7 +635,7 @@ namespace KS2Drive.FS
             {
                 //WinFSP holds a lock on the parent folder during Create (Explorer cannot list it meanwhile): skip the existence check
                 //when the cache already knows the name is free (it was probed just before, which is what Office and Explorer do)
-                if (ElementExists(FileName, Proxy))
+                if (ElementExists(FileName, Proxy, false))
                 {
                     DebugEnd(OperationId, null, "STATUS_OBJECT_NAME_COLLISION");
                     return STATUS_OBJECT_NAME_COLLISION;
@@ -572,6 +675,7 @@ namespace KS2Drive.FS
                     {
                         CFN = GetCreatedFileNode(Proxy, FileName, false);
                         CFN.HasUnflushedData = true;
+                        CFN.LastUploadAt = DateTime.Now; //The empty file has just been uploaded
                     }
                     else
                     {
@@ -825,8 +929,9 @@ namespace KS2Drive.FS
 
         /// <summary>
         /// WinFSP callback invoked when a file handle is closed. Whatever the flush mode, pending changes are uploaded
-        /// (see <see cref="UploadPendingChanges"/>). The open handle count is then decremented and, when it reaches zero,
-        /// the in-memory content is released.
+        /// (see <see cref="UploadPendingChanges"/>). The open handle count is then decremented and, when it reaches zero, the
+        /// in-memory content is kept for a short time if it is identical to the server (see <see cref="RetainClosedContent"/>),
+        /// or released if some changes could not be uploaded.
         /// </summary>
         public override void Close(
             Object FileNode0,
@@ -845,10 +950,19 @@ namespace KS2Drive.FS
                 Int32 HandleCount = Interlocked.Decrement(ref CFN.OpenCount);
                 if (HandleCount == 0)
                 {
-                    //No more handle on the file, we free its content. Changes that could not be uploaded are only kept in the
-                    //local recovery copy: the flag is cleared so that the node can be refreshed from the server again
-                    CFN.FileData = null;
-                    CFN.HasUnflushedData = false;
+                    if (CFN.HasUnflushedData)
+                    {
+                        //Changes that could not be uploaded are only kept in the local recovery copy: the content is released and
+                        //the flag cleared so that the node can be refreshed from the server again
+                        CFN.FileData = null;
+                        CFN.HasUnflushedData = false;
+                    }
+                    else if (CFN.FileData != null)
+                    {
+                        //The content is identical to the server: keep it for a short time, applications (Word...) often reopen
+                        //the file right away and would otherwise download it again (see RetainClosedContent)
+                        RetainClosedContent(CFN);
+                    }
                 }
                 DebugEnd(OperationId, CFN, $"STATUS_SUCCESS  - Handle {HandleCount}");
             }
@@ -1240,6 +1354,8 @@ namespace KS2Drive.FS
 
                     CFN.HasUnflushedData = false; //The whole content has been uploaded, including any previous resize
                     CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
+                    CFN.MarkContentInSyncWithServer();
+                    CFN.LastUploadAt = DateTime.Now;
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                     RepositoryActionPerformed?.Invoke(this, L);
                     DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
@@ -1253,7 +1369,7 @@ namespace KS2Drive.FS
                 }
                 FileInfo = CFN.FileInfo;
 
-                logger.Trace($"{CFN.ObjectId} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
+                if (logger.IsTraceEnabled) logger.Trace($"{CFN.ObjectId} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
                 DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
                 return STATUS_SUCCESS;
 
@@ -1340,7 +1456,7 @@ namespace KS2Drive.FS
                 {
                     //The cache answers when it knows the target is missing (Office probes its temporary names just before renaming):
                     //WinFSP blocks the whole volume during a rename, so every request avoided here unfreezes Explorer sooner
-                    bool TargetExists = !IsCaseOnlyRename && ElementExists(NewFileName, Proxy);
+                    bool TargetExists = !IsCaseOnlyRename && ElementExists(NewFileName, Proxy, true);
                     if (TargetExists)
                     {
                         if (!ReplaceIfExists)
@@ -1529,6 +1645,8 @@ namespace KS2Drive.FS
         /// <summary>
         /// WinFSP callback for FlushFileBuffers (e.g. an application saving a document and asking for the data to be persisted).
         /// Uploads the pending changes of the file, whatever the flush mode (see <see cref="UploadPendingChanges"/>).
+        /// A Flush coming less than <see cref="FlushMinimumIntervalInMilliseconds"/> after the last upload is deferred: applications
+        /// call it several times in a row while saving, and the changes are uploaded by the next Flush, Cleanup or Close anyway.
         /// A volume flush (<paramref name="FileNode0"/> is null) does nothing.
         /// </summary>
         /// <returns><c>STATUS_SUCCESS</c> if there was nothing to upload or the upload succeeded, <c>STATUS_UNEXPECTED_IO_ERROR</c> otherwise.</returns>
@@ -1549,6 +1667,15 @@ namespace KS2Drive.FS
             {
                 String OperationId = Guid.NewGuid().ToString();
                 DebugStart(OperationId, CFN);
+
+                //Applications (Office...) call FlushFileBuffers several times in a row while saving: each call would upload the whole
+                //file again. A Flush right after an upload is skipped; the changes are uploaded by the next Flush, Cleanup or Close
+                if (CFN.HasUnflushedData && (DateTime.Now - CFN.LastUploadAt).TotalMilliseconds < FlushMinimumIntervalInMilliseconds)
+                {
+                    FileInfo = CFN.FileInfo;
+                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Upload deferred (previous upload too recent)");
+                    return STATUS_SUCCESS;
+                }
 
                 bool Success = UploadPendingChanges(CFN, "Flush", OperationId);
                 FileInfo = CFN.FileInfo;
@@ -1589,6 +1716,8 @@ namespace KS2Drive.FS
 
                 CFN.HasUnflushedData = false;
                 CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
+                CFN.MarkContentInSyncWithServer();
+                CFN.LastUploadAt = DateTime.Now;
                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = Method, File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
                 RepositoryActionPerformed?.Invoke(this, L);
                 DebugEnd(OperationId, null, $"{Method} : STATUS_SUCCESS");
@@ -1773,6 +1902,7 @@ namespace KS2Drive.FS
             CFN.FileData = Content;
             CFN.FileInfo.FileSize = (UInt64)Content.LongLength;
             CFN.FileInfo.AllocationSize = (UInt64)Content.LongLength;
+            CFN.MarkContentInSyncWithServer();
             return STATUS_SUCCESS;
         }
 
@@ -2066,6 +2196,7 @@ namespace KS2Drive.FS
         public override void Unmounted(object Host)
         {
             Cache.Clear();
+            lock (RetainedContentsLock) RetainedContents.Clear();
             base.Unmounted(Host);
         }
 
@@ -2099,6 +2230,7 @@ namespace KS2Drive.FS
         /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void TraceStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
+            if (!logger.IsTraceEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Trace($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
         }
 
@@ -2110,6 +2242,7 @@ namespace KS2Drive.FS
         /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void TraceStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
+            if (!logger.IsTraceEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Trace($"{OperationId}|{Caller}|Start|{FileName}");
         }
 
@@ -2122,6 +2255,7 @@ namespace KS2Drive.FS
         /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void TraceEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
+            if (!logger.IsTraceEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Trace($"{OperationId}|{Caller}|End|{Result}");
         }
 
@@ -2133,6 +2267,7 @@ namespace KS2Drive.FS
         /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void DebugStart(string OperationId, FileNode CFN, [CallerMemberName]string Caller = "")
         {
+            if (!logger.IsDebugEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Debug($"{OperationId}|{Caller}|Start|{JsonConvert.SerializeObject(CFN)}");
         }
 
@@ -2144,6 +2279,7 @@ namespace KS2Drive.FS
         /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void DebugStart(String OperationId, String FileName, [CallerMemberName]string Caller = "")
         {
+            if (!logger.IsDebugEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Debug($"{OperationId}|{Caller}|Start|{FileName}");
         }
 
@@ -2156,6 +2292,7 @@ namespace KS2Drive.FS
         /// <param name="Caller">Calling method name (filled in by the compiler).</param>
         private void DebugEnd(String OperationId, FileNode CFN, String Result, [CallerMemberName]string Caller = "")
         {
+            if (!logger.IsDebugEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Debug($"{OperationId}|{Caller}|End|{Result}");
         }
     }

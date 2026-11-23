@@ -85,12 +85,12 @@ namespace KS2Drive.Tests.FS
         public void Initialize()
         {
             Server = new LocalHttpServer();
-            //.NET Framework does not apply the default limit of 2 connections to loopback addresses: apply it here, like for a
-            //remote server such as Alfresco
-            ServicePointManager.FindServicePoint(new Uri(Server.Url)).ConnectionLimit = ServicePointManager.DefaultConnectionLimit;
             WebDavClient2.TestHttpMessageHandler = null; //Real HTTP stack
             WebDavClient2.Init(Server.Url, "/dav", "user", "password", null);
             FileNode.Init("/dav", WebDAVMode.WebDAV);
+            //Small limit (Init raises it, and .NET Framework does not limit loopback addresses at all), so that a few leaked
+            //connections are enough to block the next request, like with the framework default on a remote server
+            ServicePointManager.FindServicePoint(new Uri(Server.Url)).ConnectionLimit = 2;
         }
 
         [TestCleanup]
@@ -129,6 +129,14 @@ namespace KS2Drive.Tests.FS
         {
             //The scenario relies on the default limit of 2 connections per server of a desktop .NET Framework application
             Assert.AreEqual(2, ServicePointManager.DefaultConnectionLimit);
+        }
+
+        [TestMethod]
+        public void Init_AllowsSeveralSimultaneousConnectionsToTheServer()
+        {
+            WebDavClient2.Init(Server.Url, "/dav", "user", "password", null);
+            Assert.AreEqual(WebDavClient2.MaxConnectionsPerServer, ServicePointManager.FindServicePoint(new Uri(Server.Url)).ConnectionLimit);
+            Assert.IsTrue(WebDavClient2.MaxConnectionsPerServer > 2);
         }
 
         [TestMethod]
