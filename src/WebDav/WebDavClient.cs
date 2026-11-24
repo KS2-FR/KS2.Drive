@@ -52,7 +52,8 @@ namespace KS2Drive.WebDav
         public WebDavClient(HttpClient Http, String ServerUrl)
         {
             this.Http = Http ?? throw new ArgumentNullException(nameof(Http));
-            this.Server = new Uri(ServerUrl).GetLeftPart(UriPartial.Authority);
+            //Scheme, host and port only: credentials written in the URL (user:password@) must never end up in request URLs or logs
+            this.Server = new Uri(ServerUrl).GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped);
         }
 
         /// <summary>
@@ -141,6 +142,11 @@ namespace KS2Drive.WebDav
             }
             catch (WebDavException ex) when (ex.StatusCode == 404)
             {
+                return null;
+            }
+            catch (WebDavException ex) when (!AsCollection && ex.StatusCode >= 300 && ex.StatusCode < 400)
+            {
+                //A folder looked up without trailing slash: servers may redirect to the URL with a slash. The lookup as a folder follows
                 return null;
             }
         }
