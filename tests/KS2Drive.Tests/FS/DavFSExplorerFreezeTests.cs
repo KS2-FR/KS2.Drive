@@ -102,8 +102,9 @@ namespace KS2Drive.Tests.FS
         }
 
         [TestMethod]
-        public void Create_OfANameKnownToBeMissing_SendsOnlyThePut()
+        public void Create_OfANameKnownToBeMissing_SendsNoRequest()
         {
+            //No existence check (the name was just found missing) and no upload (the file is created by its first upload)
             using (var Ctx = DavFsContext.Create())
             {
                 Assert.AreEqual(FileSystemBase.STATUS_OBJECT_NAME_NOT_FOUND, GetSecurityByName(Ctx, "\\~WRD0001.tmp")); //What Office does first
@@ -111,8 +112,10 @@ namespace KS2Drive.Tests.FS
 
                 var Node = Ctx.Create("\\~WRD0001.tmp");
 
-                CollectionAssert.AreEqual(new[] { "PUT /dav/~WRD0001.tmp" }, Ctx.Server.Requests);
+                Assert.AreEqual(0, Ctx.Server.Requests.Count, String.Join(", ", Ctx.Server.Requests));
                 Assert.AreEqual("\\~WRD0001.tmp", Node.LocalPath);
+
+                Ctx.CleanupAndClose(Node, "\\~WRD0001.tmp");
                 Assert.IsTrue(Ctx.Server.Exists("/dav/~WRD0001.tmp"));
             }
         }

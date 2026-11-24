@@ -70,7 +70,7 @@ namespace KS2Drive.Tests.Core
             Assert.AreEqual(Expected.ServerLogin, Actual.ServerLogin);
             Assert.AreEqual(Expected.ServerPassword, Actual.ServerPassword);
             Assert.AreEqual(Expected.KernelCacheMode, Actual.KernelCacheMode);
-            Assert.AreEqual(Expected.FlushMode, Actual.FlushMode);
+            Assert.AreEqual(1, Actual.FlushMode, "FlushAtWrite is no longer offered: every loaded configuration uses FlushAtCleanup");
             Assert.AreEqual(Expected.SyncOps, Actual.SyncOps);
             Assert.AreEqual(Expected.PreLoading, Actual.PreLoading);
             Assert.AreEqual(Expected.MountAsNetworkDrive, Actual.MountAsNetworkDrive);

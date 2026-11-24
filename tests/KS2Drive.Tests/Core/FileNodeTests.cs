@@ -55,11 +55,12 @@ namespace KS2Drive.Tests.Core
         }
 
         [TestMethod]
-        public void Init_SetsModeUsedByConstructor()
+        public void Init_ModeNoLongerChangesTheFolderDetection()
         {
+            //Both modes rely on the standard resourcetype property
             var I = new Item { Href = "/dav/f", ContentLength = 0, Etag = null, IsCollection = false };
             FileNode.Init(Library, WebDAVMode.WebDAV);
-            Assert.AreEqual((uint)FileAttributes.Directory, new FileNode(I).FileInfo.FileAttributes);
+            Assert.AreEqual((uint)FileAttributes.Normal, new FileNode(I).FileInfo.FileAttributes);
             FileNode.Init(Library, WebDAVMode.AOS);
             Assert.AreEqual((uint)FileAttributes.Normal, new FileNode(I).FileInfo.FileAttributes);
         }
@@ -164,16 +165,22 @@ namespace KS2Drive.Tests.Core
         }
 
         [DataTestMethod]
-        [DataRow(null, null, false, FileAttributes.Directory)]     //No length: directory
-        [DataRow(null, "\"e\"", false, FileAttributes.Directory)]  //No length even with an ETag: directory
-        [DataRow(0L, null, false, FileAttributes.Directory)]       //Empty without ETag: directory
-        [DataRow(0L, "\"e\"", false, FileAttributes.Normal)]       //Empty file with ETag
-        [DataRow(5L, null, false, FileAttributes.Normal)]          //Content without ETag: file
-        [DataRow(5L, "\"e\"", true, FileAttributes.Normal)]        //IsCollection is ignored in WebDAV mode
-        public void Constructor_WebDavMode_UsesHeuristic(long? Length, string Etag, bool IsCollection, FileAttributes Expected)
+        [DataRow(null, null, false, FileAttributes.Normal)]        //File without length nor ETag (server not sending getcontentlength)
+        [DataRow(0L, null, false, FileAttributes.Normal)]          //Empty file without ETag
+        [DataRow(5L, "\"e\"", false, FileAttributes.Normal)]
+        [DataRow(null, null, true, FileAttributes.Directory)]      //resourcetype collection
+        [DataRow(5L, "\"e\"", true, FileAttributes.Directory)]
+        public void Constructor_WebDavMode_UsesResourceType(long? Length, string Etag, bool IsCollection, FileAttributes Expected)
         {
+            //The former heuristic (no etag and no size, or no size => folder) made files folders on some servers
             var Node = new FileNode(new Item { Href = "/dav/x", IsCollection = IsCollection, ContentLength = Length, Etag = Etag });
             Assert.AreEqual((uint)Expected, Node.FileInfo.FileAttributes);
+        }
+
+        [TestMethod]
+        public void Constructor_HrefEndingWithASlash_IsAFolder()
+        {
+            Assert.AreEqual((uint)FileAttributes.Directory, new FileNode(new Item { Href = "/dav/folder/", IsCollection = false }).FileInfo.FileAttributes);
         }
 
         [TestMethod]

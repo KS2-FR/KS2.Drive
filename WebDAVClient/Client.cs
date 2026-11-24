@@ -369,14 +369,24 @@ namespace WebDAVClient
         /// <param name="remoteFilePath">Source path and filename of the file on the server</param>
         /// <param name="content"></param>
         /// <param name="name"></param>
-        public async Task<bool> Upload(string remoteFilePath, Stream content, string name)
+        public Task<bool> Upload(string remoteFilePath, Stream content, string name)
+        {
+            return Upload(remoteFilePath, content, name, false);
+        }
+
+        /// <summary>
+        /// Uploads a file. With <paramref name="onlyIfNew"/>, the request carries "If-None-Match: *": a server that supports it
+        /// answers 412 (WebDAVException) instead of replacing a file that already exists.
+        /// </summary>
+        public async Task<bool> Upload(string remoteFilePath, Stream content, string name, bool onlyIfNew)
         {
             // Should not have a trailing slash.
             var uploadUri = /*await*/ GetServerUrl(remoteFilePath.TrimEnd('/') + "/" + name.TrimStart('/'), false)/*.ConfigureAwait(false)*/;
+            IDictionary<string, string> headers = onlyIfNew ? new Dictionary<string, string> { { "If-None-Match", "*" } } : null;
 
             //The response is always disposed: an undisposed response keeps its HTTP connection busy, and .NET Framework allows only
             //2 connections per server, so a few failed requests were enough to block every following request
-            using (HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content).ConfigureAwait(false))
+            using (HttpResponseMessage response = await HttpUploadRequest(uploadUri.Uri, HttpMethod.Put, content, headers).ConfigureAwait(false))
             {
                 if (response.StatusCode == HttpStatusCode.Conflict)
                     throw new WebDAVConflictException((int)response.StatusCode, "Failed uploading file.");

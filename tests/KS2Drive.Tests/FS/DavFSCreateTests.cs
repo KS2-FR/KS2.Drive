@@ -32,7 +32,7 @@ namespace KS2Drive.Tests.FS
         #region Create
 
         [TestMethod]
-        public void Create_File_CreatesAnEmptyFileOnTheServer()
+        public void Create_File_IsCreatedOnTheServerByItsFirstUpload()
         {
             using (var Ctx = CreateContext())
             {
@@ -48,11 +48,18 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual("/dav/new.txt", Node.RepositoryPath);
                 Assert.AreEqual(1, Node.OpenCount);
                 Assert.IsTrue(Node.HasUnflushedData, "The new file must be uploaded at cleanup even if nothing is written");
+                Assert.IsTrue(Node.IsNewOnServer);
 
+                //No empty file on the server: it is created by the first upload
+                Assert.IsFalse(Ctx.Server.Exists("/dav/new.txt"));
+                Assert.AreEqual(0, Ctx.Server.CountRequests("PUT"));
+
+                Ctx.CleanupAndClose(Node, "\new.txt", DavFsContext.ModifiedFlags);
                 Assert.IsTrue(Ctx.Server.Exists("/dav/new.txt"));
                 Assert.IsFalse(Ctx.Server.IsFolder("/dav/new.txt"));
                 Assert.AreEqual(0, Ctx.Server.GetContent("/dav/new.txt").Length);
                 Assert.AreEqual(1, Ctx.Server.CountRequests("PUT"));
+                Assert.IsFalse(Node.IsNewOnServer);
 
                 var L = LastLog(Ctx, "Create");
                 Assert.IsNotNull(L);
@@ -85,6 +92,7 @@ namespace KS2Drive.Tests.FS
                 var Node = Ctx.Create("\\folder\\new.txt");
 
                 Assert.AreEqual("/dav/folder/new.txt", Node.RepositoryPath);
+                Ctx.CleanupAndClose(Node, "\folder\new.txt");
                 Assert.IsTrue(Ctx.Server.Exists("/dav/folder/new.txt"));
             }
         }
@@ -159,8 +167,7 @@ namespace KS2Drive.Tests.FS
         }
 
         [DataTestMethod]
-        [DataRow(false)]
-        [DataRow(true)]
+        [DataRow(true)] //A file is created on the server by its first upload, see Create_File_IsCreatedOnTheServerByItsFirstUpload
         public void Create_Conflict_ReturnsAccessDenied(bool IsDirectory)
         {
             using (var Ctx = CreateContext())
@@ -189,8 +196,7 @@ namespace KS2Drive.Tests.FS
         }
 
         [DataTestMethod]
-        [DataRow(false, "PUT")]
-        [DataRow(true, "MKCOL")]
+        [DataRow(true, "MKCOL")] //Only folders are created right away
         public void Create_NetworkFailureWhileCreating_ReturnsNetworkUnreachable(bool IsDirectory, String Method)
         {
             using (var Ctx = CreateContext())
@@ -219,8 +225,7 @@ namespace KS2Drive.Tests.FS
         }
 
         [DataTestMethod]
-        [DataRow(false, "PUT")]
-        [DataRow(true, "MKCOL")]
+        [DataRow(true, "MKCOL")] //Only folders are created right away
         public void Create_ServerRefusesTheCreation_ReturnsCannotMake(bool IsDirectory, String Method)
         {
             using (var Ctx = CreateContext())
@@ -247,8 +252,7 @@ namespace KS2Drive.Tests.FS
         }
 
         [DataTestMethod]
-        [DataRow(false, "PUT")]
-        [DataRow(true, "MKCOL")]
+        [DataRow(true, "MKCOL")] //Only folders are created right away
         public void Create_401WhileCreating_ReturnsNetworkUnreachableAndNotifies(bool IsDirectory, String Method)
         {
             using (var Ctx = CreateContext())
@@ -267,11 +271,11 @@ namespace KS2Drive.Tests.FS
             //read back from the server (one request less while Explorer cannot list the folder)
             using (var Ctx = CreateContext())
             {
+                Ctx.Server.Requests.Clear(); //Connection test of the mount
                 Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.TryCreate("\\new.txt", false, out FileNode Node));
 
-                Int32 PutIndex = Ctx.Server.Requests.IndexOf("PUT /dav/new.txt");
-                Assert.IsTrue(PutIndex >= 0);
-                Assert.AreEqual(PutIndex, Ctx.Server.Requests.Count - 1, "No request after the PUT: " + String.Join(", ", Ctx.Server.Requests));
+                //Only the check that the name is free: no upload (see IsNewOnServer) and no read-back
+                CollectionAssert.AreEqual(new[] { "PROPFIND /dav/new.txt" }, Ctx.Server.Requests, String.Join(", ", Ctx.Server.Requests));
                 Assert.AreEqual("\\new.txt", Node.LocalPath);
                 Assert.AreEqual("new.txt", Node.Name);
                 Assert.AreEqual(0UL, Node.FileInfo.FileSize);
@@ -297,7 +301,6 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual(0UL, Node.FileInfo.FileSize);
                 Assert.AreEqual(1, Node.OpenCount);
                 Assert.IsTrue(Node.HasUnflushedData);
-                Assert.IsTrue(Ctx.Server.Exists("/dav/new.txt"));
 
                 //The node is usable and cached
                 Assert.AreSame(Node, Ctx.Open("\\new.txt"));

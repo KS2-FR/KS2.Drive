@@ -200,8 +200,9 @@ namespace KS2Drive.Tests.FS
         #region Not supported callbacks
 
         [TestMethod]
-        public void CanDelete_AlwaysAllowsTheDeletionWithoutServerCall()
+        public void CanDelete_FileIsAllowedWithoutServerCall_NonEmptyFolderIsRefused()
         {
+            //See DavFSLogicTests for the other folder cases
             using (var Ctx = DavFsContext.Create(s => { s.AddFile("/dav/a.txt", "abc"); s.AddFolder("/dav/folder"); s.AddFile("/dav/folder/b.txt", "b"); }))
             {
                 var File = Ctx.Open("\\a.txt");
@@ -209,8 +210,8 @@ namespace KS2Drive.Tests.FS
                 int RequestsBefore = Ctx.Server.Requests.Count;
 
                 Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.Fs.CanDelete(File, null, "\\a.txt"));
-                Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.Fs.CanDelete(Folder, null, "\\folder"));
                 Assert.AreEqual(RequestsBefore, Ctx.Server.Requests.Count);
+                Assert.AreEqual(FileSystemBase.STATUS_DIRECTORY_NOT_EMPTY, Ctx.Fs.CanDelete(Folder, null, "\\folder"));
                 Assert.IsTrue(Ctx.Server.Exists("/dav/a.txt"), "Nothing is deleted before Cleanup");
             }
         }

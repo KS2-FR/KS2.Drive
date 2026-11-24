@@ -12,7 +12,8 @@ namespace KS2Drive.FS
     /// </summary>
     public enum FlushMode
     {
-        /// <summary>Upload the whole file to the server on every write operation.</summary>
+        /// <summary>No longer used (treated as <see cref="FlushAtCleanup"/>): it uploaded the whole file to the server on every write
+        /// operation, i.e. about 160 times for a 10 MB file written by blocks of 64 KB. Kept so that existing configurations still load.</summary>
         FlushAtWrite = 0,
         /// <summary>Keep written data in memory and upload it when the file handle is cleaned up/closed.</summary>
         FlushAtCleanup = 1

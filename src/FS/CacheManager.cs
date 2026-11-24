@@ -107,6 +107,18 @@ namespace KS2Drive.FS
             return Parent.IsParsed && (DateTime.Now - Parent.LastRefresh).TotalSeconds <= CacheDurationInSeconds;
         }
 
+        /// <summary>
+        /// Returns true when a folder contains (at any depth) an element whose content is not on the server yet: created on the
+        /// drive and not uploaded, or with changes not uploaded. Such elements are not seen by a listing of the server.
+        /// Does not take the cache lock: the caller is expected to hold it.
+        /// </summary>
+        public bool HasPendingChildrenNoLock(String FolderLocalPath)
+        {
+            if (FileNodeCache == null) return false;
+            String Prefix = FolderLocalPath == "\\" ? "\\" : FolderLocalPath + "\\";
+            return FileNodeCache.Any(x => x.Key.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) && !String.Equals(x.Key, FolderLocalPath, StringComparison.OrdinalIgnoreCase) && (x.Value.IsNewOnServer || x.Value.HasUnflushedData));
+        }
+
         private (FileNode node, bool IsNonExistent) GetFileNodeNoLockCore(String FileOrFolderLocalPath)
         {
             if (_mode == CacheMode.Disabled) return (null, false);
@@ -296,6 +308,13 @@ namespace KS2Drive.FS
                         if (!Object.ReferenceEquals(CachedNode, Result.Content[i].Item2)) Result.Content[i] = new Tuple<String, FileNode>(Result.Content[i].Item1, CachedNode);
                     }
 
+                    //Files created on the drive and not uploaded yet are not in the server listing: add them
+                    String PendingPrefix = CurrentFolder.LocalPath == "\\" ? "\\" : CurrentFolder.LocalPath + "\\";
+                    foreach (var Pending in FileNodeCache.Values.Where(x => x.IsNewOnServer && x.LocalPath.StartsWith(PendingPrefix, StringComparison.OrdinalIgnoreCase) && x.LocalPath.LastIndexOf('\\') == PendingPrefix.Length - 1).ToList())
+                    {
+                        if (!Result.Content.Any(x => Object.ReferenceEquals(x.Item2, Pending))) Result.Content.Add(new Tuple<String, FileNode>(Pending.Name, Pending));
+                    }
+
                     Children = Result.Content;
                 }
                 else
@@ -446,6 +465,8 @@ namespace KS2Drive.FS
                 //Remove the FileNodeCache entries that are no longer in Result.Content
                 foreach (var s in FileNodeCache.Where(x => !String.Equals(x.Key, CFN.LocalPath, StringComparison.OrdinalIgnoreCase) && x.Key.StartsWith(Filter, StringComparison.OrdinalIgnoreCase) && x.Key.LastIndexOf('\\').Equals(Filter.Length - 1)).ToList())
                 {
+                    //Elements created on the drive and not uploaded yet are not on the server yet: they must be kept
+                    if (s.Value.IsNewOnServer) continue;
                     if (Result.Content.FirstOrDefault(x => String.Equals(x.Item2.LocalPath, s.Value.LocalPath, StringComparison.OrdinalIgnoreCase)) == null)
                     {
                         DeleteFileNode(s.Value);

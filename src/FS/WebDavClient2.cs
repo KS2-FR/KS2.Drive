@@ -210,6 +210,14 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
+        /// Uploads a file; with <paramref name="onlyIfNew"/>, the server is asked not to replace an existing file (412 instead).
+        /// </summary>
+        public new Task<bool> Upload(string remoteFilePath, Stream content, string name, bool onlyIfNew)
+        {
+            return base.Upload(ParameterConvert(remoteFilePath), content, name, onlyIfNew);
+        }
+
+        /// <summary>
         /// Retrieves a file or folder from the remote repository from its local path.
         /// The element is first looked up as a file if its name (last segment of the path only, not its parent folders)
         /// contains a '.', as a folder otherwise; if that lookup answers 404, the other kind is tried. A folder named

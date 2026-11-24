@@ -69,12 +69,6 @@ namespace KS2Drive.Config
             CBKernelCache.Items.Add(new KeyValuePair<int, string>((Int32)KernelCacheMode.DataAndMetaData, KernelCacheMode.DataAndMetaData.ToString()));
             CBKernelCache.SelectedIndex = 2;
 
-            CBFlush.SelectedValuePath = "Key";
-            CBFlush.DisplayMemberPath = "Value";
-            CBFlush.Items.Add(new KeyValuePair<int, string>((Int32)FlushMode.FlushAtCleanup, FlushMode.FlushAtCleanup.ToString()));
-            CBFlush.Items.Add(new KeyValuePair<int, string>((Int32)FlushMode.FlushAtWrite, FlushMode.FlushAtWrite.ToString()));
-            CBFlush.SelectedIndex = 0;
-
             CBSyncOps.SelectedValuePath = "Key";
             CBSyncOps.DisplayMemberPath = "Value";
             CBSyncOps.Items.Add(new KeyValuePair<int, string>(0, "No"));
@@ -103,9 +97,6 @@ namespace KS2Drive.Config
 
             var KernelCacheMatchingItem = CBKernelCache.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.KernelCacheMode));
             if (!KernelCacheMatchingItem.Equals(default(KeyValuePair<int, string>))) CBKernelCache.SelectedItem = KernelCacheMatchingItem;
-
-            var FlushMatchingItem = CBFlush.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(this.AppConfiguration.FlushMode));
-            if (!FlushMatchingItem.Equals(default(KeyValuePair<int, string>))) CBFlush.SelectedItem = FlushMatchingItem;
 
             var SyncOpsMatchingItem = CBSyncOps.Items.Cast<KeyValuePair<int, string>>().FirstOrDefault(x => x.Key.Equals(Convert.ToInt32(this.AppConfiguration.SyncOps)));
             if (!SyncOpsMatchingItem.Equals(default(KeyValuePair<int, string>))) CBSyncOps.SelectedItem = SyncOpsMatchingItem;
@@ -201,7 +192,7 @@ namespace KS2Drive.Config
             this.AppConfiguration.KernelCacheMode = Convert.ToInt32(CBKernelCache.SelectedValue);
             this.AppConfiguration.SyncOps = Convert.ToBoolean(Convert.ToInt16(CBSyncOps.SelectedValue));
             this.AppConfiguration.PreLoading = Convert.ToBoolean(Convert.ToInt16(CBPreloading.SelectedValue));
-            this.AppConfiguration.FlushMode = Convert.ToInt32(CBFlush.SelectedValue);
+            this.AppConfiguration.FlushMode = (Int32)FlushMode.FlushAtCleanup; //The only mode left (FlushAtWrite uploaded the whole file after every write)
             this.AppConfiguration.MountAsNetworkDrive = Convert.ToBoolean(CBMountAsNetworkDrive.SelectedValue);
             this.AppConfiguration.UseClientCertForAuthentication = Chk_UserClientCert.IsChecked.Value;
 

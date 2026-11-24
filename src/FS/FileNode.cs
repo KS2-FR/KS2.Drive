@@ -129,29 +129,11 @@ namespace KS2Drive.FS
 
             if (this.RepositoryPath[this.RepositoryPath.Length - 1] == '/' && this.RepositoryPath.Length > 1) this.RepositoryPath = this.RepositoryPath.Remove(this.RepositoryPath.Length - 1);
 
-            if (FileNode._WebDAVMode == WebDAVMode.AOS) //AOS
-            {
-                if (WebDavObject.IsCollection)
-                {
-                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
-                }
-                else
-                {
-                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                }
-            }
-            else //Webdav
-            {
-                //Note : Detecting a webDAV directory from properties can change from one implementation to another. The folowing test is subject to evolve when testing new webDAV servers
-                if ((WebDavObject.Etag == null && WebDavObject.ContentLength == 0) || (WebDavObject.ContentLength == null))
-                {
-                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Directory;
-                }
-                else
-                {
-                    this.FileInfo.FileAttributes = (UInt32)System.IO.FileAttributes.Normal;
-                }
-            }
+            //Folder or file: the standard WebDAV "resourcetype" property (<collection/> for a folder, see IsCollection), whatever the
+            //mode. A href ending with '/' also designates a collection. The former heuristic of the WebDAV mode (no etag and no
+            //size, or no size) made every file a folder on servers that do not send getcontentlength
+            bool IsFolder = WebDavObject.IsCollection || (WebDavObject.Href != null && WebDavObject.Href.EndsWith("/") && WebDavObject.Href.Length > 1);
+            this.FileInfo.FileAttributes = IsFolder ? (UInt32)System.IO.FileAttributes.Directory : (UInt32)System.IO.FileAttributes.Normal;
 
             if (WebDavObject.CreationDate.HasValue) this.FileInfo.CreationTime = (UInt64)WebDavObject.CreationDate.Value.ToFileTimeUtc();
             this.FileInfo.LastAccessTime = (UInt64)DateTime.Now.ToFileTimeUtc();
@@ -184,6 +166,15 @@ namespace KS2Drive.FS
             String ReworkdPath = DecodedPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
+        }
+
+        /// <summary>
+        /// Returns the path of a WebDAV href, which servers send either as an absolute URL or as a path.
+        /// </summary>
+        internal static String GetPathOfHref(String Href)
+        {
+            if (Href == null) return null;
+            return Uri.TryCreate(Href, UriKind.Absolute, out Uri Parsed) && (Parsed.Scheme == Uri.UriSchemeHttp || Parsed.Scheme == Uri.UriSchemeHttps) ? Parsed.PathAndQuery : Href;
         }
 
         /// <summary>
@@ -307,6 +298,13 @@ namespace KS2Drive.FS
         /// right after an upload: the pending changes are uploaded by the following Flush, Cleanup or Close.
         /// </summary>
         internal DateTime LastUploadAt;
+
+        /// <summary>
+        /// True for a file created on the drive and not uploaded yet: it does not exist on the server until its first upload
+        /// (Flush, Cleanup or Close). Creating it on the server right away with an empty content created an empty version in the
+        /// repository, could trigger server rules on an empty file, and showed an empty file to other users.
+        /// </summary>
+        internal bool IsNewOnServer;
 
         /// <summary>
         /// Records that <see cref="FileData"/> is identical to the file on the server (just downloaded or uploaded).

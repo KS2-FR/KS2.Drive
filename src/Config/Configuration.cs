@@ -37,6 +37,8 @@ namespace KS2Drive.Config
                     //AOS is no longer offered (the server type cannot be chosen in the configuration window any more):
                     //a configuration saved in AOS mode switches to standard WebDAV (KS2Drive.FS.WebDAVMode.WebDAV = 0)
                     C.ServerType = 0;
+                    //FlushAtWrite (0) is no longer offered: it uploaded the whole file after every write (KS2Drive.FS.FlushMode.FlushAtCleanup = 1)
+                    C.FlushMode = 1;
 
                     if (IsLegacyFormat)
                     {

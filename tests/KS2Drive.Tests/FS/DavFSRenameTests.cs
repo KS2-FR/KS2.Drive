@@ -153,101 +153,17 @@ namespace KS2Drive.Tests.FS
         }
 
         [TestMethod]
-        public void Rename_ExistingTarget_WithReplace_InWebDAVMode_ReturnsCollision()
+        public void Rename_ExistingFolderTarget_WithReplace_IsRefused()
         {
-            using (var Ctx = CreateContext(WebDAVMode.WebDAV))
-            {
-                var Node = Ctx.Open("\\a.txt");
-
-                Assert.AreEqual(FileSystemBase.STATUS_OBJECT_NAME_COLLISION, Ctx.Fs.Rename(Node, null, "\\a.txt", "\\b.txt", true));
-
-                Assert.AreEqual(0, Ctx.Server.CountRequests("DELETE"));
-                Assert.AreEqual(0, Ctx.Server.CountRequests("MOVE"));
-                Assert.AreEqual("bbbb", Ctx.Server.GetText("/dav/b.txt"));
-            }
-        }
-
-        [TestMethod]
-        public void Rename_ExistingFolderTarget_WithReplace_InAOSMode_ReturnsCollision()
-        {
+            //Like NTFS, a directory is never replaced (on a WebDAV server it would delete the whole content of the target)
             using (var Ctx = CreateContext(WebDAVMode.AOS))
             {
                 var Folder = Ctx.Open("\\folder");
 
-                Assert.AreEqual(FileSystemBase.STATUS_OBJECT_NAME_COLLISION, Ctx.Fs.Rename(Folder, null, "\\folder", "\\other", true));
+                Assert.AreEqual(FileSystemBase.STATUS_ACCESS_DENIED, Ctx.Fs.Rename(Folder, null, "\\folder", "\\other", true));
 
                 Assert.AreEqual(0, Ctx.Server.CountRequests("DELETE"));
                 Assert.IsTrue(Ctx.Server.Exists("/dav/folder/c.txt"));
-            }
-        }
-
-        [TestMethod]
-        public void Rename_ExistingTarget_WithReplace_InAOSMode_DeletesTheTargetBeforeTheMove()
-        {
-            using (var Ctx = CreateContext(WebDAVMode.AOS))
-            {
-                var Node = Ctx.Open("\\a.txt");
-                var Target = Ctx.Open("\\b.txt");
-
-                Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.Fs.Rename(Node, null, "\\a.txt", "\\b.txt", true));
-
-                int DeleteIndex = Ctx.Server.Requests.IndexOf("DELETE /dav/b.txt");
-                int MoveIndex = Ctx.Server.Requests.IndexOf("MOVE /dav/a.txt");
-                Assert.IsTrue(DeleteIndex >= 0, "The target is deleted");
-                Assert.IsTrue(MoveIndex > DeleteIndex, "The MOVE is sent once the deletion is complete");
-                Assert.AreEqual("abc", Ctx.Server.GetText("/dav/b.txt"));
-                Assert.IsFalse(Ctx.Server.Exists("/dav/a.txt"));
-                Assert.AreSame(Node, Ctx.Open("\\b.txt"), "The cache now maps the target name to the renamed node");
-            }
-        }
-
-        [TestMethod]
-        public void Rename_WithReplace_InAOSMode_TargetDeleteAnswering404_IsAccepted()
-        {
-            using (var Ctx = CreateContext(WebDAVMode.AOS))
-            {
-                var Node = Ctx.Open("\\a.txt");
-                var Server = Ctx.Server;
-                //The target is deleted by another client between the existence check and our DELETE, which then answers 404
-                Server.ForcedStatus = (M, P) => { if (M == "DELETE" && P == "/dav/b.txt") { Server.Remove("/dav/b.txt"); return HttpStatusCode.NotFound; } return null; };
-
-                Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.Fs.Rename(Node, null, "\\a.txt", "\\b.txt", true));
-
-                Assert.AreEqual(1, Ctx.Server.CountRequests("MOVE"));
-                Assert.AreEqual("abc", Ctx.Server.GetText("/dav/b.txt"));
-            }
-        }
-
-        [TestMethod]
-        public void Rename_WithReplace_InAOSMode_TargetDeleteAnswering404ButTargetStillThere_IsACollisionAndNothingIsOverwritten()
-        {
-            //Inconsistent server: the MOVE is sent with "Overwrite: F", so the existing target is never replaced silently
-            using (var Ctx = CreateContext(WebDAVMode.AOS))
-            {
-                var Node = Ctx.Open("\\a.txt");
-                String TargetBefore = Ctx.Server.GetText("/dav/b.txt");
-                Ctx.Server.ForcedStatus = Answer("DELETE", "/dav/b.txt", 404);
-
-                Assert.AreEqual(FileSystemBase.STATUS_OBJECT_NAME_COLLISION, Ctx.Fs.Rename(Node, null, "\\a.txt", "\\b.txt", true));
-
-                Assert.AreEqual(TargetBefore, Ctx.Server.GetText("/dav/b.txt"));
-                Assert.AreEqual("abc", Ctx.Server.GetText("/dav/a.txt"));
-            }
-        }
-
-        [TestMethod]
-        public void Rename_WithReplace_InAOSMode_TargetDeleteFailure_ReturnsCannotMake()
-        {
-            using (var Ctx = CreateContext(WebDAVMode.AOS))
-            {
-                var Node = Ctx.Open("\\a.txt");
-                Ctx.Server.ForcedStatus = Answer("DELETE", "/dav/b.txt", 500);
-
-                Assert.AreEqual(FileSystemBase.STATUS_CANNOT_MAKE, Ctx.Fs.Rename(Node, null, "\\a.txt", "\\b.txt", true));
-
-                Assert.AreEqual(0, Ctx.Server.CountRequests("MOVE"));
-                Assert.AreEqual("abc", Ctx.Server.GetText("/dav/a.txt"));
-                Assert.AreEqual("STATUS_CANNOT_MAKE", LastLog(Ctx, "Rename").Result);
             }
         }
 
@@ -363,12 +279,10 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void Rename_OfANodeNoLongerInTheCache_Succeeds()
         {
-            using (var Ctx = CreateContext(WebDAVMode.WebDAV, FlushMode.FlushAtWrite))
+            using (var Ctx = CreateContext())
             {
                 var Node = Ctx.Open("\\a.txt");
-                Ctx.Server.ForcedStatus = AnswerAll("PUT", 500);
-                Ctx.Write(Node, 0, "X"); //The failed write flush removes the node from the cache
-                Ctx.Server.ForcedStatus = null;
+                GetCachedNodes(Ctx.Fs).Remove("\\a.txt"); //E.g. invalidated after a failed operation
                 Assert.IsFalse(GetCachedNodes(Ctx.Fs).ContainsKey("\\a.txt"));
 
                 Int32 Status = Ctx.Fs.Rename(Node, null, "\\a.txt", "\\renamed.txt", false);

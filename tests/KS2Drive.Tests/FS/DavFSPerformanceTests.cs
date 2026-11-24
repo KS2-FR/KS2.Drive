@@ -88,7 +88,8 @@ namespace KS2Drive.Tests.FS
             using (var Ctx = CreateListedContext())
             {
                 Ctx.Create("\\~WRD0001.tmp");
-                CollectionAssert.AreEqual(new[] { "PROPFIND /dav/~WRD0001.tmp", "PUT /dav/~WRD0001.tmp" }, Ctx.Server.Requests);
+                //One check that the name is free; the file itself is created by its first upload
+                CollectionAssert.AreEqual(new[] { "PROPFIND /dav/~WRD0001.tmp" }, Ctx.Server.Requests);
             }
         }
 
@@ -249,17 +250,21 @@ namespace KS2Drive.Tests.FS
         #region (5) Flush right after an upload
 
         [TestMethod]
-        public void FlushRightAfterTheCreation_IsDeferredToCleanup()
+        public void FlushRightAfterAnUpload_IsDeferredToCleanup()
         {
             using (var Ctx = DavFsContext.Create())
             {
                 var Node = Ctx.Create("\\new.docx");
-                Ctx.Write(Node, 0, "content");
+                Ctx.Write(Node, 0, "first");
                 Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.Fs.Flush(Node, null, out Fsp.Interop.FileInfo Info));
-                Assert.AreEqual(1, Ctx.Server.CountRequests("PUT"), "Only the empty file of the creation");
+                Assert.AreEqual(1, Ctx.Server.CountRequests("PUT"), "The first Flush uploads (and creates the file)");
+
+                Ctx.Write(Node, 0, "second");
+                Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Ctx.Fs.Flush(Node, null, out Info));
+                Assert.AreEqual(1, Ctx.Server.CountRequests("PUT"), "A Flush right after an upload is deferred");
 
                 Ctx.CleanupAndClose(Node, "\\new.docx", DavFsContext.ModifiedFlags);
-                Assert.AreEqual("content", Ctx.Server.GetText("/dav/new.docx"));
+                Assert.AreEqual("second", Ctx.Server.GetText("/dav/new.docx"));
                 Assert.AreEqual(2, Ctx.Server.CountRequests("PUT"));
             }
         }

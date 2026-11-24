@@ -160,7 +160,7 @@ namespace KS2Drive.Tests.Infrastructure
                 {
                     case "PROPFIND": return PropFind(Path, RawPath.EndsWith("/") && RawPath.Length > 1, Request);
                     case "GET": return Get(Path);
-                    case "PUT": return Put(Path, Body ?? new byte[0]);
+                    case "PUT": return Put(Path, Body ?? new byte[0], Request);
                     case "DELETE": return Delete(Path);
                     case "MKCOL": return MkCol(Path);
                     case "MOVE": return Move(Path, Request);
@@ -215,8 +215,10 @@ namespace KS2Drive.Tests.Infrastructure
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Target.Content) };
         }
 
-        private HttpResponseMessage Put(String Path, byte[] Body)
+        private HttpResponseMessage Put(String Path, byte[] Body, HttpRequestMessage Request)
         {
+            //RFC 7232: "If-None-Match: *" only creates, it never replaces an existing resource
+            if (Entries.ContainsKey(Path) && Request.Headers.IfNoneMatch.Any(x => x.Tag == "*")) return new HttpResponseMessage(HttpStatusCode.PreconditionFailed);
             if (!Entries.TryGetValue(ParentOf(Path), out Entry Parent) || !Parent.IsFolder) return new HttpResponseMessage(HttpStatusCode.Conflict);
             bool Existed = Entries.TryGetValue(Path, out Entry Existing);
             if (Existed && Existing.IsFolder) return new HttpResponseMessage(HttpStatusCode.MethodNotAllowed);

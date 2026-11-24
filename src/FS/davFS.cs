@@ -22,9 +22,8 @@ namespace KS2Drive.FS
     /// WinFSP user-mode file system that exposes a remote WebDAV repository as a Windows drive.
     /// Each WinFSP callback is translated into WebDAV calls through <see cref="WebDavClient2"/>; file metadata
     /// (<see cref="FileNode"/>) is kept in a <see cref="CacheManager"/>, and file contents are held in memory
-    /// (<c>FileNode.FileData</c>) while the file has open handles. Modified contents are uploaded either on every
-    /// <see cref="Write"/> (<see cref="FlushMode.FlushAtWrite"/>) or at <see cref="Cleanup"/>/<see cref="Close"/>
-    /// (<see cref="FlushMode.FlushAtCleanup"/>).
+    /// (<c>FileNode.FileData</c>) while the file has open handles, and for a short time after. Modified contents are uploaded
+    /// by <see cref="Flush"/>, <see cref="Cleanup"/> or <see cref="Close"/> (<see cref="FlushMode.FlushAtCleanup"/>, the only mode).
     /// </summary>
     public class DavFS : FileSystemBase
     {
@@ -48,7 +47,6 @@ namespace KS2Drive.FS
         private String VolumeLabel;
         private String DAVServer;
         private string DAVServeurAuthority;
-        private FlushMode FlushMode;
         private KernelCacheMode kernelCacheMode;
         private bool MountAsNetworkDrive;
         private String DAVLogin;
@@ -71,12 +69,11 @@ namespace KS2Drive.FS
         public DavFS(Configuration config)
         {
             WebDAVMode webDAVMode = (WebDAVMode)config.ServerType;
-            FlushMode flushMode = (FlushMode)Enum.ToObject(typeof(FlushMode), config.FlushMode);
             KernelCacheMode kernelCacheMode = (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), config.KernelCacheMode);
 
             this.MaxFileNodes = 500000;
             this.MaxFileSize = 0x7FFFFFC7; //Largest byte array .NET can allocate (file contents are held in a byte[]): bigger files are refused with STATUS_DISK_FULL instead of failing later
-            this.FlushMode = flushMode;
+            //config.FlushMode is ignored: FlushAtCleanup is the only mode left (FlushAtWrite uploaded the whole file after every write)
             this.WebDAVMode = webDAVMode;
             this.kernelCacheMode = kernelCacheMode;
             this.MountAsNetworkDrive = config.MountAsNetworkDrive;
@@ -579,16 +576,67 @@ namespace KS2Drive.FS
 
 
         /// <summary>
-        /// WinFSP callback asking whether a file or directory may be deleted. Deletion is always allowed here; the actual
-        /// deletion on the server happens in <see cref="Cleanup"/> when the delete flag is set.
+        /// WinFSP callback asking whether a file or directory may be deleted (the actual deletion on the server happens in
+        /// <see cref="Cleanup"/> when the delete flag is set). A file can always be deleted. A directory can only be deleted when
+        /// it is empty, like on NTFS: a WebDAV DELETE on a collection deletes its whole content, so deleting a non-empty directory
+        /// (e.g. RemoveDirectory called by an application) would silently delete everything in it. The server is asked, not the
+        /// cache, which may miss elements added by other clients; elements created on the drive and not uploaded yet count too.
         /// </summary>
-        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_DIRECTORY_NOT_EMPTY</c>; <c>STATUS_NETWORK_UNREACHABLE</c> on transport errors or 401
+        /// (which also raises <see cref="RepositoryAuthenticationFailed"/>); <c>STATUS_ACCESS_DENIED</c> if the content cannot be checked.</returns>
         public override Int32 CanDelete(
             Object FileNode0,
             Object FileDesc,
             String FileName)
         {
-            return STATUS_SUCCESS;
+            FileNode CFN = (FileNode)FileNode0;
+            if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0) return STATUS_SUCCESS;
+
+            String OperationId = Guid.NewGuid().ToString();
+            DebugStart(OperationId, CFN);
+
+            Cache.Lock();
+            try
+            {
+                if (Cache.HasPendingChildrenNoLock(CFN.LocalPath))
+                {
+                    DebugEnd(OperationId, CFN, "STATUS_DIRECTORY_NOT_EMPTY - Element not uploaded yet");
+                    return STATUS_DIRECTORY_NOT_EMPTY;
+                }
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+
+            try
+            {
+                var Items = new WebDavClient2().List(CFN.RepositoryPath).GetAwaiter().GetResult();
+                bool HasChildren = Items.Any(Item => !FileNode.IsSameRepositoryPath(FileNode.GetPathOfHref(Item.Href), CFN.RepositoryPath));
+                DebugEnd(OperationId, CFN, HasChildren ? "STATUS_DIRECTORY_NOT_EMPTY" : "STATUS_SUCCESS");
+                return HasChildren ? STATUS_DIRECTORY_NOT_EMPTY : STATUS_SUCCESS;
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
+            {
+                DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Already deleted on the server");
+                return STATUS_SUCCESS;
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                OnAuthenticationFailed();
+                return STATUS_NETWORK_UNREACHABLE;
+            }
+            catch (HttpRequestException)
+            {
+                DebugEnd(OperationId, CFN, "STATUS_NETWORK_UNREACHABLE");
+                return STATUS_NETWORK_UNREACHABLE;
+            }
+            catch (Exception ex)
+            {
+                //When in doubt, do not delete: the deletion of a collection is recursive on the server
+                DebugEnd(OperationId, CFN, $"STATUS_ACCESS_DENIED - {ex.Message}");
+                return STATUS_ACCESS_DENIED;
+            }
         }
 
         /// <summary>
@@ -669,58 +717,13 @@ namespace KS2Drive.FS
 
             if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
             {
-                try
-                {
-                    if (Proxy.Upload(RepositoryNewDocumentParentPath, new MemoryStream(new byte[0]), NewDocumentName).GetAwaiter().GetResult())
-                    {
-                        CFN = GetCreatedFileNode(Proxy, FileName, false);
-                        CFN.HasUnflushedData = true;
-                        CFN.LastUploadAt = DateTime.Now; //The empty file has just been uploaded
-                    }
-                    else
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_CANNOT_MAKE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
-                        return STATUS_CANNOT_MAKE;
-                    }
-                }
-                catch (WebDAVConflictException)
-                {
-                    //Seems that we get Conflict response when the folder cannot be created
-                    //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_ACCESS_DENIED" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
-                    return STATUS_ACCESS_DENIED;
-                }
-                catch (HttpRequestException)
-                {
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_NETWORK_UNREACHABLE" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, null, "STATUS_NETWORK_UNREACHABLE");
-                    return STATUS_NETWORK_UNREACHABLE;
-                }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                {
-                    OnAuthenticationFailed();
-                    return STATUS_NETWORK_UNREACHABLE;
-                }
-                catch (WebDAVException)
-                {
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_CANNOT_MAKE" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
-                    return STATUS_CANNOT_MAKE;
-                }
-                catch (Exception)
-                {
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_ACCESS_DENIED" };
-                    logger.Trace(JsonConvert.SerializeObject(L));
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
-                    return STATUS_ACCESS_DENIED;
-                }
+                //The file is created on the server by its first upload (Flush, Cleanup or Close), not right away with an empty
+                //content (see FileNode.IsNewOnServer). It is marked as having unflushed data so that it is created even if nothing
+                //is written in it
+                CFN = GetCreatedFileNode(Proxy, FileName, false);
+                CFN.IsNewOnServer = true;
+                CFN.HasUnflushedData = true;
+                CFN.FileData = new byte[0]; //Loaded and empty: nothing to download
             }
             else
             {
@@ -1003,7 +1006,17 @@ namespace KS2Drive.FS
                     SetFileSizeInternal(CFN, AllocationSize, true);
                 }
 
-                if ((Flags & CleanupDelete) != 0)
+                if ((Flags & CleanupDelete) != 0 && CFN.IsNewOnServer)
+                {
+                    //Created on the drive and never uploaded: it does not exist on the server, there is nothing to delete there
+                    Cache.DeleteFileNode(CFN);
+                    CFN.IsDeleted = true;
+                    CFN.HasUnflushedData = false;
+                    CFN.IsNewOnServer = false;
+                    RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Delete", File = CFN.LocalPath, Result = "STATUS_SUCCESS" });
+                    DebugEnd(OperationId, null, "STATUS_SUCCESS - Never uploaded");
+                }
+                else if ((Flags & CleanupDelete) != 0)
                 {
                     var Proxy = new WebDavClient2();
                     if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
@@ -1188,9 +1201,7 @@ namespace KS2Drive.FS
         /// <summary>
         /// WinFSP callback that writes data into the in-memory content of the file. With <paramref name="ConstrainedIo"/> the write is
         /// truncated to the current file size; otherwise the file is grown as needed (and <paramref name="WriteToEndOfFile"/> appends).
-        /// In <see cref="FlushMode.FlushAtWrite"/> mode the whole content (up to <c>FileSize</c>) is uploaded after each write and the node
-        /// is invalidated in the cache on failure; in other modes the node is only marked as having unflushed data, to be uploaded at
-        /// <see cref="Cleanup"/>/<see cref="Close"/>. If the content is not loaded yet, it is downloaded first so that the bytes outside
+        /// The node is marked as having unflushed data, uploaded by the next <see cref="Flush"/>, <see cref="Cleanup"/> or <see cref="Close"/>. If the content is not loaded yet, it is downloaded first so that the bytes outside
         /// the written range are preserved.
         /// </summary>
         /// <param name="Buffer">Source buffer.</param>
@@ -1305,68 +1316,12 @@ namespace KS2Drive.FS
                     return STATUS_UNEXPECTED_IO_ERROR;
                 }
 
-                //The in-memory content now differs from the server. In FlushAtWrite mode the flag is cleared once the upload succeeds;
-                //if it fails, Cleanup/Close will try again and keep a local copy
+                //The in-memory content now differs from the server: it is uploaded by the next Flush, Cleanup or Close. (The former
+                //FlushAtWrite mode uploaded the whole file after every write: Windows writes by blocks of 64 KB, so a 10 MB file was
+                //uploaded about 160 times)
                 CFN.HasUnflushedData = true;
-
-                if (this.FlushMode == FlushMode.FlushAtWrite)
-                {
-                    var Proxy = new WebDavClient2();
-                    try
-                    {
-                        if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), new MemoryStream(CFN.FileData, 0, (int)CFN.FileInfo.FileSize), CFN.Name).GetAwaiter().GetResult())
-                        {
-                            throw new Exception();
-                        }
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        OnAuthenticationFailed();
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_NETWORK_UNREACHABLE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, CFN, "STATUS_NETWORK_UNREACHABLE");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (WebDAVConflictException)
-                    {
-                        Cache.InvalidateFileNode(CFN);
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_ACCESS_DENIED" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, CFN, "STATUS_ACCESS_DENIED");
-                        return STATUS_ACCESS_DENIED;
-                    }
-                    catch (HttpRequestException)
-                    {
-                        Cache.InvalidateFileNode(CFN);
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_NETWORK_UNREACHABLE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, CFN, "STATUS_NETWORK_UNREACHABLE");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception)
-                    {
-                        Cache.InvalidateFileNode(CFN);
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_UNEXPECTED_IO_ERROR" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
-                        return STATUS_UNEXPECTED_IO_ERROR;
-                    }
-
-                    CFN.HasUnflushedData = false; //The whole content has been uploaded, including any previous resize
-                    CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
-                    CFN.MarkContentInSyncWithServer();
-                    CFN.LastUploadAt = DateTime.Now;
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Write Flush", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
-                }
-                else
-                {
-                    CFN.HasUnflushedData = true;
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Write", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS");
-                }
+                L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = $"Write", File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
+                RepositoryActionPerformed?.Invoke(this, L);
                 FileInfo = CFN.FileInfo;
 
                 if (logger.IsTraceEnabled) logger.Trace($"{CFN.ObjectId} Write {CFN.RepositoryPath} at {Offset} for {BytesTransferred} bytes | Requested {Length} bytes | {ConstrainedIo}");
@@ -1447,153 +1402,25 @@ namespace KS2Drive.FS
                 String RepositoryTargetDocumentName = FileNode.ConvertLocalPathToRepositoryPath(NewFileName);
 
                 var Proxy = new WebDavClient2();
+                bool IsDirectory = (CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0;
 
                 //A case-only rename (a.txt -> A.txt) targets the element itself on a case-insensitive server: the target must not
-                //be looked up, otherwise it is found and reported as a collision, or even deleted with ReplaceIfExists (data loss)
+                //be looked up, otherwise it is found and reported as a collision, or even replaced with ReplaceIfExists (data loss)
                 bool IsCaseOnlyRename = String.Equals(FileName, NewFileName, StringComparison.OrdinalIgnoreCase);
 
-                try
+                //A file created on the drive but not uploaded yet (see Create) does not exist on the server: upload it first, so
+                //that it can be moved like any other file
+                if (CFN.IsNewOnServer && !UploadPendingChanges(CFN, "Rename Flush", OperationId))
                 {
-                    //The cache answers when it knows the target is missing (Office probes its temporary names just before renaming):
-                    //WinFSP blocks the whole volume during a rename, so every request avoided here unfreezes Explorer sooner
-                    bool TargetExists = !IsCaseOnlyRename && ElementExists(NewFileName, Proxy, true);
-                    if (TargetExists)
-                    {
-                        if (!ReplaceIfExists)
-                        {
-                            DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
-                            return STATUS_OBJECT_NAME_COLLISION;
-                        }
-                        else
-                        {
-                            if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0 && WebDAVMode == WebDAVMode.AOS)
-                            {
-                                //The target must be deleted before the MOVE is sent: wait for the deletion to complete.
-                                //A 404 means it is already gone, which is what we want
-                                try
-                                {
-                                    Proxy.DeleteFile(FileNode.ConvertLocalPathToRepositoryPath(NewFileName)).GetAwaiter().GetResult();
-                                }
-                                catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
-                                {
-                                }
-                                Cache.DeleteFileEntry(NewFileName);
-                            }
-                            else
-                            {
-                                DebugEnd(OperationId, CFN, $"STATUS_OBJECT_NAME_COLLISION");
-                                return STATUS_OBJECT_NAME_COLLISION;
-                            }
-                        }
-                    }
-                }
-                catch (HttpRequestException)
-                {
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_NETWORK_UNREACHABLE" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE");
-                    return STATUS_NETWORK_UNREACHABLE;
-                }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                {
-                    //Same result as a 401 during the MOVE itself
-                    OnAuthenticationFailed();
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_NETWORK_UNREACHABLE" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, CFN, $"STATUS_NETWORK_UNREACHABLE");
-                    return STATUS_NETWORK_UNREACHABLE;
-                }
-                catch (Exception)
-                {
-                    L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_CANNOT_MAKE" };
-                    RepositoryActionPerformed?.Invoke(this, L);
-                    DebugEnd(OperationId, CFN, $"STATUS_CANNOT_MAKE");
-                    return FileSystemBase.STATUS_CANNOT_MAKE;
+                    DebugEnd(OperationId, CFN, "STATUS_UNEXPECTED_IO_ERROR");
+                    return STATUS_UNEXPECTED_IO_ERROR;
                 }
 
-                if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
+                Int32 MoveStatus = MoveOnServer(CFN, Proxy, FileName, NewFileName, RepositoryDocumentName, RepositoryTargetDocumentName, IsDirectory, IsCaseOnlyRename, ReplaceIfExists);
+                if (MoveStatus != STATUS_SUCCESS)
                 {
-                    //File
-                    try
-                    {
-                        //"Overwrite: F": the target is not expected to exist (missing, or deleted above). If it exists after all (e.g. created
-                        //by another client, or the cache was stale), the server answers 412 instead of silently replacing it
-                        if (!(IsCaseOnlyRename ? Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName) : Proxy.MoveFile(RepositoryDocumentName, RepositoryTargetDocumentName, false)).GetAwaiter().GetResult())
-                        {
-                            L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_ACCESS_DENIED" };
-                            RepositoryActionPerformed?.Invoke(this, L);
-                            DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
-                            return STATUS_ACCESS_DENIED;
-                        }
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 412)
-                    {
-                        //"Overwrite: F" and the target exists on the server after all
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_OBJECT_NAME_COLLISION" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_COLLISION");
-                        return STATUS_OBJECT_NAME_COLLISION;
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        OnAuthenticationFailed();
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (HttpRequestException)
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_NETWORK_UNREACHABLE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_NETWORK_UNREACHABLE");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception)
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_ACCESS_DENIED" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
-                        return FileSystemBase.STATUS_ACCESS_DENIED;
-                    }
-                }
-                else
-                {
-                    //Directory
-                    try
-                    {
-                        if (!(IsCaseOnlyRename ? Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName) : Proxy.MoveFolder(RepositoryDocumentName, RepositoryTargetDocumentName, false)).GetAwaiter().GetResult())
-                        {
-                            L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_ACCESS_DENIED" };
-                            RepositoryActionPerformed?.Invoke(this, L);
-                            DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
-                            return STATUS_ACCESS_DENIED;
-                        }
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 412)
-                    {
-                        //"Overwrite: F" and the target exists on the server after all
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_OBJECT_NAME_COLLISION" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, CFN, "STATUS_OBJECT_NAME_COLLISION");
-                        return STATUS_OBJECT_NAME_COLLISION;
-                    }
-                    catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
-                    {
-                        OnAuthenticationFailed();
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (HttpRequestException)
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_NETWORK_UNREACHABLE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_NETWORK_UNREACHABLE");
-                        return STATUS_NETWORK_UNREACHABLE;
-                    }
-                    catch (Exception)
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = $"{FileName} -> {NewFileName}", Result = "STATUS_ACCESS_DENIED" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
-                        return FileSystemBase.STATUS_ACCESS_DENIED;
-                    }
+                    DebugEnd(OperationId, CFN, MoveStatus.ToString());
+                    return MoveStatus;
                 }
 
                 CFN.RepositoryPath = RepositoryTargetDocumentName;
@@ -1640,6 +1467,125 @@ namespace KS2Drive.FS
                 RepositoryActionPerformed?.Invoke(this, L);
                 return STATUS_SUCCESS;
             }
+        }
+
+        /// <summary>
+        /// Moves an element on the server for <see cref="Rename"/>, with the NTFS rules:
+        /// <list type="bullet">
+        /// <item>an existing target is a collision unless <paramref name="ReplaceIfExists"/> is set;</item>
+        /// <item>with <paramref name="ReplaceIfExists"/>, an existing file is replaced atomically by a single MOVE with "Overwrite: T";</item>
+        /// <item>a directory is never replaced, and a directory never replaces a file (STATUS_ACCESS_DENIED, like NTFS): on a WebDAV
+        /// server, replacing a collection would delete its whole content;</item>
+        /// <item>otherwise the MOVE is sent with "Overwrite: F": if the target exists after all (created meanwhile by another client,
+        /// stale cache), the server answers 412 instead of replacing it silently, and the target is replaced only if requested.</item>
+        /// </list>
+        /// Failures are reported through <see cref="RepositoryActionPerformed"/>.
+        /// </summary>
+        /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_OBJECT_NAME_COLLISION</c>; <c>STATUS_ACCESS_DENIED</c> (directory replacement, or the
+        /// server refused the MOVE); <c>STATUS_CANNOT_MAKE</c> if the target cannot be checked; <c>STATUS_NETWORK_UNREACHABLE</c> on
+        /// transport errors or 401 (which also raises <see cref="RepositoryAuthenticationFailed"/>).</returns>
+        private Int32 MoveOnServer(FileNode CFN, WebDavClient2 Proxy, String FileName, String NewFileName, String Source, String Target, bool IsDirectory, bool IsCaseOnlyRename, bool ReplaceIfExists)
+        {
+            String LoggedFile = $"{FileName} -> {NewFileName}";
+            Int32 Report(Int32 Status, String Result)
+            {
+                RepositoryActionPerformed?.Invoke(this, new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = "Rename", File = LoggedFile, Result = Result });
+                return Status;
+            }
+
+            bool Move(bool? Overwrite)
+            {
+                if (IsDirectory) return (Overwrite.HasValue ? Proxy.MoveFolder(Source, Target, Overwrite.Value) : Proxy.MoveFolder(Source, Target)).GetAwaiter().GetResult();
+                return (Overwrite.HasValue ? Proxy.MoveFile(Source, Target, Overwrite.Value) : Proxy.MoveFile(Source, Target)).GetAwaiter().GetResult();
+            }
+
+            //1. Is the target free? The cache answers when it knows the target is missing (Office probes its temporary names just
+            //before renaming): WinFSP blocks the whole volume during a rename, so every request avoided here unfreezes Explorer sooner
+            bool Replace = false;
+            try
+            {
+                if (!IsCaseOnlyRename && ElementExists(NewFileName, Proxy, true))
+                {
+                    if (!ReplaceIfExists) return Report(STATUS_OBJECT_NAME_COLLISION, "STATUS_OBJECT_NAME_COLLISION");
+                    if (IsDirectory || TargetIsDirectory(NewFileName, Proxy)) return Report(STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED - A directory cannot be replaced");
+                    Replace = true;
+                }
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                OnAuthenticationFailed();
+                return Report(STATUS_NETWORK_UNREACHABLE, "STATUS_NETWORK_UNREACHABLE");
+            }
+            catch (HttpRequestException)
+            {
+                return Report(STATUS_NETWORK_UNREACHABLE, "STATUS_NETWORK_UNREACHABLE");
+            }
+            catch (Exception)
+            {
+                return Report(STATUS_CANNOT_MAKE, "STATUS_CANNOT_MAKE");
+            }
+
+            //2. Move. A case-only rename is sent without Overwrite header: on a case-insensitive server the "target" is the element
+            //itself, which "Overwrite: F" could refuse
+            try
+            {
+                bool Moved;
+                try
+                {
+                    Moved = Move(IsCaseOnlyRename ? (bool?)null : Replace);
+                }
+                catch (WebDAVException ex) when (ex.GetHttpCode() == 412 && ReplaceIfExists && !Replace && !IsDirectory)
+                {
+                    //The target exists after all: replace it as requested, unless it is a directory
+                    if (TargetIsDirectory(NewFileName, Proxy)) return Report(STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED - A directory cannot be replaced");
+                    Replace = true;
+                    Moved = Move(true);
+                }
+
+                if (!Moved) return Report(STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED");
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 412)
+            {
+                //"Overwrite: F" and the target exists on the server after all
+                return Report(STATUS_OBJECT_NAME_COLLISION, "STATUS_OBJECT_NAME_COLLISION");
+            }
+            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            {
+                OnAuthenticationFailed();
+                return Report(STATUS_NETWORK_UNREACHABLE, "STATUS_NETWORK_UNREACHABLE");
+            }
+            catch (HttpRequestException)
+            {
+                return Report(STATUS_NETWORK_UNREACHABLE, "STATUS_NETWORK_UNREACHABLE");
+            }
+            catch (Exception)
+            {
+                return Report(STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED");
+            }
+
+            //The replaced element no longer exists: forget its node (the renamed node takes its path)
+            if (Replace) Cache.DeleteFileEntry(NewFileName);
+            return STATUS_SUCCESS;
+        }
+
+        /// <summary>
+        /// Returns whether the element at a local path is a directory, from the cache or else from the server.
+        /// </summary>
+        private bool TargetIsDirectory(String FileName, WebDavClient2 Proxy)
+        {
+            Cache.Lock();
+            try
+            {
+                FileNode Known = Cache.GetFileNodeNoLock(FileName).node;
+                if (Known != null) return (Known.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0;
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+
+            WebDAVClient.Model.Item Element = Proxy.GetRepositoryElement(FileName);
+            return Element != null && Element.IsCollection;
         }
 
         /// <summary>
@@ -1709,13 +1655,15 @@ namespace KS2Drive.FS
                 else throw new InvalidOperationException("The content to upload is not loaded"); //Never upload an empty content in place of the real one
 
                 var Proxy = new WebDavClient2();
-                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), Content, CFN.Name).GetAwaiter().GetResult())
+                //First upload of a file created on the drive: never replace a file created meanwhile by another client (412 instead)
+                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), Content, CFN.Name, CFN.IsNewOnServer).GetAwaiter().GetResult())
                 {
                     throw new Exception("Upload failed");
                 }
 
                 CFN.HasUnflushedData = false;
                 CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
+                CFN.IsNewOnServer = false;
                 CFN.MarkContentInSyncWithServer();
                 CFN.LastUploadAt = DateTime.Now;
                 L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = CFN.ObjectId, Method = Method, File = CFN.LocalPath, Result = "STATUS_SUCCESS" };
