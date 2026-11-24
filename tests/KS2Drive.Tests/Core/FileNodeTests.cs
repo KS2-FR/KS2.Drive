@@ -5,7 +5,8 @@ using System.IO;
 using System.Reflection;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using Item = WebDAVClient.Model.Item;
+using KS2Drive.WebDav;
+using Item = KS2Drive.WebDav.WebDavItem;
 
 namespace KS2Drive.Tests.Core
 {
@@ -20,9 +21,9 @@ namespace KS2Drive.Tests.Core
             FileNode.Init(Library, WebDAVMode.WebDAV);
         }
 
-        private static Item FileItem(string Href, long? Length = 10, string Etag = "\"etag\"")
+        private static Item FileItem(string Href, long? Length = 10, string ETag = "\"etag\"")
         {
-            return new Item { Href = Href, DisplayName = "name", ContentLength = Length, Etag = Etag };
+            return new WebDavItem { Path = Href, DisplayName = "name", ContentLength = Length, ETag = ETag };
         }
 
         #region Init / constructor
@@ -58,7 +59,7 @@ namespace KS2Drive.Tests.Core
         public void Init_ModeNoLongerChangesTheFolderDetection()
         {
             //Both modes rely on the standard resourcetype property
-            var I = new Item { Href = "/dav/f", ContentLength = 0, Etag = null, IsCollection = false };
+            var I = new WebDavItem { Path = "/dav/f", ContentLength = 0, ETag = null, IsCollection = false };
             FileNode.Init(Library, WebDAVMode.WebDAV);
             Assert.AreEqual((uint)FileAttributes.Normal, new FileNode(I).FileInfo.FileAttributes);
             FileNode.Init(Library, WebDAVMode.AOS);
@@ -68,36 +69,37 @@ namespace KS2Drive.Tests.Core
         [TestMethod]
         public void Constructor_RelativeHref_SetsPathsAndName()
         {
-            var Node = new FileNode(new Item { Href = "/dav/folder/file.txt", DisplayName = "file.txt", ContentLength = 3, Etag = "e" });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/folder/file.txt", DisplayName = "file.txt", ContentLength = 3, ETag = "e" });
             Assert.AreEqual("file.txt", Node.Name);
             Assert.AreEqual("/dav/folder/file.txt", Node.RepositoryPath);
             Assert.AreEqual("\\folder\\file.txt", Node.LocalPath);
         }
 
         [TestMethod]
-        public void Constructor_AbsoluteHref_KeepsOnlyPath()
-        {
-            var Node = new FileNode(FileItem("https://server.example:8443/dav/folder/a%20b.txt"));
-            Assert.AreEqual("/dav/folder/a%20b.txt", Node.RepositoryPath);
-            Assert.AreEqual("\\folder\\a b.txt", Node.LocalPath);
-        }
-
-        [TestMethod]
         public void Constructor_TrailingSlash_IsRemovedFromRepositoryPath()
         {
-            var Node = new FileNode(new Item { Href = "/dav/folder/", ContentLength = null });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/folder/", ContentLength = null });
             Assert.AreEqual("/dav/folder", Node.RepositoryPath);
             Assert.AreEqual("\\folder", Node.LocalPath);
+        }
 
-            var Absolute = new FileNode(new Item { Href = "http://server/dav/folder/sub/", ContentLength = null });
-            Assert.AreEqual("/dav/folder/sub", Absolute.RepositoryPath);
-            Assert.AreEqual("\\folder\\sub", Absolute.LocalPath);
+        [DataTestMethod]
+        [DataRow("/dav/a b/C++ notes.txt", "\\a b\\C++ notes.txt")]
+        [DataRow("/dav/a%20b.txt", "\\a%20b.txt")] //A literal "%20" in a name: paths are decoded, never decoded again
+        [DataRow("/dav/caf\u00e9/r\u00e9sum\u00e9.docx", "\\caf\u00e9\\r\u00e9sum\u00e9.docx")]
+        [DataRow("/dav/c#d.txt", "\\c#d.txt")]
+        public void Constructor_DecodedPath_IsKeptAsIs(string Path, string ExpectedLocalPath)
+        {
+            //Decoding the hrefs of the server is the job of MultiStatusParser: FileNode receives decoded paths
+            var Node = new FileNode(new WebDavItem { Path = Path, ContentLength = 1 });
+            Assert.AreEqual(Path, Node.RepositoryPath);
+            Assert.AreEqual(ExpectedLocalPath, Node.LocalPath);
         }
 
         [TestMethod]
         public void Constructor_LibraryRoot_MapsToDriveRoot()
         {
-            var Node = new FileNode(new Item { Href = "/dav/", ContentLength = null });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/", ContentLength = null });
             Assert.AreEqual("/dav", Node.RepositoryPath);
             Assert.AreEqual("\\", Node.LocalPath);
         }
@@ -105,50 +107,9 @@ namespace KS2Drive.Tests.Core
         [TestMethod]
         public void Constructor_SlashHref_IsKept()
         {
-            var Node = new FileNode(new Item { Href = "/", ContentLength = null });
+            var Node = new FileNode(new WebDavItem { Path = "/", ContentLength = null });
             Assert.AreEqual("/", Node.RepositoryPath);
             Assert.AreEqual("\\", Node.LocalPath);
-        }
-
-        [TestMethod]
-        public void Constructor_PlusIsKept()
-        {
-            var Node = new FileNode(FileItem("/dav/a+b c.txt"));
-            Assert.AreEqual("\\a+b c.txt", Node.LocalPath);
-            var Encoded = new FileNode(FileItem("/dav/a%2Bb%20c.txt"));
-            Assert.AreEqual("\\a+b c.txt", Encoded.LocalPath);
-        }
-
-        [TestMethod]
-        public void Constructor_UrlDecodesOnlyOnce()
-        {
-            var Node = new FileNode(FileItem("/dav/100%2520percent.txt"));
-            Assert.AreEqual("\\100%20percent.txt", Node.LocalPath);
-            Assert.AreEqual("/dav/100%2520percent.txt", Node.RepositoryPath, "The repository path is kept as returned by the server");
-        }
-
-        [TestMethod]
-        public void Constructor_EncodedAccents_AreDecoded()
-        {
-            var Node = new FileNode(FileItem("/dav/caf%C3%A9/r%C3%A9sum%C3%A9.txt"));
-            Assert.AreEqual("\\caf\u00e9\\r\u00e9sum\u00e9.txt", Node.LocalPath);
-        }
-
-        [TestMethod]
-        public void Constructor_AbsoluteHrefWithAccents_IsDecoded()
-        {
-            var Node = new FileNode(FileItem("http://server/dav/caf\u00e9/\u00e9t\u00e9.txt"));
-            Assert.AreEqual("\\caf\u00e9\\\u00e9t\u00e9.txt", Node.LocalPath);
-            Assert.IsTrue(FileNode.IsSameRepositoryPath("/dav/caf\u00e9/\u00e9t\u00e9.txt", Node.RepositoryPath), Node.RepositoryPath);
-        }
-
-        [TestMethod]
-        public void Constructor_EncodedLibraryPath_IsRemoved()
-        {
-            FileNode.Init("/my%20lib", WebDAVMode.WebDAV);
-            Assert.AreEqual("\\x.txt", new FileNode(FileItem("/my lib/x.txt")).LocalPath);
-            Assert.AreEqual("\\x.txt", new FileNode(FileItem("/my%20lib/x.txt")).LocalPath);
-            Assert.AreEqual("\\x.txt", new FileNode(FileItem("http://server/my%20lib/x.txt")).LocalPath);
         }
 
         [DataTestMethod]
@@ -160,7 +121,7 @@ namespace KS2Drive.Tests.Core
         public void Constructor_AosMode_UsesIsCollection(bool IsCollection, long? Length, string Etag, FileAttributes Expected)
         {
             FileNode.Init(Library, WebDAVMode.AOS);
-            var Node = new FileNode(new Item { Href = "/dav/x", IsCollection = IsCollection, ContentLength = Length, Etag = Etag });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/x", IsCollection = IsCollection, ContentLength = Length, ETag = Etag });
             Assert.AreEqual((uint)Expected, Node.FileInfo.FileAttributes);
         }
 
@@ -173,14 +134,8 @@ namespace KS2Drive.Tests.Core
         public void Constructor_WebDavMode_UsesResourceType(long? Length, string Etag, bool IsCollection, FileAttributes Expected)
         {
             //The former heuristic (no etag and no size, or no size => folder) made files folders on some servers
-            var Node = new FileNode(new Item { Href = "/dav/x", IsCollection = IsCollection, ContentLength = Length, Etag = Etag });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/x", IsCollection = IsCollection, ContentLength = Length, ETag = Etag });
             Assert.AreEqual((uint)Expected, Node.FileInfo.FileAttributes);
-        }
-
-        [TestMethod]
-        public void Constructor_HrefEndingWithASlash_IsAFolder()
-        {
-            Assert.AreEqual((uint)FileAttributes.Directory, new FileNode(new Item { Href = "/dav/folder/", IsCollection = false }).FileInfo.FileAttributes);
         }
 
         [TestMethod]
@@ -190,7 +145,7 @@ namespace KS2Drive.Tests.Core
             var Modified = new DateTime(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
             long Before = DateTime.Now.ToFileTimeUtc();
             DateTime BeforeRefresh = DateTime.Now;
-            var Node = new FileNode(new Item { Href = "/dav/x", ContentLength = 1, Etag = "e", CreationDate = Created, LastModified = Modified });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/x", ContentLength = 1, ETag = "e", CreationDate = Created, LastModified = Modified });
             long After = DateTime.Now.ToFileTimeUtc();
 
             Assert.AreEqual((ulong)Created.ToFileTimeUtc(), Node.FileInfo.CreationTime);
@@ -203,7 +158,7 @@ namespace KS2Drive.Tests.Core
         [TestMethod]
         public void Constructor_MissingDates_AreZero()
         {
-            var Node = new FileNode(new Item { Href = "/dav/x", ContentLength = 1, Etag = "e" });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/x", ContentLength = 1, ETag = "e" });
             Assert.AreEqual(0UL, Node.FileInfo.CreationTime);
             Assert.AreEqual(0UL, Node.FileInfo.LastWriteTime);
             Assert.AreEqual(0UL, Node.FileInfo.ChangeTime);
@@ -213,11 +168,11 @@ namespace KS2Drive.Tests.Core
         [TestMethod]
         public void Constructor_Sizes_FromContentLength()
         {
-            var Node = new FileNode(new Item { Href = "/dav/x", ContentLength = 5000000000L, Etag = "e" });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/x", ContentLength = 5000000000L, ETag = "e" });
             Assert.AreEqual(5000000000UL, Node.FileInfo.FileSize);
             Assert.AreEqual(5000000000UL, Node.FileInfo.AllocationSize);
 
-            var Folder = new FileNode(new Item { Href = "/dav/y", ContentLength = null });
+            var Folder = new FileNode(new WebDavItem { Path = "/dav/y", ContentLength = null });
             Assert.AreEqual(0UL, Folder.FileInfo.FileSize);
             Assert.AreEqual(0UL, Folder.FileInfo.AllocationSize);
         }
@@ -258,29 +213,10 @@ namespace KS2Drive.Tests.Core
         [DataRow("/davx/a", "\\davx\\a")]          //Library removed only on a segment boundary
         [DataRow("/other/dav/a", "\\other\\dav\\a")] //Library removed only as a prefix
         [DataRow("/dav/a/dav/b", "\\a\\dav\\b")]
-        [DataRow("/dav/a%20b/c%2Bd", "\\a b\\c+d")]
         [DataRow("/dav/a+b", "\\a+b")]
-        [DataRow("/dav/a%2520b", "\\a%20b")]
-        [DataRow("/%64av/x", "\\x")]               //Encoded library path
         public void ConvertRepositoryPathToLocalPath(string Repository, string Expected)
         {
             Assert.AreEqual(Expected, FileNode.ConvertRepositoryPathToLocalPath(Repository));
-        }
-
-        [TestMethod]
-        public void ConvertRepositoryPathToLocalPath_EncodedConfiguredLibrary()
-        {
-            FileNode.Init("/Sites/my%20site", WebDAVMode.WebDAV);
-            Assert.AreEqual("\\doc.txt", FileNode.ConvertRepositoryPathToLocalPath("/Sites/my site/doc.txt"));
-            Assert.AreEqual("\\doc.txt", FileNode.ConvertRepositoryPathToLocalPath("/sites/MY%20SITE/doc.txt"));
-            Assert.AreEqual("\\", FileNode.ConvertRepositoryPathToLocalPath("/Sites/my%20site/"));
-        }
-
-        [TestMethod]
-        public void ConvertRepositoryPathToLocalPath_Accents()
-        {
-            Assert.AreEqual("\\\u00e9t\u00e9", FileNode.ConvertRepositoryPathToLocalPath("/dav/%C3%A9t%C3%A9"));
-            Assert.AreEqual("\\\u00e9t\u00e9", FileNode.ConvertRepositoryPathToLocalPath("/dav/\u00e9t\u00e9"));
         }
 
         [DataTestMethod]
@@ -306,8 +242,6 @@ namespace KS2Drive.Tests.Core
         [DataRow("/dav/a/", "/dav/a", true)]
         [DataRow("/dav/a//", "/dav/a", true)]
         [DataRow("/DAV/A", "/dav/a", true)]
-        [DataRow("/dav/a%20b", "/dav/a b", true)]
-        [DataRow("/dav/caf%C3%A9", "/dav/caf\u00e9", true)]
         [DataRow("/dav/a", "/dav/b", false)]
         [DataRow("/dav/a", "/dav/ab", false)]
         [DataRow("/dav/a+b", "/dav/a b", false)]
@@ -324,7 +258,6 @@ namespace KS2Drive.Tests.Core
         [DataRow("/dav", true)]
         [DataRow("/dav/", true)]
         [DataRow("/DAV", true)]
-        [DataRow("/%64av", true)]
         [DataRow("/dav/a", false)]
         [DataRow("/", false)]
         [DataRow("/davx", false)]

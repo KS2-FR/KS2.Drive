@@ -3,7 +3,8 @@ using KS2Drive.Log;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using Item = WebDAVClient.Model.Item;
+using KS2Drive.WebDav;
+using Item = KS2Drive.WebDav.WebDavItem;
 
 namespace KS2Drive.Tests.Core
 {
@@ -69,7 +70,7 @@ namespace KS2Drive.Tests.Core
         public void Properties_RoundTrip()
         {
             FileNode.Init("/dav", WebDAVMode.WebDAV);
-            var Node = new FileNode(new Item { Href = "/dav/a.txt", ContentLength = 1, Etag = "e" });
+            var Node = new FileNode(new WebDavItem { Path = "/dav/a.txt", ContentLength = 1, ETag = "e" });
             var Entries = new List<Tuple<string, FileNode>> { Tuple.Create(".", Node), Tuple.Create("a.txt", Node) };
             Guid Id = Guid.NewGuid();
 

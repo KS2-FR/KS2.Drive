@@ -12,7 +12,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Threading;
-using WebDAVClient.Helpers;
+using KS2Drive.WebDav;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using FileInfo = Fsp.Interop.FileInfo;
 using VolumeInfo = Fsp.Interop.VolumeInfo;
 
@@ -20,7 +22,7 @@ namespace KS2Drive.FS
 {
     /// <summary>
     /// WinFSP user-mode file system that exposes a remote WebDAV repository as a Windows drive.
-    /// Each WinFSP callback is translated into WebDAV calls through <see cref="WebDavClient2"/>; file metadata
+    /// Each WinFSP callback is translated into WebDAV calls through <see cref="WebDavClient"/>; file metadata
     /// (<see cref="FileNode"/>) is kept in a <see cref="CacheManager"/>, and file contents are held in memory
     /// (<c>FileNode.FileData</c>) while the file has open handles, and for a short time after. Modified contents are uploaded
     /// by <see cref="Flush"/>, <see cref="Cleanup"/> or <see cref="Close"/> (<see cref="FlushMode.FlushAtCleanup"/>, the only mode).
@@ -60,13 +62,37 @@ namespace KS2Drive.FS
         private const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
         /// <summary>
-        /// Creates the file system from the user configuration: parses the server URL into server, host and
-        /// document library path, initializes <see cref="FileNode"/> and <see cref="WebDavClient2"/> (with an optional
-        /// client certificate), creates the metadata cache, then tests the connection by listing the repository root.
+        /// Maximum number of simultaneous HTTP connections to the WebDAV server (.NET Framework allows only 2 by default: Office
+        /// saving a document, Explorer reading thumbnails and the background folder refreshes then queue behind each other).
+        /// </summary>
+        internal const Int32 MaxConnectionsPerServer = 8;
+
+        /// <summary>
+        /// HttpClient of this mount, shared by all the requests (connections are reused). Disposed by <see cref="Unmounted"/>.
+        /// </summary>
+        private readonly HttpClient Http;
+
+        /// <summary>
+        /// WebDAV client of this mount.
+        /// </summary>
+        internal readonly WebDavClient Client;
+
+        /// <summary>
+        /// Creates the file system from the user configuration (see <see cref="DavFS(Configuration, HttpMessageHandler)"/>).
+        /// </summary>
+        public DavFS(Configuration config) : this(config, null)
+        {
+        }
+
+        /// <summary>
+        /// Creates the file system from the user configuration: parses the server URL into server, host and (decoded) document
+        /// library path, initializes <see cref="FileNode"/>, creates the HTTP and WebDAV clients (credentials, optional client
+        /// certificate) and the metadata cache, then tests the connection by reading the library root.
         /// </summary>
         /// <param name="config">Mount configuration (server URL and type, credentials, flush and kernel cache modes, etc.).</param>
-        /// <exception cref="Exception">Thrown when the test listing fails, with a dedicated message for invalid credentials (HTTP 401).</exception>
-        public DavFS(Configuration config)
+        /// <param name="TestHandler">Unit tests only: requests are sent to this handler (e.g. an in-memory server) instead of the network.</param>
+        /// <exception cref="Exception">Thrown when the test request fails, with a dedicated message for invalid credentials (HTTP 401).</exception>
+        internal DavFS(Configuration config, HttpMessageHandler TestHandler)
         {
             WebDAVMode webDAVMode = (WebDAVMode)config.ServerType;
             KernelCacheMode kernelCacheMode = (KernelCacheMode)Enum.ToObject(typeof(KernelCacheMode), config.KernelCacheMode);
@@ -81,27 +107,41 @@ namespace KS2Drive.FS
             var DavServerURI = new Uri(config.ServerURL);
             this.DAVServer = DavServerURI.GetLeftPart(UriPartial.Authority);
             this.DAVServeurAuthority = DavServerURI.DnsSafeHost;
-            this.DocumentLibraryPath = DavServerURI.PathAndQuery.EndsWith("/") ? DavServerURI.PathAndQuery.Remove(DavServerURI.PathAndQuery.Length - 1) : DavServerURI.PathAndQuery;
+            //Every path of the application is decoded (see WebDavItem.Path): only the WebDAV client encodes URLs
+            String LibraryPath = Uri.UnescapeDataString(DavServerURI.AbsolutePath);
+            this.DocumentLibraryPath = LibraryPath.Length > 1 ? LibraryPath.TrimEnd('/') : "";
 
             this.DAVLogin = config.ServerLogin;
             this.DAVPassword = config.ServerPassword;
 
             FileNode.Init(this.DocumentLibraryPath, this.WebDAVMode);
-            WebDavClient2.Init(this.DAVServer, this.DocumentLibraryPath, this.DAVLogin, this.DAVPassword, config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null);
-            Cache = new CacheManager(CacheMode.Enabled, config.PreLoading);
+
+            if (TestHandler != null)
+            {
+                Http = WebDavClient.CreateHttpClient(TestHandler);
+            }
+            else
+            {
+                X509Certificate2 ClientCertificate = config.UseClientCertForAuthentication ? Tools.FindCertificate(config.CertStoreName, config.CertStoreLocation, config.CertSerial) : null;
+                Http = WebDavClient.CreateHttpClient(new NetworkCredential(this.DAVLogin, this.DAVPassword), ClientCertificate);
+                ServicePointManager.FindServicePoint(DavServerURI).ConnectionLimit = MaxConnectionsPerServer;
+            }
+            Client = new WebDavClient(Http, config.ServerURL);
+            Cache = new CacheManager(CacheMode.Enabled, config.PreLoading, Client);
 
             //Test connection to server with the parameters entered in the configuration screen
-            var Proxy = new WebDavClient2();
             try
             {
-                var LisTest = Proxy.List("/").GetAwaiter().GetResult();
+                Client.PropFind(this.DocumentLibraryPath, 0, true).GetAwaiter().GetResult();
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
+                Http.Dispose();
                 throw new Exception($"Cannot connect to server : Invalid credentials");
             }
             catch (Exception ex)
             {
+                Http.Dispose();
                 throw new Exception($"Cannot connect to server : {ex.Message}");
             }
         }
@@ -231,13 +271,13 @@ namespace KS2Drive.FS
                 Cache.Unlock();
             }
 
-            WebDAVClient.Model.Item RepositoryElement;
+            WebDavItem RepositoryElement;
             try
             {
-                var Proxy = new WebDavClient2();
-                RepositoryElement = Proxy.GetRepositoryElement(FileName);
+                var Proxy = Client;
+                RepositoryElement = GetRepositoryElement(FileName);
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
                 OnAuthenticationFailed();
                 return (STATUS_OBJECT_NAME_NOT_FOUND, null, "401");
@@ -280,7 +320,7 @@ namespace KS2Drive.FS
         /// (see <see cref="CacheManager.IsMissingFromFreshFolderListingNoLock"/>). Only for Rename, whose MOVE is sent with
         /// "Overwrite: F" and therefore never replaces an element created meanwhile by another client; Create uploads with a PUT,
         /// which would replace it, so it relies only on names explicitly found missing on the server.</param>
-        private bool ElementExists(String FileName, WebDavClient2 Proxy, bool TrustFolderListing)
+        private bool ElementExists(String FileName, WebDavClient Proxy, bool TrustFolderListing)
         {
             Cache.Lock();
             try
@@ -293,7 +333,7 @@ namespace KS2Drive.FS
                 Cache.Unlock();
             }
 
-            return Proxy.ExistsOnServer(FileName);
+            return Proxy.Exists(FileNode.ConvertLocalPathToRepositoryPath(FileName)).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -380,6 +420,19 @@ namespace KS2Drive.FS
         private static void ReleaseClosedContent(FileNode Node)
         {
             if (Node.OpenCount == 0 && !Node.HasUnflushedData) Node.FileData = null;
+        }
+
+        /// <summary>
+        /// Describes the element at a local path on the server (see <see cref="WebDavClient.GetItem"/>). The library root gets an
+        /// empty display name.
+        /// </summary>
+        /// <returns>The element, or null if it does not exist.</returns>
+        private WebDavItem GetRepositoryElement(String LocalFileName)
+        {
+            String RepositoryPath = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
+            WebDavItem Element = Client.GetItem(RepositoryPath).GetAwaiter().GetResult();
+            if (Element != null && FileNode.IsRepositoryRootPath(RepositoryPath)) Element.DisplayName = "";
+            return Element;
         }
 
         /// <summary>
@@ -611,17 +664,17 @@ namespace KS2Drive.FS
 
             try
             {
-                var Items = new WebDavClient2().List(CFN.RepositoryPath).GetAwaiter().GetResult();
-                bool HasChildren = Items.Any(Item => !FileNode.IsSameRepositoryPath(FileNode.GetPathOfHref(Item.Href), CFN.RepositoryPath));
+                var Items = Client.PropFind(CFN.RepositoryPath, 1, true).GetAwaiter().GetResult();
+                bool HasChildren = Items.Any(Item => !FileNode.IsSameRepositoryPath(Item.Path, CFN.RepositoryPath));
                 DebugEnd(OperationId, CFN, HasChildren ? "STATUS_DIRECTORY_NOT_EMPTY" : "STATUS_SUCCESS");
                 return HasChildren ? STATUS_DIRECTORY_NOT_EMPTY : STATUS_SUCCESS;
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 404)
+            catch (WebDavException ex) when (ex.StatusCode == 404)
             {
                 DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Already deleted on the server");
                 return STATUS_SUCCESS;
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
                 OnAuthenticationFailed();
                 return STATUS_NETWORK_UNREACHABLE;
@@ -677,7 +730,7 @@ namespace KS2Drive.FS
             NormalizedName = default(String);
 
             FileNode CFN;
-            var Proxy = new WebDavClient2();
+            var Proxy = Client;
 
             try
             {
@@ -689,7 +742,7 @@ namespace KS2Drive.FS
                     return STATUS_OBJECT_NAME_COLLISION;
                 }
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
                 OnAuthenticationFailed();
                 return STATUS_NETWORK_UNREACHABLE;
@@ -711,10 +764,6 @@ namespace KS2Drive.FS
                 return FileSystemBase.STATUS_CANNOT_MAKE;
             }
 
-            String NewDocumentName = Path.GetFileName(FileName);
-            String NewDocumentParentPath = Path.GetDirectoryName(FileName);
-            String RepositoryNewDocumentParentPath = FileNode.ConvertLocalPathToRepositoryPath(NewDocumentParentPath);
-
             if ((FileAttributes & (UInt32)System.IO.FileAttributes.Directory) == 0)
             {
                 //The file is created on the server by its first upload (Flush, Cleanup or Close), not right away with an empty
@@ -729,19 +778,10 @@ namespace KS2Drive.FS
             {
                 try
                 {
-                    if (Proxy.CreateDir(RepositoryNewDocumentParentPath, NewDocumentName).GetAwaiter().GetResult())
-                    {
-                        CFN = GetCreatedFileNode(Proxy, FileName, true);
-                    }
-                    else
-                    {
-                        L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_CANNOT_MAKE" };
-                        RepositoryActionPerformed?.Invoke(this, L);
-                        DebugEnd(OperationId, null, "STATUS_CANNOT_MAKE");
-                        return STATUS_CANNOT_MAKE;
-                    }
+                    Proxy.MkCol(FileNode.ConvertLocalPathToRepositoryPath(FileName)).GetAwaiter().GetResult(); //Throws on failure
+                    CFN = GetCreatedFileNode(Proxy, FileName, true);
                 }
-                catch (WebDAVConflictException)
+                catch (WebDavException ex) when (ex.StatusCode == 409)
                 {
                     //Seems that we get Conflict response when the folder cannot be created
                     //As we do conflict checking before running the CreateDir command, we consider it as a permission issue
@@ -750,12 +790,12 @@ namespace KS2Drive.FS
                     DebugEnd(OperationId, null, "STATUS_ACCESS_DENIED");
                     return STATUS_ACCESS_DENIED;
                 }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+                catch (WebDavException ex) when (ex.StatusCode == 401)
                 {
                     OnAuthenticationFailed();
                     return STATUS_NETWORK_UNREACHABLE;
                 }
-                catch (WebDAVException)
+                catch (WebDavException)
                 {
                     L = new LogListItem() { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Object = "None", Method = "Create", File = FileName, Result = "STATUS_CANNOT_MAKE" };
                     RepositoryActionPerformed?.Invoke(this, L);
@@ -1018,13 +1058,13 @@ namespace KS2Drive.FS
                 }
                 else if ((Flags & CleanupDelete) != 0)
                 {
-                    var Proxy = new WebDavClient2();
+                    var Proxy = Client;
                     if ((CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) == 0)
                     {
                         try
                         {
                             //File
-                            Proxy.DeleteFile(CFN.RepositoryPath).GetAwaiter().GetResult();
+                            Proxy.Delete(CFN.RepositoryPath, false).GetAwaiter().GetResult();
                             Cache.DeleteFileNode(CFN);
                             CFN.IsDeleted = true;
                             CFN.HasUnflushedData = false;
@@ -1044,7 +1084,7 @@ namespace KS2Drive.FS
                         try
                         {
                             //Directory
-                            Proxy.DeleteFolder(CFN.RepositoryPath).GetAwaiter().GetResult();
+                            Proxy.Delete(CFN.RepositoryPath, true).GetAwaiter().GetResult();
                             Cache.DeleteFileNode(CFN);
                             CFN.IsDeleted = true;
                             CFN.HasUnflushedData = false;
@@ -1401,7 +1441,7 @@ namespace KS2Drive.FS
                 String RepositoryDocumentName = FileNode.ConvertLocalPathToRepositoryPath(FileName);
                 String RepositoryTargetDocumentName = FileNode.ConvertLocalPathToRepositoryPath(NewFileName);
 
-                var Proxy = new WebDavClient2();
+                var Proxy = Client;
                 bool IsDirectory = (CFN.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory) != 0;
 
                 //A case-only rename (a.txt -> A.txt) targets the element itself on a case-insensitive server: the target must not
@@ -1484,7 +1524,7 @@ namespace KS2Drive.FS
         /// <returns><c>STATUS_SUCCESS</c>; <c>STATUS_OBJECT_NAME_COLLISION</c>; <c>STATUS_ACCESS_DENIED</c> (directory replacement, or the
         /// server refused the MOVE); <c>STATUS_CANNOT_MAKE</c> if the target cannot be checked; <c>STATUS_NETWORK_UNREACHABLE</c> on
         /// transport errors or 401 (which also raises <see cref="RepositoryAuthenticationFailed"/>).</returns>
-        private Int32 MoveOnServer(FileNode CFN, WebDavClient2 Proxy, String FileName, String NewFileName, String Source, String Target, bool IsDirectory, bool IsCaseOnlyRename, bool ReplaceIfExists)
+        private Int32 MoveOnServer(FileNode CFN, WebDavClient Proxy, String FileName, String NewFileName, String Source, String Target, bool IsDirectory, bool IsCaseOnlyRename, bool ReplaceIfExists)
         {
             String LoggedFile = $"{FileName} -> {NewFileName}";
             Int32 Report(Int32 Status, String Result)
@@ -1495,8 +1535,8 @@ namespace KS2Drive.FS
 
             bool Move(bool? Overwrite)
             {
-                if (IsDirectory) return (Overwrite.HasValue ? Proxy.MoveFolder(Source, Target, Overwrite.Value) : Proxy.MoveFolder(Source, Target)).GetAwaiter().GetResult();
-                return (Overwrite.HasValue ? Proxy.MoveFile(Source, Target, Overwrite.Value) : Proxy.MoveFile(Source, Target)).GetAwaiter().GetResult();
+                Proxy.Move(Source, Target, IsDirectory, Overwrite).GetAwaiter().GetResult(); //Throws on failure
+                return true;
             }
 
             //1. Is the target free? The cache answers when it knows the target is missing (Office probes its temporary names just
@@ -1511,7 +1551,7 @@ namespace KS2Drive.FS
                     Replace = true;
                 }
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
                 OnAuthenticationFailed();
                 return Report(STATUS_NETWORK_UNREACHABLE, "STATUS_NETWORK_UNREACHABLE");
@@ -1534,7 +1574,7 @@ namespace KS2Drive.FS
                 {
                     Moved = Move(IsCaseOnlyRename ? (bool?)null : Replace);
                 }
-                catch (WebDAVException ex) when (ex.GetHttpCode() == 412 && ReplaceIfExists && !Replace && !IsDirectory)
+                catch (WebDavException ex) when (ex.StatusCode == 412 && ReplaceIfExists && !Replace && !IsDirectory)
                 {
                     //The target exists after all: replace it as requested, unless it is a directory
                     if (TargetIsDirectory(NewFileName, Proxy)) return Report(STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED - A directory cannot be replaced");
@@ -1544,12 +1584,12 @@ namespace KS2Drive.FS
 
                 if (!Moved) return Report(STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED");
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 412)
+            catch (WebDavException ex) when (ex.StatusCode == 412)
             {
                 //"Overwrite: F" and the target exists on the server after all
                 return Report(STATUS_OBJECT_NAME_COLLISION, "STATUS_OBJECT_NAME_COLLISION");
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
                 OnAuthenticationFailed();
                 return Report(STATUS_NETWORK_UNREACHABLE, "STATUS_NETWORK_UNREACHABLE");
@@ -1571,7 +1611,7 @@ namespace KS2Drive.FS
         /// <summary>
         /// Returns whether the element at a local path is a directory, from the cache or else from the server.
         /// </summary>
-        private bool TargetIsDirectory(String FileName, WebDavClient2 Proxy)
+        private bool TargetIsDirectory(String FileName, WebDavClient Proxy)
         {
             Cache.Lock();
             try
@@ -1584,7 +1624,7 @@ namespace KS2Drive.FS
                 Cache.Unlock();
             }
 
-            WebDAVClient.Model.Item Element = Proxy.GetRepositoryElement(FileName);
+            WebDavItem Element = GetRepositoryElement(FileName);
             return Element != null && Element.IsCollection;
         }
 
@@ -1654,12 +1694,9 @@ namespace KS2Drive.FS
                 else if (CFN.FileInfo.FileSize == 0) Content = new MemoryStream(new byte[0]); //Emptied file (e.g. overwritten or truncated to 0)
                 else throw new InvalidOperationException("The content to upload is not loaded"); //Never upload an empty content in place of the real one
 
-                var Proxy = new WebDavClient2();
+                var Proxy = Client;
                 //First upload of a file created on the drive: never replace a file created meanwhile by another client (412 instead)
-                if (!Proxy.Upload(FileNode.GetRepositoryParentPath(CFN.RepositoryPath), Content, CFN.Name, CFN.IsNewOnServer).GetAwaiter().GetResult())
-                {
-                    throw new Exception("Upload failed");
-                }
+                Proxy.Put(CFN.RepositoryPath, Content, CFN.IsNewOnServer).GetAwaiter().GetResult(); //Throws on failure
 
                 CFN.HasUnflushedData = false;
                 CFN.DeleteLocalCopy(); //The server has the content: a recovery copy from a previous failure is obsolete
@@ -1797,12 +1834,12 @@ namespace KS2Drive.FS
         /// <param name="Proxy">WebDAV client used for the creation (not used any more, kept for the call sites).</param>
         /// <param name="FileName">Local path of the created element.</param>
         /// <param name="IsDirectory">True for a folder, false for a file.</param>
-        private FileNode GetCreatedFileNode(WebDavClient2 Proxy, String FileName, bool IsDirectory)
+        private FileNode GetCreatedFileNode(WebDavClient Proxy, String FileName, bool IsDirectory)
         {
             DateTime Now = DateTime.Now;
-            var LocalElement = new WebDAVClient.Model.Item()
+            var LocalElement = new WebDavItem()
             {
-                Href = FileNode.ConvertLocalPathToRepositoryPath(FileName),
+                Path = FileNode.ConvertLocalPathToRepositoryPath(FileName),
                 DisplayName = Path.GetFileName(FileName),
                 IsCollection = IsDirectory,
                 ContentLength = IsDirectory ? (long?)null : 0,
@@ -1811,8 +1848,7 @@ namespace KS2Drive.FS
             };
 
             var Node = new FileNode(LocalElement);
-            Node.LocalPath = FileName; //Do not rely on the URL decoding of the constructor: the local path is already known
-            Node.FileInfo.FileAttributes = IsDirectory ? (UInt32)FileAttributes.Directory : (UInt32)FileAttributes.Normal; //Do not rely on the WebDAV directory detection heuristic
+            Node.LocalPath = FileName; //The local path is already known (keeps the exact case asked by the application)
             return Node;
         }
 
@@ -1835,8 +1871,8 @@ namespace KS2Drive.FS
             Byte[] Content;
             try
             {
-                var Proxy = new WebDavClient2();
-                Content = Proxy.Download(CFN.RepositoryPath).GetAwaiter().GetResult();
+                var Proxy = Client;
+                Content = Proxy.Get(CFN.RepositoryPath).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -2146,6 +2182,7 @@ namespace KS2Drive.FS
             Cache.Clear();
             lock (RetainedContentsLock) RetainedContents.Clear();
             base.Unmounted(Host);
+            Http.Dispose(); //The connections of this mount are no longer needed
         }
 
         /// <summary>
@@ -2167,7 +2204,7 @@ namespace KS2Drive.FS
         /// </summary>
         private static bool IsAuthenticationError(Exception ex)
         {
-            return ex is WebDAVException WebDAVEx && WebDAVEx.GetHttpCode() == 401;
+            return ex is WebDavException WebDAVEx && WebDAVEx.StatusCode == 401;
         }
 
         /// <summary>

@@ -32,19 +32,10 @@ namespace KS2Drive.Tests.FS
 
         /// <summary>
         /// Creates a DavFS directly (without <see cref="DavFsContext"/>), e.g. to test the constructor or a specific configuration.
-        /// The fake server stays in use by the shared HttpClient after the call.
         /// </summary>
         public static DavFS CreateFileSystem(FakeWebDavServer Server, Configuration Config)
         {
-            WebDavClient2.TestHttpMessageHandler = Server;
-            try
-            {
-                return new DavFS(Config);
-            }
-            finally
-            {
-                WebDavClient2.TestHttpMessageHandler = null;
-            }
+            return new DavFS(Config, Server);
         }
 
         /// <summary>Answers <paramref name="Code"/> to the requests matching the method and (decoded) path.</summary>

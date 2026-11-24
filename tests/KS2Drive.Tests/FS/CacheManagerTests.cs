@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using WebDAVClient.Model;
+using KS2Drive.WebDav;
 
 namespace KS2Drive.Tests.FS
 {
@@ -19,13 +19,13 @@ namespace KS2Drive.Tests.FS
     {
         private FakeWebDavServer Server;
         private CacheManager Cm;
+        private WebDavClient Client;
 
         [TestInitialize]
         public void Setup()
         {
             Server = new FakeWebDavServer();
-            WebDavClient2.TestHttpMessageHandler = Server;
-            WebDavClient2.Init(FakeWebDavServer.ServerUrl, FakeWebDavServer.LibraryPath, "u", "p", null);
+            Client = new WebDavClient(WebDavClient.CreateHttpClient(Server), FakeWebDavServer.ServerUrl);
             FileNode.Init(FakeWebDavServer.LibraryPath, WebDAVMode.WebDAV);
             Cm = null;
         }
@@ -35,18 +35,17 @@ namespace KS2Drive.Tests.FS
         {
             //Let background refreshes started by the test finish before the next test (the cache lock is static)
             if (Cm != null) WaitUntil(() => RunningRefreshCount(Cm) == 0);
-            WebDavClient2.TestHttpMessageHandler = null;
         }
 
         #region Helpers
 
         private static FileNode MakeFile(String RepositoryPath, long Length = 3)
         {
-            return new FileNode(new Item
+            return new FileNode(new WebDavItem
             {
-                Href = RepositoryPath,
+                Path = RepositoryPath,
                 DisplayName = RepositoryPath.Substring(RepositoryPath.LastIndexOf('/') + 1),
-                Etag = "\"etag\"",
+                ETag = "\"etag\"",
                 ContentLength = Length,
                 IsCollection = false,
                 CreationDate = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -56,9 +55,9 @@ namespace KS2Drive.Tests.FS
 
         private static FileNode MakeFolder(String RepositoryPath)
         {
-            return new FileNode(new Item
+            return new FileNode(new WebDavItem
             {
-                Href = RepositoryPath + "/",
+                Path = RepositoryPath + "/",
                 DisplayName = RepositoryPath.Substring(RepositoryPath.LastIndexOf('/') + 1),
                 IsCollection = true
             });
@@ -66,7 +65,7 @@ namespace KS2Drive.Tests.FS
 
         private static FileNode MakeRoot()
         {
-            return new FileNode(new Item { Href = "/dav/", DisplayName = "", IsCollection = true });
+            return new FileNode(new WebDavItem { Path = "/dav/", DisplayName = "", IsCollection = true });
         }
 
         private static bool IsDirectory(FileNode Node) => (Node.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0;
@@ -154,11 +153,11 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void Constructor_StoresModeAndPreloadingFlag()
         {
-            Cm = new CacheManager(CacheMode.Disabled, true);
+            Cm = new CacheManager(CacheMode.Disabled, true, Client);
             Assert.AreEqual(CacheMode.Disabled, GetPrivateField<CacheMode>(Cm, "_mode"));
             Assert.IsTrue(GetPrivateField<bool>(Cm, "_PreLoadFoldersInCache"));
 
-            var Cm2 = new CacheManager(CacheMode.Enabled, false);
+            var Cm2 = new CacheManager(CacheMode.Enabled, false, Client);
             Assert.AreEqual(CacheMode.Enabled, GetPrivateField<CacheMode>(Cm2, "_mode"));
             Assert.IsFalse(GetPrivateField<bool>(Cm2, "_PreLoadFoldersInCache"));
             Assert.AreEqual(0, RunningRefreshCount(Cm2));
@@ -167,7 +166,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_UnknownPath_ReturnsNullAndUnknown()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Result = Cm.GetFileNodeNoLock("\\unknown.txt");
             Assert.IsNull(Result.node);
             Assert.IsFalse(Result.IsNonExistent);
@@ -176,7 +175,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_CachedNode_ReturnsIt()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Node = MakeFile("/dav/a.txt");
             Add(Node);
             var Result = Cm.GetFileNodeNoLock("\\a.txt");
@@ -187,7 +186,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_IsCaseInsensitive()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Node = MakeFile("/dav/Folder/File.TXT");
             Add(Node);
             Assert.AreSame(Node, Cm.GetFileNodeNoLock("\\folder\\file.txt").node);
@@ -196,7 +195,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_KnownMissingWithinDuration_ReturnsNonExistent()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.AddMissingFileNoLock("\\missing.txt");
             var Result = Cm.GetFileNodeNoLock("\\missing.txt");
             Assert.IsNull(Result.node);
@@ -207,7 +206,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_KnownMissingStillValidJustBeforeExpiry()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.AddMissingFileNoLock("\\missing.txt");
             MissingFileCache(Cm)["\\missing.txt"] = DateTime.Now.AddSeconds(-13);
             Assert.IsTrue(Cm.GetFileNodeNoLock("\\missing.txt").IsNonExistent);
@@ -216,7 +215,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_KnownMissingAfterExpiry_ReturnsUnknown()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.AddMissingFileNoLock("\\missing.txt");
             MissingFileCache(Cm)["\\missing.txt"] = DateTime.Now.AddSeconds(-16);
             var Result = Cm.GetFileNodeNoLock("\\missing.txt");
@@ -227,7 +226,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFileNodeNoLock_DisabledMode_AlwaysUnknown()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             Cm.AddMissingFileNoLock("\\missing.txt");
             Cm.AddFileNodeNoLock(MakeFile("/dav/a.txt"));
             var Missing = Cm.GetFileNodeNoLock("\\missing.txt");
@@ -241,7 +240,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddFileNodeNoLock_NewNode_ReturnsItAndRaisesCacheRefreshed()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             int Events = 0;
             Cm.CacheRefreshed += (s, e) => { Events++; Assert.AreSame(Cm, s); };
             var Node = MakeFile("/dav/a.txt");
@@ -252,7 +251,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddFileNodeNoLock_AlreadyCached_ReturnsCachedInstanceCaseInsensitive()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var First = MakeFile("/dav/folder/a.txt");
             Add(First);
             int Events = 0;
@@ -267,7 +266,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddFileNodeNoLock_RemovesThePathFromTheMissingList()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.AddMissingFileNoLock("\\a.txt");
             var Node = MakeFile("/dav/a.txt");
             Add(Node);
@@ -280,7 +279,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddFileNodeNoLock_DisabledMode_ReturnsNodeWithoutCachingOrEvent()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             int Events = 0;
             Cm.CacheRefreshed += (s, e) => Events++;
             var Node = MakeFile("/dav/a.txt");
@@ -297,7 +296,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddMissingFileNoLock_RetimestampsAnExpiredEntry()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.AddMissingFileNoLock("\\x");
             MissingFileCache(Cm)["\\x"] = DateTime.Now.AddSeconds(-60);
             Assert.IsFalse(Cm.GetFileNodeNoLock("\\x").IsNonExistent);
@@ -308,7 +307,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddMissingFileNoLock_PurgesExpiredEntriesAboveThreshold()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Missing = MissingFileCache(Cm);
             DateTime Old = DateTime.Now.AddSeconds(-60);
             for (int i = 0; i < 999; i++) Missing["\\old" + i] = Old;
@@ -325,7 +324,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddMissingFileNoLock_DoesNotPurgeBelowThreshold()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Missing = MissingFileCache(Cm);
             DateTime Old = DateTime.Now.AddSeconds(-60);
             for (int i = 0; i < 998; i++) Missing["\\old" + i] = Old;
@@ -338,7 +337,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void AddMissingFileNoLock_DisabledMode_DoesNothing()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             Cm.AddMissingFileNoLock("\\x");
             Assert.AreEqual(0, MissingFileCache(Cm).Count);
         }
@@ -350,7 +349,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RenameFileNodeKey_MovesTheEntryWithoutChangingTheNode()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Node = MakeFile("/dav/a.txt");
             Add(Node);
             int Events = 0;
@@ -367,7 +366,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RenameFileNodeKey_IsCaseInsensitiveOnThePreviousKey()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Node = MakeFile("/dav/a.txt");
             Add(Node);
             Cm.RenameFileNodeKey("\\A.TXT", "\\b.txt");
@@ -378,7 +377,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RenameFileNodeKey_DisabledMode_DoesNothing()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             int Events = 0;
             Cm.CacheRefreshed += (s, e) => Events++;
             Cm.RenameFileNodeKey("\\a.txt", "\\b.txt"); //Would throw (missing key) if the cache was used
@@ -388,7 +387,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RenameFolderSubElements_UpdatesDescendantsPathsAndKeys()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/old"));
             var A = Add(MakeFile("/dav/old/a.txt"));
             var Sub = Add(MakeFolder("/dav/old/sub"));
@@ -419,7 +418,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RenameFolderSubElements_IsCaseInsensitive()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var A = Add(MakeFile("/dav/Old/a.txt"));
             Cm.RenameFolderSubElements("\\OLD", "\\new");
             Assert.AreSame(A, Cached("\\new\\a.txt"));
@@ -429,7 +428,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RenameFolderSubElements_DisabledMode_DoesNothing()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             var A = MakeFile("/dav/old/a.txt");
             Cm.RenameFolderSubElements("\\old", "\\new");
             Assert.AreEqual("\\old\\a.txt", A.LocalPath);
@@ -438,7 +437,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileNode_File_RemovesOnlyThatEntry()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var A = Add(MakeFile("/dav/a.txt"));
             var B = Add(MakeFile("/dav/a.txt2"));
             int Events = 0;
@@ -454,7 +453,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileNode_Folder_RemovesDescendantsButNotSiblings()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Add(MakeFile("/dav/folder/a.txt"));
             Add(MakeFolder("/dav/folder/sub"));
@@ -474,7 +473,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileNode_Folder_IsCaseInsensitive()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Add(MakeFolder("/dav/folder"));
             Add(MakeFile("/dav/folder/a.txt"));
 
@@ -487,7 +486,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileNode_DisabledMode_DoesNotRaiseEvent()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             int Events = 0;
             Cm.CacheRefreshed += (s, e) => Events++;
             Cm.DeleteFileNode(MakeFolder("/dav/folder"));
@@ -497,7 +496,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileEntry_RemovesOnlyTheKey()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Add(MakeFolder("/dav/folder"));
             var Child = Add(MakeFile("/dav/folder/a.txt"));
             int Events = 0;
@@ -513,7 +512,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileEntry_UnknownKey_DoesNotThrow()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.DeleteFileEntry("\\nothing");
             Assert.IsNull(Cached("\\nothing"));
         }
@@ -521,7 +520,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void DeleteFileEntry_DisabledMode_DoesNotRaiseEvent()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             int Events = 0;
             Cm.CacheRefreshed += (s, e) => Events++;
             Cm.DeleteFileEntry("\\a.txt");
@@ -531,7 +530,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void InvalidateFileNode_ElementAtRoot_MarksRootAsNotParsed()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
             Assert.AreEqual("\\", Root.LocalPath);
             Root.IsParsed = true;
@@ -546,7 +545,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void InvalidateFileNode_NestedElement_MarksParentAsNotParsed()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
             Root.IsParsed = true;
             var Folder = Add(MakeFolder("/dav/folder"));
@@ -563,7 +562,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void InvalidateFileNode_ParentNotCached_RemovesNodeWithoutError()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var A = Add(MakeFile("/dav/folder/a.txt"));
             Cm.InvalidateFileNode(A);
             Assert.IsNull(Cached("\\folder\\a.txt"));
@@ -572,7 +571,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void InvalidateFileNode_DisabledMode_DoesNothing()
         {
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
             var Folder = MakeFolder("/dav/folder");
             Folder.IsParsed = true;
             Cm.InvalidateFileNode(MakeFile("/dav/folder/a.txt"));
@@ -586,7 +585,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void Clear_ReleasesTheNodeCache()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Cache = GetPrivateField<Dictionary<String, FileNode>>(Cm, "FileNodeCache");
             Add(MakeFile("/dav/a.txt"));
 
@@ -599,7 +598,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void LockAndUnlock_AcquireAndReleaseTheCacheLock()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             object CacheLock = StaticCacheLock();
 
             Cm.Lock();
@@ -627,7 +626,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void Lock_BlocksLockingOperationsOfOtherThreads()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Add(MakeFile("/dav/a.txt"));
             Task Rename;
             Cm.Lock();
@@ -664,7 +663,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void BuildDirectoryListing_SubFolder_DotEntriesFirstThenSortedChildren()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Children = SampleChildren(out FileNode Folder);
 
             var Listing = BuildListing(Folder, Children, null);
@@ -677,7 +676,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void BuildDirectoryListing_ParentCached_DotDotIsTheParent()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
             var Parent = Add(MakeFolder("/dav/parent"));
             var Folder = MakeFolder("/dav/parent/folder");
@@ -693,7 +692,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void BuildDirectoryListing_Root_HasNoDotEntries()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = MakeRoot();
             var Children = new List<Tuple<String, FileNode>>
             {
@@ -707,7 +706,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void BuildDirectoryListing_MarkerDot_SkipsDot()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Children = SampleChildren(out FileNode Folder);
             CollectionAssert.AreEqual(new[] { "..", "A.txt", "b.txt", "c.txt" }, Names(BuildListing(Folder, Children, ".")));
         }
@@ -715,7 +714,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void BuildDirectoryListing_MarkerDotDot_SkipsBothDotEntries()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Children = SampleChildren(out FileNode Folder);
             CollectionAssert.AreEqual(new[] { "A.txt", "b.txt", "c.txt" }, Names(BuildListing(Folder, Children, "..")));
         }
@@ -730,7 +729,7 @@ namespace KS2Drive.Tests.FS
         [DataRow("zzz", "")]
         public void BuildDirectoryListing_NameMarker_ResumesAfterMarkerEvenIfMissing(String Marker, String ExpectedNames)
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Children = SampleChildren(out FileNode Folder);
             var Expected = ExpectedNames.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
             CollectionAssert.AreEqual(Expected, Names(BuildListing(Folder, Children, Marker)));
@@ -739,7 +738,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void BuildDirectoryListing_AfterClear_DotDotIsCurrentFolder()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             Cm.Clear();
             var Folder = MakeFolder("/dav/folder");
             var Listing = BuildListing(Folder, new List<Tuple<String, FileNode>>(), null);
@@ -755,7 +754,7 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_UnparsedFolder_ListsFromServerAndCaches()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Assert.IsFalse(Folder.IsParsed);
 
@@ -784,7 +783,7 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_UnparsedFolder_ReturnsAlreadyCachedInstances()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             var KnownNode = Add(MakeFile("/dav/folder/b.txt", 3));
 
@@ -800,7 +799,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFile("/dav/z.txt", "z");
             Server.AddFolder("/dav/a");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
 
             var Result = Cm.GetFolderContent(Root, null);
@@ -813,7 +812,7 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_DotDotRefersToCachedParent()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
             var Folder = Add(MakeFolder("/dav/folder"));
 
@@ -826,7 +825,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFolderContent_ParsedFolder_ServedFromCacheWithoutServerRequest()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Folder.IsParsed = true;
             Folder.LastRefresh = DateTime.Now;
@@ -850,7 +849,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFolderContent_ParsedRoot_ServedFromCache()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
             Root.IsParsed = true;
             Root.LastRefresh = DateTime.Now;
@@ -868,7 +867,7 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_SecondCall_DoesNotQueryTheServerAgain()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Cm.GetFolderContent(Folder, null);
             Server.AddFile("/dav/folder/new.txt", "n");
@@ -884,12 +883,12 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_ExpiredCache_ServesCacheAndRefreshesInBackground()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Cm.GetFolderContent(Folder, null);
 
             Server.AddFile("/dav/folder/new.txt", "n");
-            new WebDavClient2().DeleteFile("/dav/folder/b.txt").GetAwaiter().GetResult();
+            Client.Delete("/dav/folder/b.txt", false).GetAwaiter().GetResult();
             Folder.LastRefresh = DateTime.Now.AddSeconds(-60);
 
             var Stale = Cm.GetFolderContent(Folder, null);
@@ -908,7 +907,7 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_WithMarker_ReturnsOnlyFollowingEntries()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
 
             var FromServer = Cm.GetFolderContent(Folder, "a.txt");
@@ -935,7 +934,7 @@ namespace KS2Drive.Tests.FS
         {
             SetupFolderOnServer();
             Server.RejectCredentials = true;
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
 
             var Result = Cm.GetFolderContent(Folder, null);
@@ -951,7 +950,7 @@ namespace KS2Drive.Tests.FS
         {
             SetupFolderOnServer();
             Server.ForcedStatus = (m, p) => HttpStatusCode.InternalServerError;
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
 
             var Result = Cm.GetFolderContent(Folder, null);
@@ -969,7 +968,7 @@ namespace KS2Drive.Tests.FS
         {
             SetupFolderOnServer();
             Server.NetworkFailure = (m, p) => true;
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
 
             var Result = Cm.GetFolderContent(Folder, null);
@@ -984,7 +983,7 @@ namespace KS2Drive.Tests.FS
         public void GetFolderContent_DisabledCache_AlwaysListsFromServer()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Disabled, true);
+            Cm = new CacheManager(CacheMode.Disabled, true, Client);
             var Folder = MakeFolder("/dav/folder");
 
             var First = Cm.GetFolderContent(Folder, null);
@@ -1005,7 +1004,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.RejectCredentials = true;
-            Cm = new CacheManager(CacheMode.Disabled, false);
+            Cm = new CacheManager(CacheMode.Disabled, false, Client);
 
             var Result = Cm.GetFolderContent(MakeFolder("/dav/folder"), null);
 
@@ -1021,7 +1020,7 @@ namespace KS2Drive.Tests.FS
             Server.AddFile("/dav/f1/x.txt", "x");
             Server.AddFolder("/dav/f2");
             Server.AddFile("/dav/file.txt", "f");
-            Cm = new CacheManager(CacheMode.Enabled, true);
+            Cm = new CacheManager(CacheMode.Enabled, true, Client);
             var Root = Add(MakeRoot());
 
             var Result = Cm.GetFolderContent(Root, null);
@@ -1039,7 +1038,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/f1");
             Server.AddFile("/dav/f1/x.txt", "x");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
 
             var Result = Cm.GetFolderContent(Root, null);
@@ -1052,7 +1051,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void GetFolderContent_PreLoading_SkipsAlreadyParsedSubFolders()
         {
-            Cm = new CacheManager(CacheMode.Enabled, true);
+            Cm = new CacheManager(CacheMode.Enabled, true, Client);
             var Root = Add(MakeRoot());
             Root.IsParsed = true;
             Root.LastRefresh = DateTime.Now;
@@ -1073,7 +1072,7 @@ namespace KS2Drive.Tests.FS
         public void Refresh_UnparsedFolder_AddsChildrenAndMarksParsed()
         {
             SetupFolderOnServer();
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Folder.LastRefresh = DateTime.Now.AddDays(-1);
             int Events = 0;
@@ -1095,7 +1094,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.AddFile("/dav/folder/a.txt", "123456789");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             var A = Add(MakeFile("/dav/folder/a.txt", 2));
             Assert.AreEqual(2UL, A.FileInfo.FileSize);
@@ -1111,7 +1110,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.AddFile("/dav/folder/a.txt", "123456789");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             var A = Add(MakeFile("/dav/folder/a.txt", 2));
             A.HasUnflushedData = true;
@@ -1127,7 +1126,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.AddFile("/dav/folder/kept.txt", "k");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             var Kept = Add(MakeFile("/dav/folder/kept.txt", 1));
             Add(MakeFile("/dav/folder/gone.txt"));
@@ -1149,7 +1148,7 @@ namespace KS2Drive.Tests.FS
         public void Refresh_Root_RemovesDeletedRootElementsAndKeepsRoot()
         {
             Server.AddFile("/dav/kept.txt", "k");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Root = Add(MakeRoot());
             Add(MakeFile("/dav/gone.txt"));
             var Deep = Add(MakeFile("/dav/folder/deep.txt"));
@@ -1167,7 +1166,7 @@ namespace KS2Drive.Tests.FS
         public void Refresh_ServerFailure_LeavesCacheUntouchedAndDoesNotThrow()
         {
             Server.AddFolder("/dav/folder");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             var A = Add(MakeFile("/dav/folder/a.txt"));
             Server.NetworkFailure = (m, p) => true;
@@ -1188,7 +1187,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.AddFile("/dav/folder/new.txt", "n");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             Cm.CacheRefreshed += (s, e) => throw new InvalidOperationException("handler failure");
             object RunningLock = GetPrivateField<object>(Cm, "RunningRefreshActionListLock");
@@ -1206,7 +1205,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.AddFile("/dav/folder/a.txt", "a");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = MakeFolder("/dav/folder");
             Cm.Clear();
 
@@ -1220,7 +1219,7 @@ namespace KS2Drive.Tests.FS
         public void InternalRefresh_RemovesTheRunningEntryAfterwards()
         {
             Server.AddFolder("/dav/folder");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
             object RunningLock = GetPrivateField<object>(Cm, "RunningRefreshActionListLock");
             lock (RunningLock) RunningRefreshSet(Cm).Add("\\FOLDER");
@@ -1235,7 +1234,7 @@ namespace KS2Drive.Tests.FS
         {
             Server.AddFolder("/dav/folder");
             Server.AddFile("/dav/folder/a.txt", "a");
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = Add(MakeFolder("/dav/folder"));
 
             Cm.Lock(); //The refresh cannot update the cache (nor complete) while the lock is held
@@ -1262,7 +1261,7 @@ namespace KS2Drive.Tests.FS
         [TestMethod]
         public void RemoveRefreshTask_RemovesThePath()
         {
-            Cm = new CacheManager(CacheMode.Enabled, false);
+            Cm = new CacheManager(CacheMode.Enabled, false, Client);
             var Folder = MakeFolder("/dav/folder");
             object RunningLock = GetPrivateField<object>(Cm, "RunningRefreshActionListLock");
             lock (RunningLock) RunningRefreshSet(Cm).Add(Folder.LocalPath);

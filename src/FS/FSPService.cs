@@ -34,13 +34,19 @@ namespace KS2Drive
         }
 
         /// <summary>
+        /// Unit tests only: when set, the mounted file system sends its requests to this handler (e.g. an in-memory server)
+        /// instead of the network. Always null in the application.
+        /// </summary>
+        internal System.Net.Http.HttpMessageHandler TestHttpMessageHandler { get; set; }
+
+        /// <summary>
         /// Creates the <see cref="DavFS"/> file system from the configuration and mounts it on the configured drive letter.
         /// </summary>
         /// <param name="config">Application configuration (server, credentials, drive letter, cache and flush options...).</param>
         /// <exception cref="IOException">WinFSP failed to mount the file system.</exception>
         public void Mount(Configuration config)
         {
-            davFs = new DavFS(config);
+            davFs = new DavFS(config, TestHttpMessageHandler);
             davFs.RepositoryActionPerformed += DavFs_RepositoryActionPerformed;
             davFs.RepositoryAuthenticationFailed += DavFs_RepositoryAuthenticationFailed;
 

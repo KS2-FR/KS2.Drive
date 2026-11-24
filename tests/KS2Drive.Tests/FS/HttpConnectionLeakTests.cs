@@ -8,7 +8,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using WebDAVClient.Helpers;
+using KS2Drive.WebDav;
 
 namespace KS2Drive.Tests.FS
 {
@@ -80,15 +80,14 @@ namespace KS2Drive.Tests.FS
         }
 
         private LocalHttpServer Server;
+        private WebDavClient Client;
 
         [TestInitialize]
         public void Initialize()
         {
             Server = new LocalHttpServer();
-            WebDavClient2.TestHttpMessageHandler = null; //Real HTTP stack
-            WebDavClient2.Init(Server.Url, "/dav", "user", "password", null);
-            FileNode.Init("/dav", WebDAVMode.WebDAV);
-            //Small limit (Init raises it, and .NET Framework does not limit loopback addresses at all), so that a few leaked
+            Client = new WebDavClient(WebDavClient.CreateHttpClient(new NetworkCredential("user", "password"), null), Server.Url); //Real HTTP stack
+            //Small limit (DavFS raises it, and .NET Framework does not limit loopback addresses at all), so that a few leaked
             //connections are enough to block the next request, like with the framework default on a remote server
             ServicePointManager.FindServicePoint(new Uri(Server.Url)).ConnectionLimit = 2;
         }
@@ -117,9 +116,9 @@ namespace KS2Drive.Tests.FS
             try
             {
                 Request().GetAwaiter().GetResult();
-                Assert.Fail("A WebDAVException was expected");
+                Assert.Fail("A WebDavException was expected");
             }
-            catch (WebDAVException)
+            catch (WebDavException)
             {
             }
         }
@@ -132,31 +131,33 @@ namespace KS2Drive.Tests.FS
         }
 
         [TestMethod]
-        public void Init_AllowsSeveralSimultaneousConnectionsToTheServer()
+        public void Mount_AllowsSeveralSimultaneousConnectionsToTheServer()
         {
-            WebDavClient2.Init(Server.Url, "/dav", "user", "password", null);
-            Assert.AreEqual(WebDavClient2.MaxConnectionsPerServer, ServicePointManager.FindServicePoint(new Uri(Server.Url)).ConnectionLimit);
-            Assert.IsTrue(WebDavClient2.MaxConnectionsPerServer > 2);
+            var Config = KS2Drive.Tests.Infrastructure.DavFsContext.TestConfiguration();
+            Config.ServerURL = Server.Url + "/dav";
+            try { new DavFS(Config); } catch (Exception) { } //The connection test may fail on this minimal server: the limit is set before
+            Assert.AreEqual(DavFS.MaxConnectionsPerServer, ServicePointManager.FindServicePoint(new Uri(Server.Url)).ConnectionLimit);
+            Assert.IsTrue(DavFS.MaxConnectionsPerServer > 2);
         }
 
         [TestMethod]
         public void FailedUploads_DoNotBlockTheFollowingRequests()
         {
             Server.Status = Method => Method == "PUT" ? 500 : 204;
-            for (int i = 0; i < 3; i++) ExpectWebDavError(() => new WebDavClient2().Upload("/dav", new MemoryStream(new byte[] { 1 }), $"~WRD000{i}.tmp"));
+            for (int i = 0; i < 3; i++) ExpectWebDavError(() => Client.Put($"/dav/~WRD000{i}.tmp", new MemoryStream(new byte[] { 1 }), false));
 
-            AssertCompletesQuickly(() => new WebDavClient2().DeleteFile("/dav/~$doc.docx"), "The DELETE following failed uploads");
+            AssertCompletesQuickly(() => Client.Delete("/dav/~$doc.docx", false), "The DELETE following failed uploads");
         }
 
         [TestMethod]
         public void FailedDeletesMovesAndFolderCreations_DoNotBlockTheFollowingRequests()
         {
             Server.Status = Method => Method == "PUT" ? 201 : 500;
-            ExpectWebDavError(() => new WebDavClient2().DeleteFile("/dav/a.txt"));
-            ExpectWebDavError(() => new WebDavClient2().MoveFile("/dav/a.txt", "/dav/b.txt", false));
-            ExpectWebDavError(() => new WebDavClient2().CreateDir("/dav", "folder"));
+            ExpectWebDavError(() => Client.Delete("/dav/a.txt", false));
+            ExpectWebDavError(() => Client.Move("/dav/a.txt", "/dav/b.txt", false, false));
+            ExpectWebDavError(() => Client.MkCol("/dav/folder"));
 
-            AssertCompletesQuickly(() => new WebDavClient2().Upload("/dav", new MemoryStream(new byte[] { 1 }), "a.txt"), "The PUT following failed requests");
+            AssertCompletesQuickly(() => Client.Put("/dav/a.txt", new MemoryStream(new byte[] { 1 }), false), "The PUT following failed requests");
         }
 
         [TestMethod]
@@ -167,9 +168,9 @@ namespace KS2Drive.Tests.FS
             {
                 for (int i = 0; i < 20; i++)
                 {
-                    await new WebDavClient2().Upload("/dav", new MemoryStream(new byte[] { 1 }), $"f{i}.txt").ConfigureAwait(false);
-                    await new WebDavClient2().MoveFile($"/dav/f{i}.txt", $"/dav/g{i}.txt", false).ConfigureAwait(false);
-                    await new WebDavClient2().DeleteFile($"/dav/g{i}.txt").ConfigureAwait(false);
+                    await Client.Put($"/dav/f{i}.txt", new MemoryStream(new byte[] { 1 }), false).ConfigureAwait(false);
+                    await Client.Move($"/dav/f{i}.txt", $"/dav/g{i}.txt", false, false).ConfigureAwait(false);
+                    await Client.Delete($"/dav/g{i}.txt", false).ConfigureAwait(false);
                 }
             }, "20 upload/move/delete cycles");
             Assert.AreEqual(60, Server.RequestCount);

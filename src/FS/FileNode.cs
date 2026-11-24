@@ -2,7 +2,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Security.AccessControl;
-using System.Web;
+using KS2Drive.WebDav;
 
 namespace KS2Drive.FS
 {
@@ -90,8 +90,8 @@ namespace KS2Drive.FS
         /// <summary>
         /// Sets the static parameters shared by all nodes. Must be called before any FileNode is created.
         /// </summary>
-        /// <param name="DocumentLibraryPath">Server-side base path of the mounted library; it maps to the drive root.</param>
-        /// <param name="webDavMode">Server type, which drives how folders are detected.</param>
+        /// <param name="DocumentLibraryPath">Decoded server-side path of the mounted library (e.g. "/alfresco/webdav/My Site"); it maps to the drive root.</param>
+        /// <param name="webDavMode">Server type (no longer used to detect folders: the resourcetype property is).</param>
         public static void Init(String DocumentLibraryPath, WebDAVMode webDavMode)
         {
             FileNode._DocumentLibraryPath = DocumentLibraryPath;
@@ -104,7 +104,7 @@ namespace KS2Drive.FS
         /// and fills the file information from the item properties. A default security descriptor is assigned.
         /// </summary>
         /// <exception cref="InvalidOperationException"><see cref="Init"/> has not been called.</exception>
-        public FileNode(WebDAVClient.Model.Item WebDavObject)
+        public FileNode(WebDavItem WebDavObject)
         {
             if (!FileNode._IsInited) throw new InvalidOperationException("Please Call Init First");
 
@@ -116,24 +116,13 @@ namespace KS2Drive.FS
             this.LastRefresh = DateTime.Now;
             this.Name = WebDavObject.DisplayName;
 
-            if (Uri.TryCreate(WebDavObject.Href, UriKind.Absolute, out Uri ParsedUri))
-            {
-                this.RepositoryPath = new Uri(WebDavObject.Href).PathAndQuery;
-            }
-            else
-            {
-                this.RepositoryPath = WebDavObject.Href;
-            }
+            //The path is already decoded (see WebDavItem.Path): like every path in the application
+            this.RepositoryPath = WebDavObject.Path.Length > 1 ? WebDavObject.Path.TrimEnd('/') : WebDavObject.Path;
+            this.LocalPath = ConvertRepositoryPathToLocalPath(this.RepositoryPath);
 
-            this.LocalPath = ConvertRepositoryPathToLocalPath(this.RepositoryPath); //Already URL-decoded
-
-            if (this.RepositoryPath[this.RepositoryPath.Length - 1] == '/' && this.RepositoryPath.Length > 1) this.RepositoryPath = this.RepositoryPath.Remove(this.RepositoryPath.Length - 1);
-
-            //Folder or file: the standard WebDAV "resourcetype" property (<collection/> for a folder, see IsCollection), whatever the
-            //mode. A href ending with '/' also designates a collection. The former heuristic of the WebDAV mode (no etag and no
-            //size, or no size) made every file a folder on servers that do not send getcontentlength
-            bool IsFolder = WebDavObject.IsCollection || (WebDavObject.Href != null && WebDavObject.Href.EndsWith("/") && WebDavObject.Href.Length > 1);
-            this.FileInfo.FileAttributes = IsFolder ? (UInt32)System.IO.FileAttributes.Directory : (UInt32)System.IO.FileAttributes.Normal;
+            //Folder or file: the standard WebDAV "resourcetype" property (<collection/> for a folder). The former heuristic of the
+            //WebDAV mode (no etag and no size, or no size) made every file a folder on servers that do not send getcontentlength
+            this.FileInfo.FileAttributes = WebDavObject.IsCollection ? (UInt32)System.IO.FileAttributes.Directory : (UInt32)System.IO.FileAttributes.Normal;
 
             if (WebDavObject.CreationDate.HasValue) this.FileInfo.CreationTime = (UInt64)WebDavObject.CreationDate.Value.ToFileTimeUtc();
             this.FileInfo.LastAccessTime = (UInt64)DateTime.Now.ToFileTimeUtc();
@@ -146,46 +135,33 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// Converts a repository path (URL-encoded or not) to a local path: URL-decodes it, strips the trailing slash and the
-        /// document library path prefix, replaces '/' by '\' and makes sure the result starts with '\'.
-        /// The library path is only removed as a prefix (not elsewhere in the path), and the comparison is done on decoded,
-        /// case-insensitive paths since servers may encode or case the library path differently from the configured URL.
-        /// '+' is kept as is: it is a valid character in a path and does not mean a space there.
+        /// Converts a repository path to a local path: strips the trailing slash and the document library path prefix, replaces
+        /// '/' by '\' and makes sure the result starts with '\'. Repository paths are decoded (see <see cref="WebDavItem.Path"/>):
+        /// nothing is decoded here, so a name like "a%41.txt" stays as is. The library path is only removed as a prefix (not
+        /// elsewhere in the path), case-insensitively since servers may case it differently from the configured URL.
         /// </summary>
-        public static String ConvertRepositoryPathToLocalPath(String CMISPath)
+        public static String ConvertRepositoryPathToLocalPath(String RepositoryPath)
         {
-            String DecodedPath = Uri.UnescapeDataString(CMISPath);
-            if (DecodedPath.EndsWith("/")) DecodedPath = DecodedPath.Substring(0, DecodedPath.Length - 1);
+            String Path = RepositoryPath;
+            if (Path.EndsWith("/")) Path = Path.Substring(0, Path.Length - 1);
 
-            String DecodedLibraryPath = Uri.UnescapeDataString(_DocumentLibraryPath);
-            if (DecodedPath.StartsWith(DecodedLibraryPath, StringComparison.OrdinalIgnoreCase) && (DecodedPath.Length == DecodedLibraryPath.Length || DecodedPath[DecodedLibraryPath.Length] == '/'))
+            if (Path.StartsWith(_DocumentLibraryPath, StringComparison.OrdinalIgnoreCase) && (Path.Length == _DocumentLibraryPath.Length || Path[_DocumentLibraryPath.Length] == '/'))
             {
-                DecodedPath = DecodedPath.Substring(DecodedLibraryPath.Length);
+                Path = Path.Substring(_DocumentLibraryPath.Length);
             }
 
-            String ReworkdPath = DecodedPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
+            String ReworkdPath = Path.Replace('/', System.IO.Path.DirectorySeparatorChar);
             if (!ReworkdPath.StartsWith(System.IO.Path.DirectorySeparatorChar.ToString())) ReworkdPath = System.IO.Path.DirectorySeparatorChar + ReworkdPath;
             return ReworkdPath;
         }
 
         /// <summary>
-        /// Returns the path of a WebDAV href, which servers send either as an absolute URL or as a path.
-        /// </summary>
-        internal static String GetPathOfHref(String Href)
-        {
-            if (Href == null) return null;
-            return Uri.TryCreate(Href, UriKind.Absolute, out Uri Parsed) && (Parsed.Scheme == Uri.UriSchemeHttp || Parsed.Scheme == Uri.UriSchemeHttps) ? Parsed.PathAndQuery : Href;
-        }
-
-        /// <summary>
-        /// Returns true if two repository paths designate the same element, whatever their URL encoding, trailing slash or case.
+        /// Returns true if two (decoded) repository paths designate the same element, whatever their trailing slash or case.
         /// </summary>
         internal static bool IsSameRepositoryPath(String Path1, String Path2)
         {
             if (Path1 == null || Path2 == null) return Path1 == Path2;
-            String Normalized1 = Uri.UnescapeDataString(Path1).TrimEnd('/');
-            String Normalized2 = Uri.UnescapeDataString(Path2).TrimEnd('/');
-            return String.Equals(Normalized1, Normalized2, StringComparison.OrdinalIgnoreCase);
+            return String.Equals(Path1.TrimEnd('/'), Path2.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 using Fsp;
 using KS2Drive.FS;
+using KS2Drive.WebDav;
 using KS2Drive.Tests.Infrastructure;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -110,14 +111,15 @@ namespace KS2Drive.Tests.FS
         {
             using (var Ctx = DavFsContext.Create(s => { s.AddFile("/dav/a.txt", "a"); s.AddFolder("/dav/v1.2"); }))
             {
-                var Proxy = new WebDavClient2();
-                Assert.IsTrue(Proxy.ExistsOnServer("\\a.txt"));
-                Assert.IsTrue(Proxy.ExistsOnServer("\\v1.2"));
-                Assert.IsFalse(Proxy.ExistsOnServer("\\missing"));
+                var Proxy = Ctx.Fs.Client;
+                bool ExistsOnServer(String LocalPath) => Proxy.Exists(FileNode.ConvertLocalPathToRepositoryPath(LocalPath)).GetAwaiter().GetResult();
+                Assert.IsTrue(ExistsOnServer("\\a.txt"));
+                Assert.IsTrue(ExistsOnServer("\\v1.2"));
+                Assert.IsFalse(ExistsOnServer("\\missing"));
                 Ctx.Server.ForcedStatus = (M, P) => P == "/dav/moved" ? (HttpStatusCode?)HttpStatusCode.MovedPermanently : null;
-                Assert.IsTrue(Proxy.ExistsOnServer("\\moved"), "A redirection (folder URL without slash) means the name is taken");
+                Assert.IsTrue(ExistsOnServer("\\moved"), "A redirection (folder URL without slash) means the name is taken");
                 Ctx.Server.ForcedStatus = (M, P) => (HttpStatusCode?)HttpStatusCode.InternalServerError;
-                Assert.ThrowsException<WebDAVClient.Helpers.WebDAVException>(() => Proxy.ExistsOnServer("\\a.txt"));
+                Assert.ThrowsException<WebDavException>(() => ExistsOnServer("\\a.txt"));
             }
         }
 

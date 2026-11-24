@@ -181,7 +181,10 @@
     </Compile>
     <Compile Include="FS\DavFS.cs" />
     <Compile Include="FS\FileNode.cs" />
-    <Compile Include="FS\WebDavClient2.cs" />
+    <Compile Include="WebDav\MultiStatusParser.cs" />
+    <Compile Include="WebDav\WebDavClient.cs" />
+    <Compile Include="WebDav\WebDavException.cs" />
+    <Compile Include="WebDav\WebDavItem.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -233,12 +236,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\WebDAVClient\WebDAVClient.csproj">
-      <Project>{f21eb154-c84e-4390-87cf-271e3df4f059}</Project>
-      <Name>WebDAVClient</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.6.1">

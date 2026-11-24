@@ -5,8 +5,6 @@ VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KS2.Drive", "src\KS2.Drive.csproj", "{5E0FD624-C176-4D4B-8B2F-C3C9BB6AFF8A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebDAVClient", "WebDAVClient\WebDAVClient.csproj", "{F21EB154-C84E-4390-87CF-271E3DF4F059}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C95BE676-0596-4555-97A5-83B9FCEF9B67}"
 	ProjectSection(SolutionItems) = preProject
 		Notes.txt = Notes.txt
@@ -26,10 +24,6 @@ Global
 		{5E0FD624-C176-4D4B-8B2F-C3C9BB6AFF8A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5E0FD624-C176-4D4B-8B2F-C3C9BB6AFF8A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5E0FD624-C176-4D4B-8B2F-C3C9BB6AFF8A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F21EB154-C84E-4390-87CF-271E3DF4F059}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F21EB154-C84E-4390-87CF-271E3DF4F059}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F21EB154-C84E-4390-87CF-271E3DF4F059}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F21EB154-C84E-4390-87CF-271E3DF4F059}.Release|Any CPU.Build.0 = Release|Any CPU
 		{AF8A5B17-B3AC-48EB-81D6-935F9B165457}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{AF8A5B17-B3AC-48EB-81D6-935F9B165457}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AF8A5B17-B3AC-48EB-81D6-935F9B165457}.Release|Any CPU.ActiveCfg = Release|Any CPU

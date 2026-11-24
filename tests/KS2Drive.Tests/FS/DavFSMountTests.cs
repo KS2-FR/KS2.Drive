@@ -18,12 +18,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSMountTests
     {
-        [TestCleanup]
-        public void Cleanup()
-        {
-            WebDavClient2.TestHttpMessageHandler = null;
-        }
-
         #region Constructor
 
         [TestMethod]

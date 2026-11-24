@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using WebDAVClient.Helpers;
+using KS2Drive.WebDav;
 
 namespace KS2Drive.FS
 {
@@ -28,6 +28,11 @@ namespace KS2Drive.FS
 
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
+        /// <summary>
+        /// WebDAV client used to list the folders on the server.
+        /// </summary>
+        private readonly WebDavClient Client;
+
         private object RunningRefreshActionListLock = new object();
         private HashSet<String> RunningRefreshActionList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -36,8 +41,10 @@ namespace KS2Drive.FS
         /// </summary>
         /// <param name="mode">When <see cref="CacheMode.Disabled"/>, every cache operation is a no-op and listings always go to the server.</param>
         /// <param name="PreLoadFoldersInCache">When true, listing a folder also schedules a background listing of its not-yet-parsed sub-folders.</param>
-        public CacheManager(CacheMode mode, bool PreLoadFoldersInCache)
+        /// <param name="Client">WebDAV client used to list the folders on the server.</param>
+        public CacheManager(CacheMode mode, bool PreLoadFoldersInCache, WebDavClient Client)
         {
+            this.Client = Client ?? throw new ArgumentNullException(nameof(Client));
             this._mode = mode;
             this._PreLoadFoldersInCache = PreLoadFoldersInCache;
         }
@@ -483,16 +490,15 @@ namespace KS2Drive.FS
         /// <returns>Success flag, the (name, FileNode) children, and an error message on failure ("401" when authentication failed).</returns>
         private (bool Success, List<Tuple<String, FileNode>> Content, String ErrorMessage) ListRemoteServerFolderContent(FileNode CFN)
         {
-            var Proxy = new WebDavClient2();
             List<Tuple<String, FileNode>> ChildrenFileNames = new List<Tuple<String, FileNode>>();
 
-            IEnumerable<WebDAVClient.Model.Item> ItemsInFolder;
+            IEnumerable<WebDavItem> ItemsInFolder;
 
             try
             {
-                ItemsInFolder = Proxy.List(CFN.RepositoryPath).GetAwaiter().GetResult();
+                ItemsInFolder = Client.PropFind(CFN.RepositoryPath, 1, true).GetAwaiter().GetResult();
             }
-            catch (WebDAVException ex) when (ex.GetHttpCode() == 401)
+            catch (WebDavException ex) when (ex.StatusCode == 401)
             {
                 return (false, null, "401");
             }

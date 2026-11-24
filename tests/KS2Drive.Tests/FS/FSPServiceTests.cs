@@ -17,18 +17,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class FSPServiceTests
     {
-        [TestInitialize]
-        public void Setup()
-        {
-            WebDavClient2.TestHttpMessageHandler = null;
-        }
-
-        [TestCleanup]
-        public void Cleanup()
-        {
-            WebDavClient2.TestHttpMessageHandler = null;
-        }
-
         #region Helpers
 
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -125,8 +113,7 @@ namespace KS2Drive.Tests.FS
         public void Mount_ServerRejectsCredentials_ThrowsAndStaysUnmounted()
         {
             var Server = new FakeWebDavServer { RejectCredentials = true };
-            WebDavClient2.TestHttpMessageHandler = Server;
-            var Service = new FSPService();
+            var Service = new FSPService { TestHttpMessageHandler = Server };
             int AuthFailures = 0;
             Service.RepositoryAuthenticationFailed += (s, e) => AuthFailures++;
 
@@ -144,8 +131,7 @@ namespace KS2Drive.Tests.FS
         public void Mount_UnreachableServer_ThrowsAndStaysUnmounted()
         {
             var Server = new FakeWebDavServer { NetworkFailure = (m, p) => true };
-            WebDavClient2.TestHttpMessageHandler = Server;
-            var Service = new FSPService();
+            var Service = new FSPService { TestHttpMessageHandler = Server };
 
             var Ex = CatchException(() => Service.Mount(DavFsContext.TestConfiguration()));
 

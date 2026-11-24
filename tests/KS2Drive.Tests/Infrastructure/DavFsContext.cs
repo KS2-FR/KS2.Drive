@@ -27,8 +27,7 @@ namespace KS2Drive.Tests.Infrastructure
         {
             this.Server = Server;
             this.Config = Config;
-            WebDavClient2.TestHttpMessageHandler = Server;
-            Fs = new DavFS(Config);
+            Fs = new DavFS(Config, Server); //Requests go to the in-memory server
             Fs.RepositoryActionPerformed += (s, e) => { lock (Log) Log.Add(e); };
             Fs.RepositoryAuthenticationFailed += (s, e) => AuthenticationFailures++;
         }
@@ -62,7 +61,6 @@ namespace KS2Drive.Tests.Infrastructure
 
         public void Dispose()
         {
-            WebDavClient2.TestHttpMessageHandler = null;
         }
 
         /// <summary>Opens an existing element and asserts success.</summary>

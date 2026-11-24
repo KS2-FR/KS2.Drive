@@ -24,7 +24,6 @@
       <SetConfiguration>Configuration=$(Configuration)</SetConfiguration>
       <AdditionalProperties>SignManifests=false</AdditionalProperties>
     </ProjectReference>
-    <ProjectReference Include="..\..\WebDAVClient\WebDAVClient.csproj" />
   </ItemGroup>
 
   <ItemGroup>

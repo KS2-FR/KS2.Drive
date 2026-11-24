@@ -47,8 +47,6 @@
 
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray" Margin="0,60,0,0">Based on WinFSP by Bill Zissimopoulos :
                     <Hyperlink NavigateUri="http://www.secfs.net/winfsp" RequestNavigate="Hyperlink_RequestNavigate">http://www.secfs.net/winfsp</Hyperlink></Paragraph>
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">Based on the WebdavClient library by Sagui Itay:
-                    <Hyperlink NavigateUri="https://github.com/saguiitay/WebDAVClient" RequestNavigate="Hyperlink_RequestNavigate">https://github.com/saguiitay/WebDAVClient</Hyperlink></Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray">This software is under GPLV3.
                     <Hyperlink NavigateUri="https://github.com/FrKaram/KS2.Drive" RequestNavigate="Hyperlink_RequestNavigate">Source available on GitHub</Hyperlink></Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12">More information on KS² : 
