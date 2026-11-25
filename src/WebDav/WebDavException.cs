@@ -25,6 +25,8 @@ namespace KS2Drive.WebDav
             StatusCode = Info.GetInt32(nameof(StatusCode));
         }
 
+        #region Overrides
+
         public override void GetObjectData(SerializationInfo Info, StreamingContext Context)
         {
             base.GetObjectData(Info, Context);
@@ -32,5 +34,7 @@ namespace KS2Drive.WebDav
         }
 
         public override String ToString() => $"HTTP {StatusCode}: {base.ToString()}";
+
+        #endregion
     }
 }

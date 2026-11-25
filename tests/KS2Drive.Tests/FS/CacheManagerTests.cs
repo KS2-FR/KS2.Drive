@@ -37,117 +37,6 @@ namespace KS2Drive.Tests.FS
             if (Cm != null) WaitUntil(() => RunningRefreshCount(Cm) == 0);
         }
 
-        #region Helpers
-
-        private static FileNode MakeFile(String RepositoryPath, long Length = 3)
-        {
-            return new FileNode(new WebDavItem
-            {
-                Path = RepositoryPath,
-                DisplayName = RepositoryPath.Substring(RepositoryPath.LastIndexOf('/') + 1),
-                ETag = "\"etag\"",
-                ContentLength = Length,
-                IsCollection = false,
-                CreationDate = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                LastModified = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-            });
-        }
-
-        private static FileNode MakeFolder(String RepositoryPath)
-        {
-            return new FileNode(new WebDavItem
-            {
-                Path = RepositoryPath + "/",
-                DisplayName = RepositoryPath.Substring(RepositoryPath.LastIndexOf('/') + 1),
-                IsCollection = true
-            });
-        }
-
-        private static FileNode MakeRoot()
-        {
-            return new FileNode(new WebDavItem { Path = "/dav/", DisplayName = "", IsCollection = true });
-        }
-
-        private static bool IsDirectory(FileNode Node) => (Node.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0;
-
-        private FileNode Add(FileNode Node)
-        {
-            Cm.Lock();
-            try { return Cm.AddFileNodeNoLock(Node); }
-            finally { Cm.Unlock(); }
-        }
-
-        private FileNode Cached(String LocalPath)
-        {
-            Cm.Lock();
-            try { return Cm.GetFileNodeNoLock(LocalPath).node; }
-            finally { Cm.Unlock(); }
-        }
-
-        private static T GetPrivateField<T>(object Target, String Name)
-        {
-            return (T)Target.GetType().GetField(Name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Target);
-        }
-
-        private static object InvokePrivate(object Target, String Name, params object[] Args)
-        {
-            try
-            {
-                return Target.GetType().GetMethod(Name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(Target, Args);
-            }
-            catch (TargetInvocationException ex)
-            {
-                ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-                throw;
-            }
-        }
-
-        private static Dictionary<String, DateTime> MissingFileCache(CacheManager Cm) => GetPrivateField<Dictionary<String, DateTime>>(Cm, "MissingFileCache");
-
-        private static HashSet<String> RunningRefreshSet(CacheManager Cm) => GetPrivateField<HashSet<String>>(Cm, "RunningRefreshActionList");
-
-        private static int RunningRefreshCount(CacheManager Cm)
-        {
-            object LockObject = GetPrivateField<object>(Cm, "RunningRefreshActionListLock");
-            lock (LockObject) return RunningRefreshSet(Cm).Count;
-        }
-
-        private static object StaticCacheLock() => typeof(CacheManager).GetField("CacheLock", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
-
-        private List<Tuple<String, FileNode>> BuildListing(FileNode Folder, IEnumerable<Tuple<String, FileNode>> Children, String Marker)
-        {
-            return (List<Tuple<String, FileNode>>)InvokePrivate(Cm, "BuildDirectoryListing", Folder, Children, Marker);
-        }
-
-        private static bool WaitUntil(Func<bool> Condition, int TimeoutMs = 10000)
-        {
-            var Sw = Stopwatch.StartNew();
-            while (Sw.ElapsedMilliseconds < TimeoutMs)
-            {
-                if (Condition()) return true;
-                Thread.Sleep(20);
-            }
-            return Condition();
-        }
-
-        private static List<String> Names(List<Tuple<String, FileNode>> Listing) => Listing.Select(x => x.Item1).ToList();
-
-        private int CountRequests(String Request)
-        {
-            lock (Server.Requests) return Server.Requests.ToArray().Count(x => x == Request);
-        }
-
-        private void SetupFolderOnServer()
-        {
-            Server.AddFolder("/dav/folder");
-            Server.AddFile("/dav/folder/b.txt", "bbb");
-            Server.AddFile("/dav/folder/A.txt", "a");
-            Server.AddFolder("/dav/folder/sub");
-            Server.AddFile("/dav/folder/sub/deep.txt", "deep");
-        }
-
-        #endregion
-
         #region Constructor / GetFileNodeNoLock / AddFileNodeNoLock
 
         [TestMethod]
@@ -646,19 +535,6 @@ namespace KS2Drive.Tests.FS
         #endregion
 
         #region BuildDirectoryListing
-
-        private List<Tuple<String, FileNode>> SampleChildren(out FileNode Folder)
-        {
-            Folder = MakeFolder("/dav/folder");
-            return new List<Tuple<String, FileNode>>
-            {
-                new Tuple<String, FileNode>("c.txt", MakeFile("/dav/folder/c.txt")),
-                new Tuple<String, FileNode>("A.txt", MakeFile("/dav/folder/A.txt")),
-                new Tuple<String, FileNode>("b.txt", MakeFile("/dav/folder/b.txt")),
-                new Tuple<String, FileNode>(".", Folder),
-                new Tuple<String, FileNode>("..", Folder),
-            };
-        }
 
         [TestMethod]
         public void BuildDirectoryListing_SubFolder_DotEntriesFirstThenSortedChildren()
@@ -1269,6 +1145,130 @@ namespace KS2Drive.Tests.FS
             InvokePrivate(Cm, "RemoveRefreshTask", Folder);
 
             Assert.AreEqual(0, RunningRefreshCount(Cm));
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static FileNode MakeFile(String RepositoryPath, long Length = 3)
+        {
+            return new FileNode(new WebDavItem
+            {
+                Path = RepositoryPath,
+                DisplayName = RepositoryPath.Substring(RepositoryPath.LastIndexOf('/') + 1),
+                ETag = "\"etag\"",
+                ContentLength = Length,
+                IsCollection = false,
+                CreationDate = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                LastModified = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+        }
+
+        private static FileNode MakeFolder(String RepositoryPath)
+        {
+            return new FileNode(new WebDavItem
+            {
+                Path = RepositoryPath + "/",
+                DisplayName = RepositoryPath.Substring(RepositoryPath.LastIndexOf('/') + 1),
+                IsCollection = true
+            });
+        }
+
+        private static FileNode MakeRoot()
+        {
+            return new FileNode(new WebDavItem { Path = "/dav/", DisplayName = "", IsCollection = true });
+        }
+
+        private static bool IsDirectory(FileNode Node) => (Node.FileInfo.FileAttributes & (UInt32)System.IO.FileAttributes.Directory) != 0;
+
+        private FileNode Add(FileNode Node)
+        {
+            Cm.Lock();
+            try { return Cm.AddFileNodeNoLock(Node); }
+            finally { Cm.Unlock(); }
+        }
+
+        private FileNode Cached(String LocalPath)
+        {
+            Cm.Lock();
+            try { return Cm.GetFileNodeNoLock(LocalPath).node; }
+            finally { Cm.Unlock(); }
+        }
+
+        private static T GetPrivateField<T>(object Target, String Name)
+        {
+            return (T)Target.GetType().GetField(Name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Target);
+        }
+
+        private static object InvokePrivate(object Target, String Name, params object[] Args)
+        {
+            try
+            {
+                return Target.GetType().GetMethod(Name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(Target, Args);
+            }
+            catch (TargetInvocationException ex)
+            {
+                ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                throw;
+            }
+        }
+
+        private static Dictionary<String, DateTime> MissingFileCache(CacheManager Cm) => GetPrivateField<Dictionary<String, DateTime>>(Cm, "MissingFileCache");
+
+        private static HashSet<String> RunningRefreshSet(CacheManager Cm) => GetPrivateField<HashSet<String>>(Cm, "RunningRefreshActionList");
+
+        private static int RunningRefreshCount(CacheManager Cm)
+        {
+            object LockObject = GetPrivateField<object>(Cm, "RunningRefreshActionListLock");
+            lock (LockObject) return RunningRefreshSet(Cm).Count;
+        }
+
+        private static object StaticCacheLock() => typeof(CacheManager).GetField("CacheLock", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+
+        private List<Tuple<String, FileNode>> BuildListing(FileNode Folder, IEnumerable<Tuple<String, FileNode>> Children, String Marker)
+        {
+            return (List<Tuple<String, FileNode>>)InvokePrivate(Cm, "BuildDirectoryListing", Folder, Children, Marker);
+        }
+
+        private static bool WaitUntil(Func<bool> Condition, int TimeoutMs = 10000)
+        {
+            var Sw = Stopwatch.StartNew();
+            while (Sw.ElapsedMilliseconds < TimeoutMs)
+            {
+                if (Condition()) return true;
+                Thread.Sleep(20);
+            }
+            return Condition();
+        }
+
+        private static List<String> Names(List<Tuple<String, FileNode>> Listing) => Listing.Select(x => x.Item1).ToList();
+
+        private int CountRequests(String Request)
+        {
+            lock (Server.Requests) return Server.Requests.ToArray().Count(x => x == Request);
+        }
+
+        private void SetupFolderOnServer()
+        {
+            Server.AddFolder("/dav/folder");
+            Server.AddFile("/dav/folder/b.txt", "bbb");
+            Server.AddFile("/dav/folder/A.txt", "a");
+            Server.AddFolder("/dav/folder/sub");
+            Server.AddFile("/dav/folder/sub/deep.txt", "deep");
+        }
+
+        private List<Tuple<String, FileNode>> SampleChildren(out FileNode Folder)
+        {
+            Folder = MakeFolder("/dav/folder");
+            return new List<Tuple<String, FileNode>>
+            {
+                new Tuple<String, FileNode>("c.txt", MakeFile("/dav/folder/c.txt")),
+                new Tuple<String, FileNode>("A.txt", MakeFile("/dav/folder/A.txt")),
+                new Tuple<String, FileNode>("b.txt", MakeFile("/dav/folder/b.txt")),
+                new Tuple<String, FileNode>(".", Folder),
+                new Tuple<String, FileNode>("..", Folder),
+            };
         }
 
         #endregion

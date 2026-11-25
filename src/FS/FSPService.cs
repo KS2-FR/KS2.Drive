@@ -27,17 +27,17 @@ namespace KS2Drive
         public event EventHandler RepositoryAuthenticationFailed;
 
         /// <summary>
+        /// Unit tests only: when set, the mounted file system sends its requests to this handler (e.g. an in-memory server)
+        /// instead of the network. Always null in the application.
+        /// </summary>
+        internal System.Net.Http.HttpMessageHandler TestHttpMessageHandler { get; set; }
+
+        /// <summary>
         /// Creates the service, registered with WinFSP under the name "KS2DriveService".
         /// </summary>
         public FSPService() : base("KS2DriveService")
         {
         }
-
-        /// <summary>
-        /// Unit tests only: when set, the mounted file system sends its requests to this handler (e.g. an in-memory server)
-        /// instead of the network. Always null in the application.
-        /// </summary>
-        internal System.Net.Http.HttpMessageHandler TestHttpMessageHandler { get; set; }
 
         /// <summary>
         /// Creates the <see cref="DavFS"/> file system from the configuration and mounts it on the configured drive letter.
@@ -75,6 +75,23 @@ namespace KS2Drive
             DetachFileSystem();
         }
 
+        #region Overrides
+
+        /// <summary>
+        /// Called when the service stops: unmounts the file system if it is mounted.
+        /// </summary>
+        protected override void OnStop()
+        {
+            if (Host != null)
+            {
+                Unmount();
+            }
+        }
+
+        #endregion
+
+        #region Private methods
+
         /// <summary>
         /// Detaches the event handlers from the current <see cref="DavFS"/> instance and releases it.
         /// </summary>
@@ -102,15 +119,6 @@ namespace KS2Drive
             RepositoryAuthenticationFailed?.Invoke(sender, e);
         }
 
-        /// <summary>
-        /// Called when the service stops: unmounts the file system if it is mounted.
-        /// </summary>
-        protected override void OnStop()
-        {
-            if (Host != null)
-            {
-                Unmount();
-            }
-        }
+        #endregion
     }
 }

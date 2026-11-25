@@ -21,11 +21,6 @@ namespace KS2Drive.Tests.Core
             FileNode.Init(Library, WebDAVMode.WebDAV);
         }
 
-        private static Item FileItem(string Href, long? Length = 10, string ETag = "\"etag\"")
-        {
-            return new WebDavItem { Path = Href, DisplayName = "name", ContentLength = Length, ETag = ETag };
-        }
-
         #region Init / constructor
 
         [TestMethod]
@@ -327,19 +322,6 @@ namespace KS2Drive.Tests.Core
 
         #region Local copy
 
-        private static FileNode NodeWithData(byte[] Data, ulong FileSize)
-        {
-            var Node = new FileNode(FileItem("/dav/copy.bin", (long)FileSize));
-            Node.FileData = Data;
-            Node.FileInfo.FileSize = FileSize;
-            return Node;
-        }
-
-        private static void DeleteIfExists(string Path)
-        {
-            if (!String.IsNullOrEmpty(Path) && File.Exists(Path)) File.Delete(Path);
-        }
-
         [TestMethod]
         public void GenerateLocalCopy_WritesOnlyFileSizeBytes()
         {
@@ -495,6 +477,28 @@ namespace KS2Drive.Tests.Core
             {
                 DeleteIfExists(Path);
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static Item FileItem(string Href, long? Length = 10, string ETag = "\"etag\"")
+        {
+            return new WebDavItem { Path = Href, DisplayName = "name", ContentLength = Length, ETag = ETag };
+        }
+
+        private static FileNode NodeWithData(byte[] Data, ulong FileSize)
+        {
+            var Node = new FileNode(FileItem("/dav/copy.bin", (long)FileSize));
+            Node.FileData = Data;
+            Node.FileInfo.FileSize = FileSize;
+            return Node;
+        }
+
+        private static void DeleteIfExists(string Path)
+        {
+            if (!String.IsNullOrEmpty(Path) && File.Exists(Path)) File.Delete(Path);
         }
 
         #endregion

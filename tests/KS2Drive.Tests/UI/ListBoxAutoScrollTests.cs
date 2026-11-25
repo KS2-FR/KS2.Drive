@@ -23,6 +23,10 @@ namespace KS2Drive.Tests.UI
             public ListView List;
             public ObservableCollection<String> Items = new ObservableCollection<String>(Enumerable.Range(0, 200).Select(i => $"event {i}"));
 
+            public ScrollViewer Viewer => FindScrollViewer(List);
+
+            public bool IsAtEnd => Viewer.VerticalOffset >= Viewer.ScrollableHeight - 1;
+
             public Harness()
             {
                 List = new ListView { Height = 150 };
@@ -32,10 +36,6 @@ namespace KS2Drive.Tests.UI
                 Window.Show();
                 Flush();
             }
-
-            public ScrollViewer Viewer => FindScrollViewer(List);
-
-            public bool IsAtEnd => Viewer.VerticalOffset >= Viewer.ScrollableHeight - 1;
 
             /// <summary>Processes the pending dispatcher work (layout and background scroll requests).</summary>
             public void Flush()
@@ -49,6 +49,8 @@ namespace KS2Drive.Tests.UI
 
             public void Close() => Window.Close();
 
+            #region Private methods
+
             private static ScrollViewer FindScrollViewer(DependencyObject Parent)
             {
                 for (int i = 0; i < VisualTreeHelper.GetChildrenCount(Parent); i++)
@@ -60,6 +62,8 @@ namespace KS2Drive.Tests.UI
                 }
                 return null;
             }
+
+            #endregion
         }
 
         [TestMethod]

@@ -152,6 +152,21 @@ namespace KS2Drive
             }
         }
 
+        #region Overrides
+
+        /// <summary>
+        /// Hides the window when it is minimized (the application lives in the notification area).
+        /// </summary>
+        protected override void OnStateChanged(EventArgs e)
+        {
+            if (WindowState == System.Windows.WindowState.Minimized) this.Hide();
+            base.OnStateChanged(e);
+        }
+
+        #endregion
+
+        #region Private methods
+
         /// <summary>
         /// Mounts the drive with the current configuration, updates the tray menu (Mount becomes Unmount,
         /// Configure is disabled), clears the log and opens the drive in Explorer. Shows an error on failure.
@@ -211,15 +226,6 @@ namespace KS2Drive
         }
 
         /// <summary>
-        /// Hides the window when it is minimized (the application lives in the notification area).
-        /// </summary>
-        protected override void OnStateChanged(EventArgs e)
-        {
-            if (WindowState == System.Windows.WindowState.Minimized) this.Hide();
-            base.OnStateChanged(e);
-        }
-
-        /// <summary>
         /// Removes the tray icon, stops the WinFSP service and shuts down the application.
         /// </summary>
         private void QuitApp()
@@ -232,8 +238,6 @@ namespace KS2Drive
             Service?.Stop();
             Application.Current.Shutdown();
         }
-
-        #region Menu actions
 
         /// <summary>
         /// Toggles the drive between mounted and unmounted.
@@ -278,10 +282,6 @@ namespace KS2Drive
             About.About A = new About.About();
             A.ShowDialog();
         }
-
-        #endregion
-
-        #region Log actions
 
         /// <summary>
         /// Clears all log entries.

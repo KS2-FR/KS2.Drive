@@ -32,15 +32,6 @@ namespace KS2Drive.Tests.WebDav
             Client = TestClients.For(Recorder);
         }
 
-        /// <summary>A client whose responses are built by the given function (requests still recorded in <see cref="Recorder"/>).</summary>
-        private WebDavClient Scripted(Func<HttpRequestMessage, HttpResponseMessage> Respond)
-        {
-            Recorder = new RecordingHandler { Respond = Respond };
-            return TestClients.For(Recorder);
-        }
-
-        private static bool IsCollectionUrl(HttpRequestMessage Request) => Request.RequestUri.AbsolutePath.EndsWith("/");
-
         #region PropFind
 
         [TestMethod]
@@ -725,18 +716,6 @@ namespace KS2Drive.Tests.WebDav
 
         #region Errors common to every operation
 
-        private IEnumerable<KeyValuePair<String, Func<Task>>> EveryOperation()
-        {
-            yield return new KeyValuePair<String, Func<Task>>("PropFind", () => Client.PropFind("/dav/a.txt", 0, false));
-            yield return new KeyValuePair<String, Func<Task>>("GetItem", () => Client.GetItem("/dav/a.txt"));
-            yield return new KeyValuePair<String, Func<Task>>("Exists", () => Client.Exists("/dav/a.txt"));
-            yield return new KeyValuePair<String, Func<Task>>("Get", () => Client.Get("/dav/a.txt"));
-            yield return new KeyValuePair<String, Func<Task>>("Put", () => Client.Put("/dav/b.txt", TestClients.Text("x"), false));
-            yield return new KeyValuePair<String, Func<Task>>("Delete", () => Client.Delete("/dav/a.txt", false));
-            yield return new KeyValuePair<String, Func<Task>>("MkCol", () => Client.MkCol("/dav/folder"));
-            yield return new KeyValuePair<String, Func<Task>>("Move", () => Client.Move("/dav/a.txt", "/dav/c.txt", false, null));
-        }
-
         [TestMethod]
         public async Task EveryOperation_CredentialsRejected_Throws401()
         {
@@ -775,6 +754,31 @@ namespace KS2Drive.Tests.WebDav
                     Assert.Fail($"{Operation.Key}: expected HttpRequestException, got {ex.GetType().Name}: {ex.Message}");
                 }
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        /// <summary>A client whose responses are built by the given function (requests still recorded in <see cref="Recorder"/>).</summary>
+        private WebDavClient Scripted(Func<HttpRequestMessage, HttpResponseMessage> Respond)
+        {
+            Recorder = new RecordingHandler { Respond = Respond };
+            return TestClients.For(Recorder);
+        }
+
+        private static bool IsCollectionUrl(HttpRequestMessage Request) => Request.RequestUri.AbsolutePath.EndsWith("/");
+
+        private IEnumerable<KeyValuePair<String, Func<Task>>> EveryOperation()
+        {
+            yield return new KeyValuePair<String, Func<Task>>("PropFind", () => Client.PropFind("/dav/a.txt", 0, false));
+            yield return new KeyValuePair<String, Func<Task>>("GetItem", () => Client.GetItem("/dav/a.txt"));
+            yield return new KeyValuePair<String, Func<Task>>("Exists", () => Client.Exists("/dav/a.txt"));
+            yield return new KeyValuePair<String, Func<Task>>("Get", () => Client.Get("/dav/a.txt"));
+            yield return new KeyValuePair<String, Func<Task>>("Put", () => Client.Put("/dav/b.txt", TestClients.Text("x"), false));
+            yield return new KeyValuePair<String, Func<Task>>("Delete", () => Client.Delete("/dav/a.txt", false));
+            yield return new KeyValuePair<String, Func<Task>>("MkCol", () => Client.MkCol("/dav/folder"));
+            yield return new KeyValuePair<String, Func<Task>>("Move", () => Client.Move("/dav/a.txt", "/dav/c.txt", false, null));
         }
 
         #endregion

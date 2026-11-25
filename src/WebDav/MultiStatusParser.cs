@@ -72,6 +72,8 @@ namespace KS2Drive.WebDav
             return Uri.UnescapeDataString(Escaped);
         }
 
+        #region Private methods
+
         private static bool Is(XElement Element, String LocalName) => String.Equals(Element.Name.LocalName, LocalName, StringComparison.OrdinalIgnoreCase);
 
         private static void ReadProperty(WebDavItem Item, XElement Prop)
@@ -119,5 +121,7 @@ namespace KS2Drive.WebDav
             if (DateTimeOffset.TryParse(Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset Parsed)) return Parsed.UtcDateTime;
             return null;
         }
+
+        #endregion
     }
 }

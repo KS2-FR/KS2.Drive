@@ -23,6 +23,8 @@ namespace KS2Drive.Tests.Infrastructure
         public List<LogListItem> Log { get; } = new List<LogListItem>();
         public int AuthenticationFailures { get; private set; }
 
+        public const UInt32 ModifiedFlags = 16 | 64; //CleanupSetArchiveBit | CleanupSetLastWriteTime
+
         private DavFsContext(FakeWebDavServer Server, Configuration Config)
         {
             this.Server = Server;
@@ -151,7 +153,5 @@ namespace KS2Drive.Tests.Infrastructure
             Fs.Cleanup(Node, null, FileName, Flags);
             Fs.Close(Node, null);
         }
-
-        public const UInt32 ModifiedFlags = 16 | 64; //CleanupSetArchiveBit | CleanupSetLastWriteTime
     }
 }

@@ -16,16 +16,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSReadWriteTests
     {
-        private static DavFsContext CreateContext(FlushMode Flush = FlushMode.FlushAtCleanup)
-        {
-            return DavFsContext.Create(s =>
-            {
-                s.AddFile("/dav/a.txt", "abcdef");
-                s.AddFile("/dav/empty.txt", "");
-                s.AddFolder("/dav/folder");
-            }, Flush);
-        }
-
         #region Read
 
         [TestMethod]
@@ -409,7 +399,17 @@ namespace KS2Drive.Tests.FS
 
         #endregion
 
-        #region Write (FlushAtWrite)
+        #region Private methods
+
+        private static DavFsContext CreateContext(FlushMode Flush = FlushMode.FlushAtCleanup)
+        {
+            return DavFsContext.Create(s =>
+            {
+                s.AddFile("/dav/a.txt", "abcdef");
+                s.AddFile("/dav/empty.txt", "");
+                s.AddFolder("/dav/folder");
+            }, Flush);
+        }
 
         #endregion
     }

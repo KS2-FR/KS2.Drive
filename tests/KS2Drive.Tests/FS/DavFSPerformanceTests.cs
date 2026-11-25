@@ -17,20 +17,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSPerformanceTests
     {
-        private static Int32 GetSecurityByName(DavFsContext Ctx, String FileName)
-        {
-            Byte[] Descriptor = null;
-            return Ctx.Fs.GetSecurityByName(FileName, out UInt32 Attributes, ref Descriptor);
-        }
-
-        private static DavFsContext CreateListedContext()
-        {
-            var Ctx = DavFsContext.Create(s => { s.AddFile("/dav/doc.docx", "content"); s.AddFolder("/dav/sub"); });
-            Ctx.List(Ctx.Open("\\")); //Explorer shows the folder: its listing is cached
-            Ctx.Server.Requests.Clear();
-            return Ctx;
-        }
-
         #region (1) Names absent from a fresh folder listing
 
         [TestMethod]
@@ -126,14 +112,6 @@ namespace KS2Drive.Tests.FS
         #endregion
 
         #region (3) Content of a closed file reused by a new open
-
-        private static FileNode ReadAndClose(DavFsContext Ctx, String FileName)
-        {
-            var Node = Ctx.Open(FileName);
-            Ctx.ReadAll(Node);
-            Ctx.CleanupAndClose(Node, FileName);
-            return Node;
-        }
 
         [TestMethod]
         public void ReopenRightAfterClose_DoesNotDownloadAgain()
@@ -297,6 +275,32 @@ namespace KS2Drive.Tests.FS
 
                 Assert.AreEqual("content", Ctx.Server.GetText("/dav/new.docx"));
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static Int32 GetSecurityByName(DavFsContext Ctx, String FileName)
+        {
+            Byte[] Descriptor = null;
+            return Ctx.Fs.GetSecurityByName(FileName, out UInt32 Attributes, ref Descriptor);
+        }
+
+        private static DavFsContext CreateListedContext()
+        {
+            var Ctx = DavFsContext.Create(s => { s.AddFile("/dav/doc.docx", "content"); s.AddFolder("/dav/sub"); });
+            Ctx.List(Ctx.Open("\\")); //Explorer shows the folder: its listing is cached
+            Ctx.Server.Requests.Clear();
+            return Ctx;
+        }
+
+        private static FileNode ReadAndClose(DavFsContext Ctx, String FileName)
+        {
+            var Node = Ctx.Open(FileName);
+            Ctx.ReadAll(Node);
+            Ctx.CleanupAndClose(Node, FileName);
+            return Node;
         }
 
         #endregion

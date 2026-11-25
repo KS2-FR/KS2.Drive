@@ -14,11 +14,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSFileSizeAndInfoTests
     {
-        private static DavFsContext CreateContext()
-        {
-            return DavFsContext.Create(s => s.AddFile("/dav/a.txt", "abcdef"));
-        }
-
         #region SetFileSize
 
         [TestMethod]
@@ -268,6 +263,15 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual(Before.CreationTime, Info.CreationTime);
                 Assert.AreEqual(Before.ChangeTime, Info.ChangeTime);
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static DavFsContext CreateContext()
+        {
+            return DavFsContext.Create(s => s.AddFile("/dav/a.txt", "abcdef"));
         }
 
         #endregion

@@ -88,16 +88,30 @@ namespace KS2Drive.FS
         private static bool _IsInited = false;
 
         /// <summary>
-        /// Sets the static parameters shared by all nodes. Must be called before any FileNode is created.
+        /// Size and last write time of the file on the server when <see cref="FileData"/> was downloaded or last uploaded.
+        /// If a later refresh of the folder reports other values, the file changed on the server and the content kept in
+        /// memory is obsolete.
         /// </summary>
-        /// <param name="DocumentLibraryPath">Decoded server-side path of the mounted library (e.g. "/alfresco/webdav/My Site"); it maps to the drive root.</param>
-        /// <param name="webDavMode">Server type (no longer used to detect folders: the resourcetype property is).</param>
-        public static void Init(String DocumentLibraryPath, WebDAVMode webDavMode)
-        {
-            FileNode._DocumentLibraryPath = DocumentLibraryPath;
-            FileNode._WebDAVMode = webDavMode;
-            FileNode._IsInited = true;
-        }
+        internal UInt64 ContentServerFileSize;
+        internal UInt64 ContentServerLastWriteTime;
+
+        /// <summary>
+        /// When the last handle was closed while the content was kept in memory (see <see cref="CanReuseContent"/>).
+        /// </summary>
+        internal DateTime ContentRetainedAt;
+
+        /// <summary>
+        /// When the content of this node was last uploaded successfully (creation included). Used to skip a Flush that comes
+        /// right after an upload: the pending changes are uploaded by the following Flush, Cleanup or Close.
+        /// </summary>
+        internal DateTime LastUploadAt;
+
+        /// <summary>
+        /// True for a file created on the drive and not uploaded yet: it does not exist on the server until its first upload
+        /// (Flush, Cleanup or Close). Creating it on the server right away with an empty content created an empty version in the
+        /// repository, could trigger server rules on an empty file, and showed an empty file to other users.
+        /// </summary>
+        internal bool IsNewOnServer;
 
         /// <summary>
         /// Builds a node from a WebDAV item: computes its repository and local paths, detects whether it is a folder,
@@ -132,6 +146,18 @@ namespace KS2Drive.FS
             this.FileInfo.FileSize = WebDavObject.ContentLength.HasValue ? (UInt64)WebDavObject.ContentLength.Value : 0;
             //CFN.FileInfo.IndexNumber = CFN.GetIndex(); //TEMP
             this.FileSecurity = GetDefaultSecurity();
+        }
+
+        /// <summary>
+        /// Sets the static parameters shared by all nodes. Must be called before any FileNode is created.
+        /// </summary>
+        /// <param name="DocumentLibraryPath">Decoded server-side path of the mounted library (e.g. "/alfresco/webdav/My Site"); it maps to the drive root.</param>
+        /// <param name="webDavMode">Server type (no longer used to detect folders: the resourcetype property is).</param>
+        public static void Init(String DocumentLibraryPath, WebDAVMode webDavMode)
+        {
+            FileNode._DocumentLibraryPath = DocumentLibraryPath;
+            FileNode._WebDAVMode = webDavMode;
+            FileNode._IsInited = true;
         }
 
         /// <summary>
@@ -255,32 +281,6 @@ namespace KS2Drive.FS
             if (DocumentPath.Length < _DocumentLibraryPath.Length) return null;
             return DocumentPath.Substring(0, DocumentPath.LastIndexOf('/'));
         }
-
-        /// <summary>
-        /// Size and last write time of the file on the server when <see cref="FileData"/> was downloaded or last uploaded.
-        /// If a later refresh of the folder reports other values, the file changed on the server and the content kept in
-        /// memory is obsolete.
-        /// </summary>
-        internal UInt64 ContentServerFileSize;
-        internal UInt64 ContentServerLastWriteTime;
-
-        /// <summary>
-        /// When the last handle was closed while the content was kept in memory (see <see cref="CanReuseContent"/>).
-        /// </summary>
-        internal DateTime ContentRetainedAt;
-
-        /// <summary>
-        /// When the content of this node was last uploaded successfully (creation included). Used to skip a Flush that comes
-        /// right after an upload: the pending changes are uploaded by the following Flush, Cleanup or Close.
-        /// </summary>
-        internal DateTime LastUploadAt;
-
-        /// <summary>
-        /// True for a file created on the drive and not uploaded yet: it does not exist on the server until its first upload
-        /// (Flush, Cleanup or Close). Creating it on the server right away with an empty content created an empty version in the
-        /// repository, could trigger server rules on an empty file, and showed an empty file to other users.
-        /// </summary>
-        internal bool IsNewOnServer;
 
         /// <summary>
         /// Records that <see cref="FileData"/> is identical to the file on the server (just downloaded or uploaded).

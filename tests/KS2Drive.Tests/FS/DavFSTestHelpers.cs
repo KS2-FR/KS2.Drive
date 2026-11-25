@@ -124,6 +124,8 @@ namespace KS2Drive.Tests.FS
         private readonly LoggingConfiguration Previous;
         private readonly MemoryTarget Target;
 
+        public List<String> Messages => Target.Logs.ToList();
+
         public NLogCapture()
         {
             Previous = LogManager.Configuration;
@@ -133,8 +135,6 @@ namespace KS2Drive.Tests.FS
             Config.LoggingRules.Add(new LoggingRule("*", LogLevel.Trace, Target));
             LogManager.Configuration = Config;
         }
-
-        public List<String> Messages => Target.Logs.ToList();
 
         public void Dispose()
         {

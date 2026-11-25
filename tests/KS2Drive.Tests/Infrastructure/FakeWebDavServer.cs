@@ -23,15 +23,6 @@ namespace KS2Drive.Tests.Infrastructure
         public const String LibraryPath = "/dav";
         public static String LibraryUrl => ServerUrl + LibraryPath;
 
-        private class Entry
-        {
-            public bool IsFolder;
-            public byte[] Content = new byte[0];
-            public DateTime Created = new DateTime(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
-            public DateTime Modified = new DateTime(2021, 6, 7, 8, 9, 10, DateTimeKind.Utc);
-            public String ETag = Guid.NewGuid().ToString("N");
-        }
-
         private readonly object Lock = new object();
         private readonly Dictionary<String, Entry> Entries = new Dictionary<String, Entry>(StringComparer.OrdinalIgnoreCase);
 
@@ -67,6 +58,15 @@ namespace KS2Drive.Tests.Infrastructure
         public FakeWebDavServer()
         {
             AddFolder(LibraryPath);
+        }
+
+        private class Entry
+        {
+            public bool IsFolder;
+            public byte[] Content = new byte[0];
+            public DateTime Created = new DateTime(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+            public DateTime Modified = new DateTime(2021, 6, 7, 8, 9, 10, DateTimeKind.Utc);
+            public String ETag = Guid.NewGuid().ToString("N");
         }
 
         public void AddFolder(String Path)
@@ -114,24 +114,7 @@ namespace KS2Drive.Tests.Infrastructure
 
         public int CountRequests(String Method) => Requests.Count(x => x.StartsWith(Method + " ", StringComparison.Ordinal));
 
-        private static String Normalize(String Path)
-        {
-            String Decoded = Uri.UnescapeDataString(Path);
-            if (Decoded.Length > 1) Decoded = Decoded.TrimEnd('/');
-            if (!Decoded.StartsWith("/")) Decoded = "/" + Decoded;
-            return Decoded;
-        }
-
-        private static String ParentOf(String Path)
-        {
-            int Index = Path.LastIndexOf('/');
-            return Index <= 0 ? "/" : Path.Substring(0, Index);
-        }
-
-        private static String Escape(String Path)
-        {
-            return String.Join("/", Path.Split('/').Select(Uri.EscapeDataString));
-        }
+        #region Overrides
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage Request, CancellationToken CancellationToken)
         {
@@ -167,6 +150,29 @@ namespace KS2Drive.Tests.Infrastructure
                     default: return new HttpResponseMessage(HttpStatusCode.MethodNotAllowed);
                 }
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static String Normalize(String Path)
+        {
+            String Decoded = Uri.UnescapeDataString(Path);
+            if (Decoded.Length > 1) Decoded = Decoded.TrimEnd('/');
+            if (!Decoded.StartsWith("/")) Decoded = "/" + Decoded;
+            return Decoded;
+        }
+
+        private static String ParentOf(String Path)
+        {
+            int Index = Path.LastIndexOf('/');
+            return Index <= 0 ? "/" : Path.Substring(0, Index);
+        }
+
+        private static String Escape(String Path)
+        {
+            return String.Join("/", Path.Split('/').Select(Uri.EscapeDataString));
         }
 
         private HttpResponseMessage PropFind(String Path, bool AsFolder, HttpRequestMessage Request)
@@ -261,5 +267,7 @@ namespace KS2Drive.Tests.Infrastructure
             }
             return new HttpResponseMessage(HttpStatusCode.Created);
         }
+
+        #endregion
     }
 }

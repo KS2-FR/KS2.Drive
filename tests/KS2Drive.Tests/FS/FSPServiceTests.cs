@@ -17,56 +17,7 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class FSPServiceTests
     {
-        #region Helpers
-
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
-
-        private static object GetPrivateField(FSPService Service, String Name) => typeof(FSPService).GetField(Name, PrivateInstance).GetValue(Service);
-
-        private static void SetPrivateField(FSPService Service, String Name, object Value) => typeof(FSPService).GetField(Name, PrivateInstance).SetValue(Service, Value);
-
-        private static void InvokePrivate(FSPService Service, String Name, params object[] Args)
-        {
-            try
-            {
-                typeof(FSPService).GetMethod(Name, PrivateInstance).Invoke(Service, Args);
-            }
-            catch (TargetInvocationException ex)
-            {
-                ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-                throw;
-            }
-        }
-
-        /// <summary>Attaches the DavFS to the service the way Mount does, without creating the WinFSP host.</summary>
-        private static void AttachLikeMount(FSPService Service, DavFS Fs)
-        {
-            SetPrivateField(Service, "davFs", Fs);
-            Fs.RepositoryActionPerformed += (EventHandler<LogListItem>)Delegate.CreateDelegate(typeof(EventHandler<LogListItem>), Service, typeof(FSPService).GetMethod("DavFs_RepositoryActionPerformed", PrivateInstance));
-            Fs.RepositoryAuthenticationFailed += (EventHandler)Delegate.CreateDelegate(typeof(EventHandler), Service, typeof(FSPService).GetMethod("DavFs_RepositoryAuthenticationFailed", PrivateInstance));
-        }
-
-        /// <summary>Raises a DavFS event through its backing delegate field.</summary>
-        private static void RaiseDavFsEvent(DavFS Fs, String EventName, object Args)
-        {
-            var Handler = (Delegate)typeof(DavFS).GetField(EventName, PrivateInstance).GetValue(Fs);
-            Handler?.DynamicInvoke(Fs, Args);
-        }
-
-        private static Exception CatchException(Action Action)
-        {
-            try
-            {
-                Action();
-                return null;
-            }
-            catch (Exception ex)
-            {
-                return ex;
-            }
-        }
-
-        #endregion
 
         [TestMethod]
         public void Constructor_CreatesAnUnmountedService()
@@ -218,5 +169,54 @@ namespace KS2Drive.Tests.FS
             InvokePrivate(Service, "DetachFileSystem");
             Assert.IsNull(GetPrivateField(Service, "davFs"));
         }
+
+        #region Private methods
+
+        private static object GetPrivateField(FSPService Service, String Name) => typeof(FSPService).GetField(Name, PrivateInstance).GetValue(Service);
+
+        private static void SetPrivateField(FSPService Service, String Name, object Value) => typeof(FSPService).GetField(Name, PrivateInstance).SetValue(Service, Value);
+
+        private static void InvokePrivate(FSPService Service, String Name, params object[] Args)
+        {
+            try
+            {
+                typeof(FSPService).GetMethod(Name, PrivateInstance).Invoke(Service, Args);
+            }
+            catch (TargetInvocationException ex)
+            {
+                ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                throw;
+            }
+        }
+
+        /// <summary>Attaches the DavFS to the service the way Mount does, without creating the WinFSP host.</summary>
+        private static void AttachLikeMount(FSPService Service, DavFS Fs)
+        {
+            SetPrivateField(Service, "davFs", Fs);
+            Fs.RepositoryActionPerformed += (EventHandler<LogListItem>)Delegate.CreateDelegate(typeof(EventHandler<LogListItem>), Service, typeof(FSPService).GetMethod("DavFs_RepositoryActionPerformed", PrivateInstance));
+            Fs.RepositoryAuthenticationFailed += (EventHandler)Delegate.CreateDelegate(typeof(EventHandler), Service, typeof(FSPService).GetMethod("DavFs_RepositoryAuthenticationFailed", PrivateInstance));
+        }
+
+        /// <summary>Raises a DavFS event through its backing delegate field.</summary>
+        private static void RaiseDavFsEvent(DavFS Fs, String EventName, object Args)
+        {
+            var Handler = (Delegate)typeof(DavFS).GetField(EventName, PrivateInstance).GetValue(Fs);
+            Handler?.DynamicInvoke(Fs, Args);
+        }
+
+        private static Exception CatchException(Action Action)
+        {
+            try
+            {
+                Action();
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
+        }
+
+        #endregion
     }
 }

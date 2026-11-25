@@ -19,70 +19,6 @@ namespace KS2Drive.Config
         public String Path;
 
         /// <summary>
-        /// Loads and decrypts the configuration file. A configuration saved in the legacy format of previous releases is
-        /// migrated to the current format. If the file does not exist or cannot be read/decrypted/parsed, returns a default
-        /// configuration with <see cref="IsConfigured"/> set to false; an unreadable file is first kept aside as
-        /// <c>config.json.unreadable</c> so that the next save does not destroy it.
-        /// </summary>
-        /// <param name="ConfigurationFilePath">Path of the encrypted configuration file.</param>
-        public static Configuration Load(String ConfigurationFilePath)
-        {
-            if (File.Exists(ConfigurationFilePath))
-            {
-                try
-                {
-                    var C = JsonConvert.DeserializeObject<Configuration>(Tools.Unprotect(File.ReadAllText(ConfigurationFilePath), out bool IsLegacyFormat));
-                    C.Path = ConfigurationFilePath;
-
-                    //AOS is no longer offered (the server type cannot be chosen in the configuration window any more):
-                    //a configuration saved in AOS mode switches to standard WebDAV (KS2Drive.FS.WebDAVMode.WebDAV = 0)
-                    C.ServerType = 0;
-                    //FlushAtWrite (0) is no longer offered: it uploaded the whole file after every write (KS2Drive.FS.FlushMode.FlushAtCleanup = 1)
-                    C.FlushMode = 1;
-
-                    if (IsLegacyFormat)
-                    {
-                        //Encrypt it again in the current format, which does not depend on the application version
-                        try
-                        {
-                            C.Save();
-                        }
-                        catch
-                        {
-                            //Not blocking: the configuration has been loaded, the migration will be done at the next save
-                        }
-                    }
-
-                    return C;
-                }
-                catch
-                {
-                    try
-                    {
-                        File.Copy(ConfigurationFilePath, ConfigurationFilePath + ".unreadable", true);
-                    }
-                    catch
-                    {
-                        //Not blocking
-                    }
-                    return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, Path = ConfigurationFilePath };
-                }
-            }
-            else
-            {
-                return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, Path = ConfigurationFilePath };
-            }
-        }
-
-        /// <summary>
-        /// Serializes the configuration to JSON, encrypts it and writes it to <see cref="Path"/>.
-        /// </summary>
-        public void Save()
-        {
-            File.WriteAllText(Path, Tools.Protect(JsonConvert.SerializeObject(this)));
-        }
-
-        /// <summary>
         /// False when no valid configuration file could be loaded. Not persisted.
         /// </summary>
         [JsonIgnore]
@@ -180,5 +116,69 @@ namespace KS2Drive.Config
         /// Serial number of the client certificate.
         /// </summary>
         public String CertSerial { get; set; }
+
+        /// <summary>
+        /// Loads and decrypts the configuration file. A configuration saved in the legacy format of previous releases is
+        /// migrated to the current format. If the file does not exist or cannot be read/decrypted/parsed, returns a default
+        /// configuration with <see cref="IsConfigured"/> set to false; an unreadable file is first kept aside as
+        /// <c>config.json.unreadable</c> so that the next save does not destroy it.
+        /// </summary>
+        /// <param name="ConfigurationFilePath">Path of the encrypted configuration file.</param>
+        public static Configuration Load(String ConfigurationFilePath)
+        {
+            if (File.Exists(ConfigurationFilePath))
+            {
+                try
+                {
+                    var C = JsonConvert.DeserializeObject<Configuration>(Tools.Unprotect(File.ReadAllText(ConfigurationFilePath), out bool IsLegacyFormat));
+                    C.Path = ConfigurationFilePath;
+
+                    //AOS is no longer offered (the server type cannot be chosen in the configuration window any more):
+                    //a configuration saved in AOS mode switches to standard WebDAV (KS2Drive.FS.WebDAVMode.WebDAV = 0)
+                    C.ServerType = 0;
+                    //FlushAtWrite (0) is no longer offered: it uploaded the whole file after every write (KS2Drive.FS.FlushMode.FlushAtCleanup = 1)
+                    C.FlushMode = 1;
+
+                    if (IsLegacyFormat)
+                    {
+                        //Encrypt it again in the current format, which does not depend on the application version
+                        try
+                        {
+                            C.Save();
+                        }
+                        catch
+                        {
+                            //Not blocking: the configuration has been loaded, the migration will be done at the next save
+                        }
+                    }
+
+                    return C;
+                }
+                catch
+                {
+                    try
+                    {
+                        File.Copy(ConfigurationFilePath, ConfigurationFilePath + ".unreadable", true);
+                    }
+                    catch
+                    {
+                        //Not blocking
+                    }
+                    return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, Path = ConfigurationFilePath };
+                }
+            }
+            else
+            {
+                return new Configuration() { IsConfigured = false, HTTPProxyMode = 0, Path = ConfigurationFilePath };
+            }
+        }
+
+        /// <summary>
+        /// Serializes the configuration to JSON, encrypts it and writes it to <see cref="Path"/>.
+        /// </summary>
+        public void Save()
+        {
+            File.WriteAllText(Path, Tools.Protect(JsonConvert.SerializeObject(this)));
+        }
     }
 }

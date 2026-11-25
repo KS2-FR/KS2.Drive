@@ -58,8 +58,8 @@ namespace KS2Drive.FS
 
         private CacheManager Cache;
 
-        private const UInt16 MEMFS_SECTOR_SIZE = 4096;
-        private const UInt16 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
+        private const UInt16 DAVFS_SECTOR_SIZE = 4096;
+        private const UInt16 DAVFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
         /// <summary>
         /// Maximum number of simultaneous HTTP connections to the WebDAV server (.NET Framework allows only 2 by default: Office
@@ -76,6 +76,29 @@ namespace KS2Drive.FS
         /// WebDAV client of this mount.
         /// </summary>
         internal readonly WebDavClient Client;
+
+        /// <summary>
+        /// How long the content of a closed file is kept in memory to be reused by a new open (Word, for instance, reopens the
+        /// same document several times while saving it: each reopen used to download it again).
+        /// </summary>
+        private const Int32 ClosedContentMaxAgeInSeconds = 15;
+
+        /// <summary>
+        /// A Flush coming less than this delay after the last successful upload of the file does not upload it again (see <see cref="Flush"/>).
+        /// </summary>
+        private const Int32 FlushMinimumIntervalInMilliseconds = 1000;
+
+        /// <summary>
+        /// Maximum memory used by the contents kept after their file was closed; the oldest are released first.
+        /// </summary>
+        private const Int64 ClosedContentMaxTotalBytes = 64L * 1024 * 1024;
+
+        private readonly object RetainedContentsLock = new object();
+
+        /// <summary>
+        /// Closed nodes whose content is kept in memory, oldest first.
+        /// </summary>
+        private readonly List<FileNode> RetainedContents = new List<FileNode>();
 
         /// <summary>
         /// Creates the file system from the user configuration (see <see cref="DavFS(Configuration, HttpMessageHandler)"/>).
@@ -146,6 +169,8 @@ namespace KS2Drive.FS
             }
         }
 
+        #region Overrides
+
         /// <summary>
         /// WinFSP callback invoked before mounting: sets the general parameters of the file system on the host
         /// (kernel FileInfo cache timeout, optional network-drive prefix, sector size, case-insensitive search,
@@ -160,8 +185,8 @@ namespace KS2Drive.FS
             Host.FileInfoTimeout = unchecked((UInt32)(Int32)(this.kernelCacheMode));
             Host.FileSystemName = "davFS";
             if (MountAsNetworkDrive) Host.Prefix = $@"\{this.DAVServeurAuthority}\dav"; //mount as network drive
-            Host.SectorSize = DavFS.MEMFS_SECTOR_SIZE;
-            Host.SectorsPerAllocationUnit = DavFS.MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+            Host.SectorSize = DavFS.DAVFS_SECTOR_SIZE;
+            Host.SectorsPerAllocationUnit = DavFS.DAVFS_SECTORS_PER_ALLOCATION_UNIT;
             Host.VolumeCreationTime = (UInt64)DateTime.Now.ToFileTimeUtc();
             Host.VolumeSerialNumber = (UInt32)(Host.VolumeCreationTime / (10000 * 1000));
             Host.CaseSensitiveSearch = false;
@@ -243,212 +268,6 @@ namespace KS2Drive.FS
             if (null != SecurityDescriptor) SecurityDescriptor = Lookup.Node.FileSecurity;
             TraceEnd(OperationId, Lookup.Node, $"STATUS_SUCCESS - {Lookup.Detail}");
             return STATUS_SUCCESS;
-        }
-
-        /// <summary>
-        /// Finds the node of a local path: from the cache, or else from the server (then cached). Elements that do not exist
-        /// on the server are remembered as missing (see <see cref="CacheManager.AddMissingFileNoLock"/>).
-        /// The cache lock is only held to read and update the cache, never during the request to the server: holding it there
-        /// blocked every other file system operation (e.g. Explorer listing a folder) for the duration of each request,
-        /// which froze Explorer while Office was saving a document (Office probes many temporary file names).
-        /// </summary>
-        /// <returns>The status (<c>STATUS_SUCCESS</c>, <c>STATUS_OBJECT_NAME_NOT_FOUND</c> — also on 401, which raises
-        /// <see cref="RepositoryAuthenticationFailed"/> — or <c>STATUS_NETWORK_UNREACHABLE</c> on a transport error), the node on
-        /// success, and a short description for the logs.</returns>
-        private (Int32 Status, FileNode Node, String Detail) LookupFileNode(String FileName)
-        {
-            Cache.Lock();
-            try
-            {
-                var KnownNode = Cache.GetFileNodeNoLock(FileName);
-                if (KnownNode.node != null) return (STATUS_SUCCESS, KnownNode.node, "From Cache");
-                if (KnownNode.IsNonExistent) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Known to be non-existent");
-                //Not recorded as missing on purpose: Create still checks the server before uploading (see ElementExists)
-                if (Cache.IsMissingFromFreshFolderListingNoLock(FileName)) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Not in the folder listing");
-            }
-            finally
-            {
-                Cache.Unlock();
-            }
-
-            WebDavItem RepositoryElement;
-            try
-            {
-                var Proxy = Client;
-                RepositoryElement = GetRepositoryElement(FileName);
-            }
-            catch (WebDavException ex) when (ex.StatusCode == 401)
-            {
-                OnAuthenticationFailed();
-                return (STATUS_OBJECT_NAME_NOT_FOUND, null, "401");
-            }
-            catch (HttpRequestException ex)
-            {
-                return (STATUS_NETWORK_UNREACHABLE, null, ex.Message); //Not remembered as missing: it may exist
-            }
-            catch (Exception ex)
-            {
-                AddMissingFile(FileName);
-                return (STATUS_OBJECT_NAME_NOT_FOUND, null, ex.Message);
-            }
-
-            if (RepositoryElement == null)
-            {
-                AddMissingFile(FileName);
-                return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Not found on the server");
-            }
-
-            Cache.Lock();
-            try
-            {
-                //Another operation may have cached the same element meanwhile: the cached instance is returned in that case
-                return (STATUS_SUCCESS, Cache.AddFileNodeNoLock(new FileNode(RepositoryElement)), "From Repository");
-            }
-            finally
-            {
-                Cache.Unlock();
-            }
-        }
-
-        /// <summary>
-        /// Returns whether an element exists at a local path. When the cache knows the path is missing (e.g. Office probed its
-        /// temporary file name just before), no request is sent; otherwise the server is asked. Used by <see cref="Create"/> and
-        /// <see cref="Rename"/>, which run while WinFSP holds a lock on the parent folder or on the volume: every request avoided
-        /// there shortens the time Explorer is blocked. Errors (401, network...) are propagated to the caller.
-        /// </summary>
-        /// <param name="TrustFolderListing">Also answer "missing" when the name is absent from a fresh listing of its folder
-        /// (see <see cref="CacheManager.IsMissingFromFreshFolderListingNoLock"/>). Only for Rename, whose MOVE is sent with
-        /// "Overwrite: F" and therefore never replaces an element created meanwhile by another client; Create uploads with a PUT,
-        /// which would replace it, so it relies only on names explicitly found missing on the server.</param>
-        private bool ElementExists(String FileName, WebDavClient Proxy, bool TrustFolderListing)
-        {
-            Cache.Lock();
-            try
-            {
-                if (Cache.GetFileNodeNoLock(FileName).IsNonExistent) return false;
-                if (TrustFolderListing && Cache.IsMissingFromFreshFolderListingNoLock(FileName)) return false;
-            }
-            finally
-            {
-                Cache.Unlock();
-            }
-
-            return Proxy.Exists(FileNode.ConvertLocalPathToRepositoryPath(FileName)).GetAwaiter().GetResult();
-        }
-
-        /// <summary>
-        /// How long the content of a closed file is kept in memory to be reused by a new open (Word, for instance, reopens the
-        /// same document several times while saving it: each reopen used to download it again).
-        /// </summary>
-        private const Int32 ClosedContentMaxAgeInSeconds = 15;
-
-        /// <summary>
-        /// A Flush coming less than this delay after the last successful upload of the file does not upload it again (see <see cref="Flush"/>).
-        /// </summary>
-        private const Int32 FlushMinimumIntervalInMilliseconds = 1000;
-
-        /// <summary>
-        /// Maximum memory used by the contents kept after their file was closed; the oldest are released first.
-        /// </summary>
-        private const Int64 ClosedContentMaxTotalBytes = 64L * 1024 * 1024;
-
-        private readonly object RetainedContentsLock = new object();
-
-        /// <summary>
-        /// Closed nodes whose content is kept in memory, oldest first.
-        /// </summary>
-        private readonly List<FileNode> RetainedContents = new List<FileNode>();
-
-        /// <summary>
-        /// Keeps the content of a node whose last handle was just closed (the content being identical to the server), so that
-        /// a new open within <see cref="ClosedContentMaxAgeInSeconds"/> does not download it again. Releases the contents that
-        /// expired or exceed <see cref="ClosedContentMaxTotalBytes"/>. Must be called with the node's <c>OperationLock</c> held.
-        /// </summary>
-        private void RetainClosedContent(FileNode CFN)
-        {
-            CFN.ContentRetainedAt = DateTime.Now;
-            var ToRelease = new List<FileNode>();
-
-            lock (RetainedContentsLock)
-            {
-                RetainedContents.Remove(CFN);
-                RetainedContents.Add(CFN);
-
-                //From the newest to the oldest: keep what is recent and fits in the memory budget
-                DateTime Now = DateTime.Now;
-                Int64 Total = 0;
-                for (int i = RetainedContents.Count - 1; i >= 0; i--)
-                {
-                    FileNode Node = RetainedContents[i];
-                    Byte[] Data = Node.FileData;
-                    Int64 Size = Data?.LongLength ?? 0;
-                    if (Data == null || (Now - Node.ContentRetainedAt).TotalSeconds > ClosedContentMaxAgeInSeconds || Total + Size > ClosedContentMaxTotalBytes)
-                    {
-                        ToRelease.Add(Node);
-                        RetainedContents.RemoveAt(i);
-                    }
-                    else
-                    {
-                        Total += Size;
-                    }
-                }
-            }
-
-            foreach (FileNode Node in ToRelease)
-            {
-                if (Object.ReferenceEquals(Node, CFN))
-                {
-                    ReleaseClosedContent(Node); //Its lock is already held by the caller
-                }
-                else if (Monitor.TryEnter(Node.OperationLock)) //Never wait for another node: it is busy, so it is in use anyway
-                {
-                    try
-                    {
-                        ReleaseClosedContent(Node);
-                    }
-                    finally
-                    {
-                        Monitor.Exit(Node.OperationLock);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Frees the content of a node if it is still closed and has nothing to upload.
-        /// </summary>
-        private static void ReleaseClosedContent(FileNode Node)
-        {
-            if (Node.OpenCount == 0 && !Node.HasUnflushedData) Node.FileData = null;
-        }
-
-        /// <summary>
-        /// Describes the element at a local path on the server (see <see cref="WebDavClient.GetItem"/>). The library root gets an
-        /// empty display name.
-        /// </summary>
-        /// <returns>The element, or null if it does not exist.</returns>
-        private WebDavItem GetRepositoryElement(String LocalFileName)
-        {
-            String RepositoryPath = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
-            WebDavItem Element = Client.GetItem(RepositoryPath).GetAwaiter().GetResult();
-            if (Element != null && FileNode.IsRepositoryRootPath(RepositoryPath)) Element.DisplayName = "";
-            return Element;
-        }
-
-        /// <summary>
-        /// Remembers that a path does not exist on the server, taking the cache lock.
-        /// </summary>
-        private void AddMissingFile(String FileName)
-        {
-            Cache.Lock();
-            try
-            {
-                Cache.AddMissingFileNoLock(FileName);
-            }
-            finally
-            {
-                Cache.Unlock();
-            }
         }
 
         /// <summary>
@@ -626,7 +445,6 @@ namespace KS2Drive.FS
             FileInfo = default(FileInfo);
             return false;
         }
-
 
         /// <summary>
         /// WinFSP callback asking whether a file or directory may be deleted (the actual deletion on the server happens in
@@ -1041,7 +859,7 @@ namespace KS2Drive.FS
 
                 if ((Flags & CleanupSetAllocationSize) != 0)
                 {
-                    UInt64 AllocationUnit = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+                    UInt64 AllocationUnit = DAVFS_SECTOR_SIZE * DAVFS_SECTORS_PER_ALLOCATION_UNIT;
                     UInt64 AllocationSize = (CFN.FileInfo.FileSize + AllocationUnit - 1) / AllocationUnit * AllocationUnit;
                     SetFileSizeInternal(CFN, AllocationSize, true);
                 }
@@ -1510,6 +1328,547 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
+        /// WinFSP callback for FlushFileBuffers (e.g. an application saving a document and asking for the data to be persisted).
+        /// Uploads the pending changes of the file, whatever the flush mode (see <see cref="UploadPendingChanges"/>).
+        /// A Flush coming less than <see cref="FlushMinimumIntervalInMilliseconds"/> after the last upload is deferred: applications
+        /// call it several times in a row while saving, and the changes are uploaded by the next Flush, Cleanup or Close anyway.
+        /// A volume flush (<paramref name="FileNode0"/> is null) does nothing.
+        /// </summary>
+        /// <returns><c>STATUS_SUCCESS</c> if there was nothing to upload or the upload succeeded, <c>STATUS_UNEXPECTED_IO_ERROR</c> otherwise.</returns>
+        public override Int32 Flush(
+            Object FileNode0,
+            Object FileDesc,
+            out FileInfo FileInfo)
+        {
+            FileNode CFN = (FileNode)FileNode0;
+            if (CFN == null)
+            {
+                //Flush of the whole volume: pending changes of each file are uploaded by its own Flush/Cleanup/Close
+                FileInfo = default(FileInfo);
+                return STATUS_SUCCESS;
+            }
+
+            lock (CFN.OperationLock)
+            {
+                String OperationId = Guid.NewGuid().ToString();
+                DebugStart(OperationId, CFN);
+
+                //Applications (Office...) call FlushFileBuffers several times in a row while saving: each call would upload the whole
+                //file again. A Flush right after an upload is skipped; the changes are uploaded by the next Flush, Cleanup or Close
+                if (CFN.HasUnflushedData && (DateTime.Now - CFN.LastUploadAt).TotalMilliseconds < FlushMinimumIntervalInMilliseconds)
+                {
+                    FileInfo = CFN.FileInfo;
+                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Upload deferred (previous upload too recent)");
+                    return STATUS_SUCCESS;
+                }
+
+                bool Success = UploadPendingChanges(CFN, "Flush", OperationId);
+                FileInfo = CFN.FileInfo;
+
+                DebugEnd(OperationId, CFN, Success ? "STATUS_SUCCESS" : "STATUS_UNEXPECTED_IO_ERROR");
+                return Success ? STATUS_SUCCESS : STATUS_UNEXPECTED_IO_ERROR;
+            }
+        }
+
+        /// <summary>
+        /// WinFSP callback that sets attributes and timestamps. Values are only applied to the cached node (a value of -1 for attributes
+        /// or 0 for a timestamp means "unchanged"); they are not sent to the server.
+        /// </summary>
+        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
+        public override Int32 SetBasicInfo(
+            Object FileNode0,
+            Object FileDesc,
+            UInt32 FileAttributes,
+            UInt64 CreationTime,
+            UInt64 LastAccessTime,
+            UInt64 LastWriteTime,
+            UInt64 ChangeTime,
+            out FileInfo FileInfo)
+        {
+            DateTime StartTime = DateTime.Now;
+            FileNode CFN = (FileNode)FileNode0;
+
+            lock (CFN.OperationLock)
+            {
+
+                if (unchecked((UInt32)(-1)) != FileAttributes)
+                    CFN.FileInfo.FileAttributes = FileAttributes;
+                if (0 != CreationTime)
+                    CFN.FileInfo.CreationTime = CreationTime;
+                if (0 != LastAccessTime)
+                    CFN.FileInfo.LastAccessTime = LastAccessTime;
+                if (0 != LastWriteTime)
+                    CFN.FileInfo.LastWriteTime = LastWriteTime;
+                if (0 != ChangeTime)
+                    CFN.FileInfo.ChangeTime = ChangeTime;
+
+                FileInfo = CFN.FileInfo;
+
+                //TODO : We cannot override those informations in Alfresco, so ... what ?
+                /*
+                FileNode FileNode = (FileNode)FileNode0;
+
+                if (null != FileNode.MainFileNode)
+                    FileNode = FileNode.MainFileNode;
+
+                if (unchecked((UInt32)(-1)) != FileAttributes)
+                    FileNode.FileInfo.FileAttributes = FileAttributes;
+                if (0 != CreationTime)
+                    FileNode.FileInfo.CreationTime = CreationTime;
+                if (0 != LastAccessTime)
+                    FileNode.FileInfo.LastAccessTime = LastAccessTime;
+                if (0 != LastWriteTime)
+                    FileNode.FileInfo.LastWriteTime = LastWriteTime;
+                if (0 != ChangeTime)
+                    FileNode.FileInfo.ChangeTime = ChangeTime;
+
+                FileInfo = FileNode.GetFileInfo();
+                */
+                //Console.WriteLine($"{CFN.handle} SetBasicInfo {CFN.FullPath} in {(DateTime.Now - StartTime).TotalSeconds}");
+                return STATUS_SUCCESS;
+            }
+        }
+
+        /// <summary>
+        /// WinFSP callback that changes the file size or the allocation size of the in-memory content through
+        /// <see cref="SetFileSizeInternal"/> (which downloads the content first if it is not loaded). Nothing is sent to the server here:
+        /// if the file size changed, the node is marked as having unflushed data, uploaded at <see cref="Cleanup"/>/<see cref="Close"/>.
+        /// </summary>
+        /// <param name="NewSize">New file size or allocation size.</param>
+        /// <param name="SetAllocationSize"><c>true</c> to change the allocation size, <c>false</c> to change the file size.</param>
+        /// <param name="FileInfo">Receives the updated file information, or a default value if resizing failed.</param>
+        /// <returns>The result of <see cref="SetFileSizeInternal"/>.</returns>
+        public override Int32 SetFileSize(
+            Object FileNode0,
+            Object FileDesc,
+            UInt64 NewSize,
+            Boolean SetAllocationSize,
+            out FileInfo FileInfo)
+        {
+            FileNode CFN = (FileNode)FileNode0;
+
+            lock (CFN.OperationLock)
+            {
+
+                FileInfo = CFN.FileInfo;
+
+                UInt64 PreviousFileSize = CFN.FileInfo.FileSize;
+                Int32 Result = SetFileSizeInternal(CFN, NewSize, SetAllocationSize);
+                FileInfo = Result >= 0 ? CFN.FileInfo : default(FileInfo);
+
+                //A change of the file size (truncation or extension) must be uploaded, even if no write follows.
+                //A change of the allocation size alone does not change the content.
+                if (Result >= 0 && CFN.FileInfo.FileSize != PreviousFileSize) CFN.HasUnflushedData = true;
+
+                logger.Trace($"{CFN.ObjectId} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}. Result {Result}");
+
+                /*
+                FileNode FileNode = (FileNode)FileNode0;
+                Int32 Result;
+
+                Result = SetFileSizeInternal(FileNode, NewSize, SetAllocationSize);
+                FileInfo = 0 <= Result ? FileNode.GetFileInfo() : default(FileInfo);
+                */
+
+                return Result;
+            }
+        }
+
+        /// <summary>
+        /// WinFSP callback to change a security descriptor. Not supported.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
+        public override Int32 SetSecurity(
+            Object FileNode0,
+            Object FileDesc,
+            AccessControlSections Sections,
+            Byte[] SecurityDescriptor)
+        {
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+
+            if (null != FileNode.MainFileNode)
+                FileNode = FileNode.MainFileNode;
+
+            FileNode.FileSecurity = ModifySecurityDescriptor(
+                FileNode.FileSecurity, Sections, SecurityDescriptor);
+            */
+            return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        /// <summary>
+        /// WinFSP callback enumerating named streams. Not implemented (named streams are disabled in <see cref="Init"/>).
+        /// </summary>
+        /// <returns>Always <c>false</c> (no stream entries).</returns>
+        public override Boolean GetStreamEntry(
+            Object FileNode0,
+            Object FileDesc,
+            ref Object Context,
+            out String StreamName,
+            out UInt64 StreamSize,
+            out UInt64 StreamAllocationSize)
+        {
+            logger.Trace("Not implemented : GetStreamEntry");
+
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+            IEnumerator<String> Enumerator = (IEnumerator<String>)Context;
+
+            if (null == Enumerator)
+            {
+                if (null != FileNode.MainFileNode)
+                    FileNode = FileNode.MainFileNode;
+
+                List<String> StreamFileNames = new List<String>();
+                if (0 == (FileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory))
+                    StreamFileNames.Add(FileNode.FileName);
+                StreamFileNames.AddRange(FileNodeMap.GetStreamFileNames(FileNode));
+                Context = Enumerator = StreamFileNames.GetEnumerator();
+            }
+
+            while (Enumerator.MoveNext())
+            {
+                String FullFileName = Enumerator.Current;
+                FileNode StreamFileNode = FileNodeMap.Get(FullFileName);
+                if (null != StreamFileNode)
+                {
+                    int Index = FullFileName.IndexOf(':');
+                    if (0 > Index)
+                        StreamName = "";
+                    else
+                        StreamName = FullFileName.Substring(Index + 1);
+                    StreamSize = StreamFileNode.FileInfo.FileSize;
+                    StreamAllocationSize = StreamFileNode.FileInfo.AllocationSize;
+                    return true;
+                }
+            }
+            */
+            StreamName = default(String);
+            StreamSize = default(UInt64);
+            StreamAllocationSize = default(UInt64);
+            return false;
+        }
+
+        /// <summary>
+        /// WinFSP callback to get a reparse point by file name. Not implemented (reparse points are disabled in <see cref="Init"/>).
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
+        public override Int32 GetReparsePointByName(
+            String FileName,
+            Boolean IsDirectory,
+            ref Byte[] ReparseData)
+        {
+            logger.Trace("Not implemented : GetReparsePointByName");
+
+            /*
+            FileNode FileNode;
+
+            FileNode = FileNodeMap.Get(FileName);
+            if (null == FileNode)
+                return STATUS_OBJECT_NAME_NOT_FOUND;
+
+            if (0 == (FileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.ReparsePoint))
+                return STATUS_NOT_A_REPARSE_POINT;
+
+            ReparseData = FileNode.ReparseData;
+            */
+            return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        /// <summary>
+        /// WinFSP callback to get the reparse point of an open file. Not implemented.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
+        public override Int32 GetReparsePoint(
+            Object FileNode0,
+            Object FileDesc,
+            String FileName,
+            ref Byte[] ReparseData)
+        {
+            logger.Trace("Not implemented : GetReparsePoint");
+
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+
+            if (null != FileNode.MainFileNode)
+                FileNode = FileNode.MainFileNode;
+
+            if (0 == (FileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.ReparsePoint))
+                return STATUS_NOT_A_REPARSE_POINT;
+
+            ReparseData = FileNode.ReparseData;
+            */
+            return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        /// <summary>
+        /// WinFSP callback to set a reparse point. Not implemented.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
+        public override Int32 SetReparsePoint(
+            Object FileNode0,
+            Object FileDesc,
+            String FileName,
+            Byte[] ReparseData)
+        {
+            logger.Trace("Not implemented : SetReparsePoint");
+
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+
+            if (null != FileNode.MainFileNode)
+                FileNode = FileNode.MainFileNode;
+
+            if (FileNodeMap.HasChild(FileNode))
+                return STATUS_DIRECTORY_NOT_EMPTY;
+
+            if (null != FileNode.ReparseData)
+            {
+                Int32 Result = CanReplaceReparsePoint(FileNode.ReparseData, ReparseData);
+                if (0 > Result)
+                    return Result;
+            }
+
+            FileNode.FileInfo.FileAttributes |= (UInt32)FileAttributes.ReparsePoint;
+            FileNode.FileInfo.ReparseTag = GetReparseTag(ReparseData);
+            FileNode.ReparseData = ReparseData;
+            */
+            return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        /// <summary>
+        /// WinFSP callback to delete a reparse point. Not implemented.
+        /// </summary>
+        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
+        public override Int32 DeleteReparsePoint(
+            Object FileNode0,
+            Object FileDesc,
+            String FileName,
+            Byte[] ReparseData)
+        {
+            logger.Trace("Not implemented : DeleteReparsePoint");
+
+            /*
+            FileNode FileNode = (FileNode)FileNode0;
+
+            if (null != FileNode.MainFileNode)
+                FileNode = FileNode.MainFileNode;
+
+            if (null != FileNode.ReparseData)
+            {
+                Int32 Result = CanReplaceReparsePoint(FileNode.ReparseData, ReparseData);
+                if (0 > Result)
+                    return Result;
+            }
+            else
+                return STATUS_NOT_A_REPARSE_POINT;
+
+            FileNode.FileInfo.FileAttributes &= ~(UInt32)FileAttributes.ReparsePoint;
+            FileNode.FileInfo.ReparseTag = 0;
+            FileNode.ReparseData = null;
+            */
+            return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        /// <summary>
+        /// WinFSP callback invoked after the volume is unmounted: clears the metadata cache, then calls the base implementation.
+        /// </summary>
+        public override void Unmounted(object Host)
+        {
+            Cache.Clear();
+            lock (RetainedContentsLock) RetainedContents.Clear();
+            base.Unmounted(Host);
+            Http.Dispose(); //The connections of this mount are no longer needed
+        }
+
+        #endregion
+
+        #region Private methods
+
+        /// <summary>
+        /// Finds the node of a local path: from the cache, or else from the server (then cached). Elements that do not exist
+        /// on the server are remembered as missing (see <see cref="CacheManager.AddMissingFileNoLock"/>).
+        /// The cache lock is only held to read and update the cache, never during the request to the server: holding it there
+        /// blocked every other file system operation (e.g. Explorer listing a folder) for the duration of each request,
+        /// which froze Explorer while Office was saving a document (Office probes many temporary file names).
+        /// </summary>
+        /// <returns>The status (<c>STATUS_SUCCESS</c>, <c>STATUS_OBJECT_NAME_NOT_FOUND</c> — also on 401, which raises
+        /// <see cref="RepositoryAuthenticationFailed"/> — or <c>STATUS_NETWORK_UNREACHABLE</c> on a transport error), the node on
+        /// success, and a short description for the logs.</returns>
+        private (Int32 Status, FileNode Node, String Detail) LookupFileNode(String FileName)
+        {
+            Cache.Lock();
+            try
+            {
+                var KnownNode = Cache.GetFileNodeNoLock(FileName);
+                if (KnownNode.node != null) return (STATUS_SUCCESS, KnownNode.node, "From Cache");
+                if (KnownNode.IsNonExistent) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Known to be non-existent");
+                //Not recorded as missing on purpose: Create still checks the server before uploading (see ElementExists)
+                if (Cache.IsMissingFromFreshFolderListingNoLock(FileName)) return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Not in the folder listing");
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+
+            WebDavItem RepositoryElement;
+            try
+            {
+                var Proxy = Client;
+                RepositoryElement = GetRepositoryElement(FileName);
+            }
+            catch (WebDavException ex) when (ex.StatusCode == 401)
+            {
+                OnAuthenticationFailed();
+                return (STATUS_OBJECT_NAME_NOT_FOUND, null, "401");
+            }
+            catch (HttpRequestException ex)
+            {
+                return (STATUS_NETWORK_UNREACHABLE, null, ex.Message); //Not remembered as missing: it may exist
+            }
+            catch (Exception ex)
+            {
+                AddMissingFile(FileName);
+                return (STATUS_OBJECT_NAME_NOT_FOUND, null, ex.Message);
+            }
+
+            if (RepositoryElement == null)
+            {
+                AddMissingFile(FileName);
+                return (STATUS_OBJECT_NAME_NOT_FOUND, null, "Not found on the server");
+            }
+
+            Cache.Lock();
+            try
+            {
+                //Another operation may have cached the same element meanwhile: the cached instance is returned in that case
+                return (STATUS_SUCCESS, Cache.AddFileNodeNoLock(new FileNode(RepositoryElement)), "From Repository");
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+        }
+
+        /// <summary>
+        /// Returns whether an element exists at a local path. When the cache knows the path is missing (e.g. Office probed its
+        /// temporary file name just before), no request is sent; otherwise the server is asked. Used by <see cref="Create"/> and
+        /// <see cref="Rename"/>, which run while WinFSP holds a lock on the parent folder or on the volume: every request avoided
+        /// there shortens the time Explorer is blocked. Errors (401, network...) are propagated to the caller.
+        /// </summary>
+        /// <param name="TrustFolderListing">Also answer "missing" when the name is absent from a fresh listing of its folder
+        /// (see <see cref="CacheManager.IsMissingFromFreshFolderListingNoLock"/>). Only for Rename, whose MOVE is sent with
+        /// "Overwrite: F" and therefore never replaces an element created meanwhile by another client; Create uploads with a PUT,
+        /// which would replace it, so it relies only on names explicitly found missing on the server.</param>
+        private bool ElementExists(String FileName, WebDavClient Proxy, bool TrustFolderListing)
+        {
+            Cache.Lock();
+            try
+            {
+                if (Cache.GetFileNodeNoLock(FileName).IsNonExistent) return false;
+                if (TrustFolderListing && Cache.IsMissingFromFreshFolderListingNoLock(FileName)) return false;
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+
+            return Proxy.Exists(FileNode.ConvertLocalPathToRepositoryPath(FileName)).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Keeps the content of a node whose last handle was just closed (the content being identical to the server), so that
+        /// a new open within <see cref="ClosedContentMaxAgeInSeconds"/> does not download it again. Releases the contents that
+        /// expired or exceed <see cref="ClosedContentMaxTotalBytes"/>. Must be called with the node's <c>OperationLock</c> held.
+        /// </summary>
+        private void RetainClosedContent(FileNode CFN)
+        {
+            CFN.ContentRetainedAt = DateTime.Now;
+            var ToRelease = new List<FileNode>();
+
+            lock (RetainedContentsLock)
+            {
+                RetainedContents.Remove(CFN);
+                RetainedContents.Add(CFN);
+
+                //From the newest to the oldest: keep what is recent and fits in the memory budget
+                DateTime Now = DateTime.Now;
+                Int64 Total = 0;
+                for (int i = RetainedContents.Count - 1; i >= 0; i--)
+                {
+                    FileNode Node = RetainedContents[i];
+                    Byte[] Data = Node.FileData;
+                    Int64 Size = Data?.LongLength ?? 0;
+                    if (Data == null || (Now - Node.ContentRetainedAt).TotalSeconds > ClosedContentMaxAgeInSeconds || Total + Size > ClosedContentMaxTotalBytes)
+                    {
+                        ToRelease.Add(Node);
+                        RetainedContents.RemoveAt(i);
+                    }
+                    else
+                    {
+                        Total += Size;
+                    }
+                }
+            }
+
+            foreach (FileNode Node in ToRelease)
+            {
+                if (Object.ReferenceEquals(Node, CFN))
+                {
+                    ReleaseClosedContent(Node); //Its lock is already held by the caller
+                }
+                else if (Monitor.TryEnter(Node.OperationLock)) //Never wait for another node: it is busy, so it is in use anyway
+                {
+                    try
+                    {
+                        ReleaseClosedContent(Node);
+                    }
+                    finally
+                    {
+                        Monitor.Exit(Node.OperationLock);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Frees the content of a node if it is still closed and has nothing to upload.
+        /// </summary>
+        private static void ReleaseClosedContent(FileNode Node)
+        {
+            if (Node.OpenCount == 0 && !Node.HasUnflushedData) Node.FileData = null;
+        }
+
+        /// <summary>
+        /// Describes the element at a local path on the server (see <see cref="WebDavClient.GetItem"/>). The library root gets an
+        /// empty display name.
+        /// </summary>
+        /// <returns>The element, or null if it does not exist.</returns>
+        private WebDavItem GetRepositoryElement(String LocalFileName)
+        {
+            String RepositoryPath = FileNode.ConvertLocalPathToRepositoryPath(LocalFileName);
+            WebDavItem Element = Client.GetItem(RepositoryPath).GetAwaiter().GetResult();
+            if (Element != null && FileNode.IsRepositoryRootPath(RepositoryPath)) Element.DisplayName = "";
+            return Element;
+        }
+
+        /// <summary>
+        /// Remembers that a path does not exist on the server, taking the cache lock.
+        /// </summary>
+        private void AddMissingFile(String FileName)
+        {
+            Cache.Lock();
+            try
+            {
+                Cache.AddMissingFileNoLock(FileName);
+            }
+            finally
+            {
+                Cache.Unlock();
+            }
+        }
+
+        /// <summary>
         /// Moves an element on the server for <see cref="Rename"/>, with the NTFS rules:
         /// <list type="bullet">
         /// <item>an existing target is a collision unless <paramref name="ReplaceIfExists"/> is set;</item>
@@ -1629,49 +1988,6 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
-        /// WinFSP callback for FlushFileBuffers (e.g. an application saving a document and asking for the data to be persisted).
-        /// Uploads the pending changes of the file, whatever the flush mode (see <see cref="UploadPendingChanges"/>).
-        /// A Flush coming less than <see cref="FlushMinimumIntervalInMilliseconds"/> after the last upload is deferred: applications
-        /// call it several times in a row while saving, and the changes are uploaded by the next Flush, Cleanup or Close anyway.
-        /// A volume flush (<paramref name="FileNode0"/> is null) does nothing.
-        /// </summary>
-        /// <returns><c>STATUS_SUCCESS</c> if there was nothing to upload or the upload succeeded, <c>STATUS_UNEXPECTED_IO_ERROR</c> otherwise.</returns>
-        public override Int32 Flush(
-            Object FileNode0,
-            Object FileDesc,
-            out FileInfo FileInfo)
-        {
-            FileNode CFN = (FileNode)FileNode0;
-            if (CFN == null)
-            {
-                //Flush of the whole volume: pending changes of each file are uploaded by its own Flush/Cleanup/Close
-                FileInfo = default(FileInfo);
-                return STATUS_SUCCESS;
-            }
-
-            lock (CFN.OperationLock)
-            {
-                String OperationId = Guid.NewGuid().ToString();
-                DebugStart(OperationId, CFN);
-
-                //Applications (Office...) call FlushFileBuffers several times in a row while saving: each call would upload the whole
-                //file again. A Flush right after an upload is skipped; the changes are uploaded by the next Flush, Cleanup or Close
-                if (CFN.HasUnflushedData && (DateTime.Now - CFN.LastUploadAt).TotalMilliseconds < FlushMinimumIntervalInMilliseconds)
-                {
-                    FileInfo = CFN.FileInfo;
-                    DebugEnd(OperationId, CFN, "STATUS_SUCCESS - Upload deferred (previous upload too recent)");
-                    return STATUS_SUCCESS;
-                }
-
-                bool Success = UploadPendingChanges(CFN, "Flush", OperationId);
-                FileInfo = CFN.FileInfo;
-
-                DebugEnd(OperationId, CFN, Success ? "STATUS_SUCCESS" : "STATUS_UNEXPECTED_IO_ERROR");
-                return Success ? STATUS_SUCCESS : STATUS_UNEXPECTED_IO_ERROR;
-            }
-        }
-
-        /// <summary>
         /// Uploads the in-memory content of a node (up to <c>FileSize</c>) if it has unflushed data and is not deleted.
         /// Must be called with the node's <c>OperationLock</c> held. On success the unflushed flag is cleared. On failure
         /// (refused upload, network error, 401...) a local recovery copy is generated, a 401 is reported through
@@ -1717,110 +2033,6 @@ namespace KS2Drive.FS
                 RepositoryActionPerformed?.Invoke(this, L);
                 DebugEnd(OperationId, null, $"{Method} : STATUS_FAILED - {ex.Message}");
                 return false;
-            }
-        }
-
-        /// <summary>
-        /// WinFSP callback that sets attributes and timestamps. Values are only applied to the cached node (a value of -1 for attributes
-        /// or 0 for a timestamp means "unchanged"); they are not sent to the server.
-        /// </summary>
-        /// <returns>Always <c>STATUS_SUCCESS</c>.</returns>
-        public override Int32 SetBasicInfo(
-            Object FileNode0,
-            Object FileDesc,
-            UInt32 FileAttributes,
-            UInt64 CreationTime,
-            UInt64 LastAccessTime,
-            UInt64 LastWriteTime,
-            UInt64 ChangeTime,
-            out FileInfo FileInfo)
-        {
-            DateTime StartTime = DateTime.Now;
-            FileNode CFN = (FileNode)FileNode0;
-
-            lock (CFN.OperationLock)
-            {
-
-                if (unchecked((UInt32)(-1)) != FileAttributes)
-                    CFN.FileInfo.FileAttributes = FileAttributes;
-                if (0 != CreationTime)
-                    CFN.FileInfo.CreationTime = CreationTime;
-                if (0 != LastAccessTime)
-                    CFN.FileInfo.LastAccessTime = LastAccessTime;
-                if (0 != LastWriteTime)
-                    CFN.FileInfo.LastWriteTime = LastWriteTime;
-                if (0 != ChangeTime)
-                    CFN.FileInfo.ChangeTime = ChangeTime;
-
-                FileInfo = CFN.FileInfo;
-
-                //TODO : We cannot override those informations in Alfresco, so ... what ?
-                /*
-                FileNode FileNode = (FileNode)FileNode0;
-
-                if (null != FileNode.MainFileNode)
-                    FileNode = FileNode.MainFileNode;
-
-                if (unchecked((UInt32)(-1)) != FileAttributes)
-                    FileNode.FileInfo.FileAttributes = FileAttributes;
-                if (0 != CreationTime)
-                    FileNode.FileInfo.CreationTime = CreationTime;
-                if (0 != LastAccessTime)
-                    FileNode.FileInfo.LastAccessTime = LastAccessTime;
-                if (0 != LastWriteTime)
-                    FileNode.FileInfo.LastWriteTime = LastWriteTime;
-                if (0 != ChangeTime)
-                    FileNode.FileInfo.ChangeTime = ChangeTime;
-
-                FileInfo = FileNode.GetFileInfo();
-                */
-                //Console.WriteLine($"{CFN.handle} SetBasicInfo {CFN.FullPath} in {(DateTime.Now - StartTime).TotalSeconds}");
-                return STATUS_SUCCESS;
-            }
-        }
-
-        /// <summary>
-        /// WinFSP callback that changes the file size or the allocation size of the in-memory content through
-        /// <see cref="SetFileSizeInternal"/> (which downloads the content first if it is not loaded). Nothing is sent to the server here:
-        /// if the file size changed, the node is marked as having unflushed data, uploaded at <see cref="Cleanup"/>/<see cref="Close"/>.
-        /// </summary>
-        /// <param name="NewSize">New file size or allocation size.</param>
-        /// <param name="SetAllocationSize"><c>true</c> to change the allocation size, <c>false</c> to change the file size.</param>
-        /// <param name="FileInfo">Receives the updated file information, or a default value if resizing failed.</param>
-        /// <returns>The result of <see cref="SetFileSizeInternal"/>.</returns>
-        public override Int32 SetFileSize(
-            Object FileNode0,
-            Object FileDesc,
-            UInt64 NewSize,
-            Boolean SetAllocationSize,
-            out FileInfo FileInfo)
-        {
-            FileNode CFN = (FileNode)FileNode0;
-
-            lock (CFN.OperationLock)
-            {
-
-                FileInfo = CFN.FileInfo;
-
-                UInt64 PreviousFileSize = CFN.FileInfo.FileSize;
-                Int32 Result = SetFileSizeInternal(CFN, NewSize, SetAllocationSize);
-                FileInfo = Result >= 0 ? CFN.FileInfo : default(FileInfo);
-
-                //A change of the file size (truncation or extension) must be uploaded, even if no write follows.
-                //A change of the allocation size alone does not change the content.
-                if (Result >= 0 && CFN.FileInfo.FileSize != PreviousFileSize) CFN.HasUnflushedData = true;
-
-                logger.Trace($"{CFN.ObjectId} SetFileSize File {CFN.LocalPath}. New Size {NewSize}. Allocation size {SetAllocationSize}. Result {Result}");
-
-                /*
-                FileNode FileNode = (FileNode)FileNode0;
-                Int32 Result;
-
-                Result = SetFileSizeInternal(FileNode, NewSize, SetAllocationSize);
-                FileInfo = 0 <= Result ? FileNode.GetFileInfo() : default(FileInfo);
-                */
-
-                return Result;
             }
         }
 
@@ -1947,7 +2159,7 @@ namespace KS2Drive.FS
                     {
                         if (FileNode.FileInfo.AllocationSize < NewSize)
                         {
-                            UInt64 AllocationUnit = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+                            UInt64 AllocationUnit = DAVFS_SECTOR_SIZE * DAVFS_SECTORS_PER_ALLOCATION_UNIT;
                             UInt64 AllocationSize = (NewSize + AllocationUnit - 1) / AllocationUnit * AllocationUnit;
                             Int32 Result = SetFileSizeInternal(FileNode, AllocationSize, true);
                             if (Result < 0) return Result;
@@ -1972,217 +2184,6 @@ namespace KS2Drive.FS
             }
 
             return STATUS_SUCCESS;
-        }
-
-        /// <summary>
-        /// WinFSP callback to change a security descriptor. Not supported.
-        /// </summary>
-        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
-        public override Int32 SetSecurity(
-            Object FileNode0,
-            Object FileDesc,
-            AccessControlSections Sections,
-            Byte[] SecurityDescriptor)
-        {
-            /*
-            FileNode FileNode = (FileNode)FileNode0;
-
-            if (null != FileNode.MainFileNode)
-                FileNode = FileNode.MainFileNode;
-
-            FileNode.FileSecurity = ModifySecurityDescriptor(
-                FileNode.FileSecurity, Sections, SecurityDescriptor);
-            */
-            return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        /// <summary>
-        /// WinFSP callback enumerating named streams. Not implemented (named streams are disabled in <see cref="Init"/>).
-        /// </summary>
-        /// <returns>Always <c>false</c> (no stream entries).</returns>
-        public override Boolean GetStreamEntry(
-            Object FileNode0,
-            Object FileDesc,
-            ref Object Context,
-            out String StreamName,
-            out UInt64 StreamSize,
-            out UInt64 StreamAllocationSize)
-        {
-            logger.Trace("Not implemented : GetStreamEntry");
-
-            /*
-            FileNode FileNode = (FileNode)FileNode0;
-            IEnumerator<String> Enumerator = (IEnumerator<String>)Context;
-
-            if (null == Enumerator)
-            {
-                if (null != FileNode.MainFileNode)
-                    FileNode = FileNode.MainFileNode;
-
-                List<String> StreamFileNames = new List<String>();
-                if (0 == (FileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.Directory))
-                    StreamFileNames.Add(FileNode.FileName);
-                StreamFileNames.AddRange(FileNodeMap.GetStreamFileNames(FileNode));
-                Context = Enumerator = StreamFileNames.GetEnumerator();
-            }
-
-            while (Enumerator.MoveNext())
-            {
-                String FullFileName = Enumerator.Current;
-                FileNode StreamFileNode = FileNodeMap.Get(FullFileName);
-                if (null != StreamFileNode)
-                {
-                    int Index = FullFileName.IndexOf(':');
-                    if (0 > Index)
-                        StreamName = "";
-                    else
-                        StreamName = FullFileName.Substring(Index + 1);
-                    StreamSize = StreamFileNode.FileInfo.FileSize;
-                    StreamAllocationSize = StreamFileNode.FileInfo.AllocationSize;
-                    return true;
-                }
-            }
-            */
-            StreamName = default(String);
-            StreamSize = default(UInt64);
-            StreamAllocationSize = default(UInt64);
-            return false;
-        }
-
-        #region Reparse points
-
-        /// <summary>
-        /// WinFSP callback to get a reparse point by file name. Not implemented (reparse points are disabled in <see cref="Init"/>).
-        /// </summary>
-        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
-        public override Int32 GetReparsePointByName(
-            String FileName,
-            Boolean IsDirectory,
-            ref Byte[] ReparseData)
-        {
-            logger.Trace("Not implemented : GetReparsePointByName");
-
-            /*
-            FileNode FileNode;
-
-            FileNode = FileNodeMap.Get(FileName);
-            if (null == FileNode)
-                return STATUS_OBJECT_NAME_NOT_FOUND;
-
-            if (0 == (FileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.ReparsePoint))
-                return STATUS_NOT_A_REPARSE_POINT;
-
-            ReparseData = FileNode.ReparseData;
-            */
-            return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        /// <summary>
-        /// WinFSP callback to get the reparse point of an open file. Not implemented.
-        /// </summary>
-        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
-        public override Int32 GetReparsePoint(
-            Object FileNode0,
-            Object FileDesc,
-            String FileName,
-            ref Byte[] ReparseData)
-        {
-            logger.Trace("Not implemented : GetReparsePoint");
-
-            /*
-            FileNode FileNode = (FileNode)FileNode0;
-
-            if (null != FileNode.MainFileNode)
-                FileNode = FileNode.MainFileNode;
-
-            if (0 == (FileNode.FileInfo.FileAttributes & (UInt32)FileAttributes.ReparsePoint))
-                return STATUS_NOT_A_REPARSE_POINT;
-
-            ReparseData = FileNode.ReparseData;
-            */
-            return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        /// <summary>
-        /// WinFSP callback to set a reparse point. Not implemented.
-        /// </summary>
-        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
-        public override Int32 SetReparsePoint(
-            Object FileNode0,
-            Object FileDesc,
-            String FileName,
-            Byte[] ReparseData)
-        {
-            logger.Trace("Not implemented : SetReparsePoint");
-
-            /*
-            FileNode FileNode = (FileNode)FileNode0;
-
-            if (null != FileNode.MainFileNode)
-                FileNode = FileNode.MainFileNode;
-
-            if (FileNodeMap.HasChild(FileNode))
-                return STATUS_DIRECTORY_NOT_EMPTY;
-
-            if (null != FileNode.ReparseData)
-            {
-                Int32 Result = CanReplaceReparsePoint(FileNode.ReparseData, ReparseData);
-                if (0 > Result)
-                    return Result;
-            }
-
-            FileNode.FileInfo.FileAttributes |= (UInt32)FileAttributes.ReparsePoint;
-            FileNode.FileInfo.ReparseTag = GetReparseTag(ReparseData);
-            FileNode.ReparseData = ReparseData;
-            */
-            return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        /// <summary>
-        /// WinFSP callback to delete a reparse point. Not implemented.
-        /// </summary>
-        /// <returns>Always <c>STATUS_INVALID_DEVICE_REQUEST</c>.</returns>
-        public override Int32 DeleteReparsePoint(
-            Object FileNode0,
-            Object FileDesc,
-            String FileName,
-            Byte[] ReparseData)
-        {
-            logger.Trace("Not implemented : DeleteReparsePoint");
-
-            /*
-            FileNode FileNode = (FileNode)FileNode0;
-
-            if (null != FileNode.MainFileNode)
-                FileNode = FileNode.MainFileNode;
-
-            if (null != FileNode.ReparseData)
-            {
-                Int32 Result = CanReplaceReparsePoint(FileNode.ReparseData, ReparseData);
-                if (0 > Result)
-                    return Result;
-            }
-            else
-                return STATUS_NOT_A_REPARSE_POINT;
-
-            FileNode.FileInfo.FileAttributes &= ~(UInt32)FileAttributes.ReparsePoint;
-            FileNode.FileInfo.ReparseTag = 0;
-            FileNode.ReparseData = null;
-            */
-            return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        #endregion
-
-        /// <summary>
-        /// WinFSP callback invoked after the volume is unmounted: clears the metadata cache, then calls the base implementation.
-        /// </summary>
-        public override void Unmounted(object Host)
-        {
-            Cache.Clear();
-            lock (RetainedContentsLock) RetainedContents.Clear();
-            base.Unmounted(Host);
-            Http.Dispose(); //The connections of this mount are no longer needed
         }
 
         /// <summary>
@@ -2280,6 +2281,8 @@ namespace KS2Drive.FS
             if (!logger.IsDebugEnabled) return; //Do not build the message (JSON serialization of the node) when it is not logged
             logger.Debug($"{OperationId}|{Caller}|End|{Result}");
         }
+
+        #endregion
     }
 
     /// <summary>

@@ -14,34 +14,6 @@ namespace KS2Drive.Tests.WebDav
     [TestClass]
     public class MultiStatusParserTests
     {
-        private static List<WebDavItem> Parse(String Xml) => MultiStatusParser.Parse(new MemoryStream(Encoding.UTF8.GetBytes(Xml)));
-
-        /// <summary>A multistatus with a single response, whose 200 propstat contains the given properties.</summary>
-        private static WebDavItem ParseSingle(String Href, String Properties)
-        {
-            var Items = Parse("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\" xmlns:Z=\"urn:schemas-microsoft-com:\"><D:response><D:href>"
-                + Href + "</D:href><D:propstat><D:prop>" + Properties + "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response></D:multistatus>");
-            Assert.AreEqual(1, Items.Count);
-            return Items[0];
-        }
-
-        private static void WithCulture(String Culture, Action Action)
-        {
-            var Thread = System.Threading.Thread.CurrentThread;
-            CultureInfo Previous = Thread.CurrentCulture, PreviousUI = Thread.CurrentUICulture;
-            try
-            {
-                Thread.CurrentCulture = new CultureInfo(Culture);
-                Thread.CurrentUICulture = new CultureInfo(Culture);
-                Action();
-            }
-            finally
-            {
-                Thread.CurrentCulture = Previous;
-                Thread.CurrentUICulture = PreviousUI;
-            }
-        }
-
         #region Parse: responses
 
         [TestMethod]
@@ -408,6 +380,38 @@ namespace KS2Drive.Tests.WebDav
         public void DecodeHref_ReturnsDecodedPath(String Href, String Expected)
         {
             Assert.AreEqual(Expected, MultiStatusParser.DecodeHref(Href));
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static List<WebDavItem> Parse(String Xml) => MultiStatusParser.Parse(new MemoryStream(Encoding.UTF8.GetBytes(Xml)));
+
+        /// <summary>A multistatus with a single response, whose 200 propstat contains the given properties.</summary>
+        private static WebDavItem ParseSingle(String Href, String Properties)
+        {
+            var Items = Parse("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\" xmlns:Z=\"urn:schemas-microsoft-com:\"><D:response><D:href>"
+                + Href + "</D:href><D:propstat><D:prop>" + Properties + "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response></D:multistatus>");
+            Assert.AreEqual(1, Items.Count);
+            return Items[0];
+        }
+
+        private static void WithCulture(String Culture, Action Action)
+        {
+            var Thread = System.Threading.Thread.CurrentThread;
+            CultureInfo Previous = Thread.CurrentCulture, PreviousUI = Thread.CurrentUICulture;
+            try
+            {
+                Thread.CurrentCulture = new CultureInfo(Culture);
+                Thread.CurrentUICulture = new CultureInfo(Culture);
+                Action();
+            }
+            finally
+            {
+                Thread.CurrentCulture = Previous;
+                Thread.CurrentUICulture = PreviousUI;
+            }
         }
 
         #endregion

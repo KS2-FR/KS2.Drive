@@ -16,17 +16,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSCleanupCloseFlushTests
     {
-        private static DavFsContext CreateContext(FlushMode Flush = FlushMode.FlushAtCleanup)
-        {
-            return DavFsContext.Create(s =>
-            {
-                s.AddFile("/dav/a.txt", "abcdef");
-                s.AddFolder("/dav/folder");
-                s.AddFile("/dav/folder/b.txt", "bb");
-                s.AddFolder("/dav/folder/sub");
-            }, Flush);
-        }
-
         #region Cleanup - delete
 
         [TestMethod]
@@ -603,6 +592,21 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual(0, Ctx.Server.CountRequests("PUT"));
                 Assert.IsFalse(Ctx.Server.Exists("/dav/a.txt"));
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static DavFsContext CreateContext(FlushMode Flush = FlushMode.FlushAtCleanup)
+        {
+            return DavFsContext.Create(s =>
+            {
+                s.AddFile("/dav/a.txt", "abcdef");
+                s.AddFolder("/dav/folder");
+                s.AddFile("/dav/folder/b.txt", "bb");
+                s.AddFolder("/dav/folder/sub");
+            }, Flush);
         }
 
         #endregion

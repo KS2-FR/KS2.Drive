@@ -20,18 +20,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSLogicTests
     {
-        private static DavFsContext CreateContext(WebDAVMode Mode = WebDAVMode.WebDAV)
-        {
-            return DavFsContext.Create(s =>
-            {
-                s.AddFile("/dav/a.txt", "abc");
-                s.AddFile("/dav/b.txt", "bbbb");
-                s.AddFolder("/dav/empty");
-                s.AddFolder("/dav/full");
-                s.AddFile("/dav/full/x.txt", "x");
-            }, FlushMode.FlushAtCleanup, Mode);
-        }
-
         #region (1) CanDelete
 
         [TestMethod]
@@ -332,6 +320,22 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual(1, Ctx.Server.CountRequests("PUT"));
                 Assert.AreEqual("xxxxxxxxxx", Ctx.Server.GetText("/dav/a.txt"));
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static DavFsContext CreateContext(WebDAVMode Mode = WebDAVMode.WebDAV)
+        {
+            return DavFsContext.Create(s =>
+            {
+                s.AddFile("/dav/a.txt", "abc");
+                s.AddFile("/dav/b.txt", "bbbb");
+                s.AddFolder("/dav/empty");
+                s.AddFolder("/dav/full");
+                s.AddFile("/dav/full/x.txt", "x");
+            }, FlushMode.FlushAtCleanup, Mode);
         }
 
         #endregion

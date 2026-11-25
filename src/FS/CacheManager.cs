@@ -36,6 +36,16 @@ namespace KS2Drive.FS
         private object RunningRefreshActionListLock = new object();
         private HashSet<String> RunningRefreshActionList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        private static object CacheLock = new object();
+
+        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase); //Store the files that we know for sure that they do not exist
+        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>(StringComparer.OrdinalIgnoreCase); //Case-insensitive, like the file system (CaseSensitiveSearch = false)
+
+        /// <summary>
+        /// Number of entries in the known-missing files list above which expired entries are purged.
+        /// </summary>
+        private const Int32 MissingFileCachePurgeThreshold = 1000;
+
         /// <summary>
         /// Creates a cache manager.
         /// </summary>
@@ -48,37 +58,6 @@ namespace KS2Drive.FS
             this._mode = mode;
             this._PreLoadFoldersInCache = PreLoadFoldersInCache;
         }
-
-        /// <summary>
-        /// Queues a refresh of the cached content of the given folder from the server on the thread pool,
-        /// unless a refresh for the same path is already planned or running. The thread pool limits the number of
-        /// concurrent refreshes, whereas a dedicated thread per folder could start hundreds of threads when pre-loading.
-        /// </summary>
-        private void AddRefreshTask(FileNode CFN)
-        {
-            lock (RunningRefreshActionListLock)
-            {
-                if (RunningRefreshActionList.Contains(CFN.LocalPath)) return; //An action is already planned or in progress for this path
-                RunningRefreshActionList.Add(CFN.LocalPath);
-                ThreadPool.QueueUserWorkItem(_ => InternalRefreshFolderCacheContent(CFN));
-            }
-        }
-
-        /// <summary>
-        /// Removes the folder from the list of running refresh actions so that it can be refreshed again.
-        /// </summary>
-        private void RemoveRefreshTask(FileNode CFN)
-        {
-            lock (RunningRefreshActionListLock)
-            {
-                RunningRefreshActionList.Remove(CFN.LocalPath);
-            }
-        }
-
-        private static object CacheLock = new object();
-
-        private Dictionary<String, DateTime> MissingFileCache = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase); //Store the files that we know for sure that they do not exist
-        private Dictionary<String, FileNode> FileNodeCache = new Dictionary<string, FileNode>(StringComparer.OrdinalIgnoreCase); //Case-insensitive, like the file system (CaseSensitiveSearch = false)
 
         /// <summary>
         /// Looks in the cache for the FileNode matching the local path. Does not take the cache lock:
@@ -124,29 +103,6 @@ namespace KS2Drive.FS
             if (FileNodeCache == null) return false;
             String Prefix = FolderLocalPath == "\\" ? "\\" : FolderLocalPath + "\\";
             return FileNodeCache.Any(x => x.Key.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) && !String.Equals(x.Key, FolderLocalPath, StringComparison.OrdinalIgnoreCase) && (x.Value.IsNewOnServer || x.Value.HasUnflushedData));
-        }
-
-        private (FileNode node, bool IsNonExistent) GetFileNodeNoLockCore(String FileOrFolderLocalPath)
-        {
-            if (_mode == CacheMode.Disabled) return (null, false);
-
-            if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath))
-            {
-                //Is there a valid missing file entry for this file
-                if (MissingFileCache.ContainsKey(FileOrFolderLocalPath) && (DateTime.Now - MissingFileCache[FileOrFolderLocalPath]).TotalSeconds <= CacheDurationInSeconds)
-                {
-                    //Less than (CacheDurationInSeconds) seconds ago, the file was not existing. We send the same answer
-                    return (null, true);
-                }
-                else
-                {
-                    return (null, false);
-                }
-            }
-            else
-            {
-                return (FileNodeCache[FileOrFolderLocalPath], false);
-            }
         }
 
         /// <summary>
@@ -353,6 +309,105 @@ namespace KS2Drive.FS
         }
 
         /// <summary>
+        /// Empties the node cache and releases it (the dictionary is set to null).
+        /// Background refresh threads check for this and stop updating the cache.
+        /// </summary>
+        public void Clear()
+        {
+            FileNodeCache.Clear();
+            FileNodeCache = null;
+        }
+
+        /// <summary>
+        /// Acquires the cache lock. Must be paired with <see cref="Unlock"/>; required around the *NoLock methods.
+        /// </summary>
+        public void Lock()
+        {
+            Monitor.Enter(CacheLock);
+        }
+
+        /// <summary>
+        /// Releases the cache lock acquired with <see cref="Lock"/>.
+        /// </summary>
+        public void Unlock()
+        {
+            Monitor.Exit(CacheLock);
+        }
+
+        /// <summary>
+        /// Records (or re-timestamps) a local path as known to be missing on the server, so that lookups within
+        /// <c>CacheDurationInSeconds</c> can answer "not found" without a server round-trip. Does not take the cache lock.
+        /// </summary>
+        public void AddMissingFileNoLock(String FileOrFolderPath)
+        {
+            if (_mode == CacheMode.Disabled) return;
+
+            //Expired entries are useless: purge them from time to time so that the dictionary does not grow forever
+            //(Explorer and applications probe many non-existent files: desktop.ini, thumbs.db, temporary files...)
+            if (MissingFileCache.Count >= MissingFileCachePurgeThreshold)
+            {
+                DateTime Now = DateTime.Now;
+                foreach (var ExpiredEntry in MissingFileCache.Where(x => (Now - x.Value).TotalSeconds > CacheDurationInSeconds).Select(x => x.Key).ToList())
+                {
+                    MissingFileCache.Remove(ExpiredEntry);
+                }
+            }
+
+            MissingFileCache[FileOrFolderPath] = DateTime.Now;
+        }
+
+        #region Private methods
+
+        /// <summary>
+        /// Queues a refresh of the cached content of the given folder from the server on the thread pool,
+        /// unless a refresh for the same path is already planned or running. The thread pool limits the number of
+        /// concurrent refreshes, whereas a dedicated thread per folder could start hundreds of threads when pre-loading.
+        /// </summary>
+        private void AddRefreshTask(FileNode CFN)
+        {
+            lock (RunningRefreshActionListLock)
+            {
+                if (RunningRefreshActionList.Contains(CFN.LocalPath)) return; //An action is already planned or in progress for this path
+                RunningRefreshActionList.Add(CFN.LocalPath);
+                ThreadPool.QueueUserWorkItem(_ => InternalRefreshFolderCacheContent(CFN));
+            }
+        }
+
+        /// <summary>
+        /// Removes the folder from the list of running refresh actions so that it can be refreshed again.
+        /// </summary>
+        private void RemoveRefreshTask(FileNode CFN)
+        {
+            lock (RunningRefreshActionListLock)
+            {
+                RunningRefreshActionList.Remove(CFN.LocalPath);
+            }
+        }
+
+        private (FileNode node, bool IsNonExistent) GetFileNodeNoLockCore(String FileOrFolderLocalPath)
+        {
+            if (_mode == CacheMode.Disabled) return (null, false);
+
+            if (!FileNodeCache.ContainsKey(FileOrFolderLocalPath))
+            {
+                //Is there a valid missing file entry for this file
+                if (MissingFileCache.ContainsKey(FileOrFolderLocalPath) && (DateTime.Now - MissingFileCache[FileOrFolderLocalPath]).TotalSeconds <= CacheDurationInSeconds)
+                {
+                    //Less than (CacheDurationInSeconds) seconds ago, the file was not existing. We send the same answer
+                    return (null, true);
+                }
+                else
+                {
+                    return (null, false);
+                }
+            }
+            else
+            {
+                return (FileNodeCache[FileOrFolderLocalPath], false);
+            }
+        }
+
+        /// <summary>
         /// Builds the directory listing returned to WinFSP, the same way whatever the source of the children (server or cache):
         /// <list type="bullet">
         /// <item>"." and ".." come first, except for the root of the drive, which has none (like an NTFS volume root).
@@ -385,32 +440,6 @@ namespace KS2Drive.FS
             if (Marker == ".") return Listing.Where(x => x.Item1 != ".").ToList();
             if (Marker == "..") return Listing.Where(x => x.Item1 != "." && x.Item1 != "..").ToList();
             return Listing.Where(x => x.Item1 != "." && x.Item1 != ".." && StringComparer.OrdinalIgnoreCase.Compare(x.Item1, Marker) > 0).ToList();
-        }
-
-        /// <summary>
-        /// Empties the node cache and releases it (the dictionary is set to null).
-        /// Background refresh threads check for this and stop updating the cache.
-        /// </summary>
-        public void Clear()
-        {
-            FileNodeCache.Clear();
-            FileNodeCache = null;
-        }
-
-        /// <summary>
-        /// Acquires the cache lock. Must be paired with <see cref="Unlock"/>; required around the *NoLock methods.
-        /// </summary>
-        public void Lock()
-        {
-            Monitor.Enter(CacheLock);
-        }
-
-        /// <summary>
-        /// Releases the cache lock acquired with <see cref="Lock"/>.
-        /// </summary>
-        public void Unlock()
-        {
-            Monitor.Exit(CacheLock);
         }
 
         /// <summary>
@@ -517,31 +546,6 @@ namespace KS2Drive.FS
             return (true, ChildrenFileNames, null);
         }
 
-        /// <summary>
-        /// Records (or re-timestamps) a local path as known to be missing on the server, so that lookups within
-        /// <c>CacheDurationInSeconds</c> can answer "not found" without a server round-trip. Does not take the cache lock.
-        /// </summary>
-        public void AddMissingFileNoLock(String FileOrFolderPath)
-        {
-            if (_mode == CacheMode.Disabled) return;
-
-            //Expired entries are useless: purge them from time to time so that the dictionary does not grow forever
-            //(Explorer and applications probe many non-existent files: desktop.ini, thumbs.db, temporary files...)
-            if (MissingFileCache.Count >= MissingFileCachePurgeThreshold)
-            {
-                DateTime Now = DateTime.Now;
-                foreach (var ExpiredEntry in MissingFileCache.Where(x => (Now - x.Value).TotalSeconds > CacheDurationInSeconds).Select(x => x.Key).ToList())
-                {
-                    MissingFileCache.Remove(ExpiredEntry);
-                }
-            }
-
-            MissingFileCache[FileOrFolderPath] = DateTime.Now;
-        }
-
-        /// <summary>
-        /// Number of entries in the known-missing files list above which expired entries are purged.
-        /// </summary>
-        private const Int32 MissingFileCachePurgeThreshold = 1000;
+        #endregion
     }
 }

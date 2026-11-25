@@ -31,68 +31,6 @@ namespace KS2Drive.Tests.Core
             }
         }
 
-        private static Configuration FullConfiguration(string Path)
-        {
-            return new Configuration
-            {
-                Path = Path,
-                AutoMount = true,
-                AutoStart = true,
-                DriveLetter = "Y",
-                ServerURL = "https://server.example/alfresco/aos/Sites/café",
-                ServerType = 1,
-                ServerLogin = "useré",
-                ServerPassword = "p@ss €",
-                KernelCacheMode = 1000,
-                FlushMode = 0,
-                SyncOps = true,
-                PreLoading = false,
-                MountAsNetworkDrive = true,
-                HTTPProxyMode = 2,
-                ProxyURL = "http://proxy:8080",
-                UseProxyAuthentication = true,
-                ProxyLogin = "plogin",
-                ProxyPassword = "ppass",
-                UseClientCertForAuthentication = true,
-                CertStoreName = "My",
-                CertStoreLocation = "CurrentUser",
-                CertSerial = "0123AB"
-            };
-        }
-
-        private static void AssertSameSettings(Configuration Expected, Configuration Actual)
-        {
-            Assert.AreEqual(Expected.AutoMount, Actual.AutoMount);
-            Assert.AreEqual(Expected.AutoStart, Actual.AutoStart);
-            Assert.AreEqual(Expected.DriveLetter, Actual.DriveLetter);
-            Assert.AreEqual(Expected.ServerURL, Actual.ServerURL);
-            Assert.AreEqual(0, Actual.ServerType, "AOS is no longer offered: every loaded configuration uses WebDAV");
-            Assert.AreEqual(Expected.ServerLogin, Actual.ServerLogin);
-            Assert.AreEqual(Expected.ServerPassword, Actual.ServerPassword);
-            Assert.AreEqual(Expected.KernelCacheMode, Actual.KernelCacheMode);
-            Assert.AreEqual(1, Actual.FlushMode, "FlushAtWrite is no longer offered: every loaded configuration uses FlushAtCleanup");
-            Assert.AreEqual(Expected.SyncOps, Actual.SyncOps);
-            Assert.AreEqual(Expected.PreLoading, Actual.PreLoading);
-            Assert.AreEqual(Expected.MountAsNetworkDrive, Actual.MountAsNetworkDrive);
-            Assert.AreEqual(Expected.HTTPProxyMode, Actual.HTTPProxyMode);
-            Assert.AreEqual(Expected.ProxyURL, Actual.ProxyURL);
-            Assert.AreEqual(Expected.UseProxyAuthentication, Actual.UseProxyAuthentication);
-            Assert.AreEqual(Expected.ProxyLogin, Actual.ProxyLogin);
-            Assert.AreEqual(Expected.ProxyPassword, Actual.ProxyPassword);
-            Assert.AreEqual(Expected.UseClientCertForAuthentication, Actual.UseClientCertForAuthentication);
-            Assert.AreEqual(Expected.CertStoreName, Actual.CertStoreName);
-            Assert.AreEqual(Expected.CertStoreLocation, Actual.CertStoreLocation);
-            Assert.AreEqual(Expected.CertSerial, Actual.CertSerial);
-        }
-
-        private static void AssertNotConfigured(Configuration C, string ExpectedPath)
-        {
-            Assert.IsNotNull(C);
-            Assert.IsFalse(C.IsConfigured);
-            Assert.AreEqual((short)0, C.HTTPProxyMode);
-            Assert.AreEqual(ExpectedPath, C.Path);
-        }
-
         #region Defaults
 
         [TestMethod]
@@ -357,6 +295,72 @@ namespace KS2Drive.Tests.Core
             var Reloaded = Configuration.Load(_ConfigPath);
             Assert.IsTrue(Reloaded.IsConfigured);
             Assert.AreEqual("Q", Reloaded.DriveLetter);
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static Configuration FullConfiguration(string Path)
+        {
+            return new Configuration
+            {
+                Path = Path,
+                AutoMount = true,
+                AutoStart = true,
+                DriveLetter = "Y",
+                ServerURL = "https://server.example/alfresco/aos/Sites/café",
+                ServerType = 1,
+                ServerLogin = "useré",
+                ServerPassword = "p@ss €",
+                KernelCacheMode = 1000,
+                FlushMode = 0,
+                SyncOps = true,
+                PreLoading = false,
+                MountAsNetworkDrive = true,
+                HTTPProxyMode = 2,
+                ProxyURL = "http://proxy:8080",
+                UseProxyAuthentication = true,
+                ProxyLogin = "plogin",
+                ProxyPassword = "ppass",
+                UseClientCertForAuthentication = true,
+                CertStoreName = "My",
+                CertStoreLocation = "CurrentUser",
+                CertSerial = "0123AB"
+            };
+        }
+
+        private static void AssertSameSettings(Configuration Expected, Configuration Actual)
+        {
+            Assert.AreEqual(Expected.AutoMount, Actual.AutoMount);
+            Assert.AreEqual(Expected.AutoStart, Actual.AutoStart);
+            Assert.AreEqual(Expected.DriveLetter, Actual.DriveLetter);
+            Assert.AreEqual(Expected.ServerURL, Actual.ServerURL);
+            Assert.AreEqual(0, Actual.ServerType, "AOS is no longer offered: every loaded configuration uses WebDAV");
+            Assert.AreEqual(Expected.ServerLogin, Actual.ServerLogin);
+            Assert.AreEqual(Expected.ServerPassword, Actual.ServerPassword);
+            Assert.AreEqual(Expected.KernelCacheMode, Actual.KernelCacheMode);
+            Assert.AreEqual(1, Actual.FlushMode, "FlushAtWrite is no longer offered: every loaded configuration uses FlushAtCleanup");
+            Assert.AreEqual(Expected.SyncOps, Actual.SyncOps);
+            Assert.AreEqual(Expected.PreLoading, Actual.PreLoading);
+            Assert.AreEqual(Expected.MountAsNetworkDrive, Actual.MountAsNetworkDrive);
+            Assert.AreEqual(Expected.HTTPProxyMode, Actual.HTTPProxyMode);
+            Assert.AreEqual(Expected.ProxyURL, Actual.ProxyURL);
+            Assert.AreEqual(Expected.UseProxyAuthentication, Actual.UseProxyAuthentication);
+            Assert.AreEqual(Expected.ProxyLogin, Actual.ProxyLogin);
+            Assert.AreEqual(Expected.ProxyPassword, Actual.ProxyPassword);
+            Assert.AreEqual(Expected.UseClientCertForAuthentication, Actual.UseClientCertForAuthentication);
+            Assert.AreEqual(Expected.CertStoreName, Actual.CertStoreName);
+            Assert.AreEqual(Expected.CertStoreLocation, Actual.CertStoreLocation);
+            Assert.AreEqual(Expected.CertSerial, Actual.CertSerial);
+        }
+
+        private static void AssertNotConfigured(Configuration C, string ExpectedPath)
+        {
+            Assert.IsNotNull(C);
+            Assert.IsFalse(C.IsConfigured);
+            Assert.AreEqual((short)0, C.HTTPProxyMode);
+            Assert.AreEqual(ExpectedPath, C.Path);
         }
 
         #endregion

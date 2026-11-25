@@ -20,15 +20,6 @@ namespace KS2Drive.Tests.FS
         private const UInt32 HiddenAttribute = (UInt32)System.IO.FileAttributes.Hidden;
         private const UInt32 NormalAttribute = (UInt32)System.IO.FileAttributes.Normal;
 
-        private static DavFsContext CreateContext(FlushMode Flush = FlushMode.FlushAtCleanup)
-        {
-            return DavFsContext.Create(s =>
-            {
-                s.AddFile("/dav/a.txt", "abcdef");
-                s.AddFolder("/dav/folder");
-            }, Flush);
-        }
-
         #region Create
 
         [TestMethod]
@@ -480,6 +471,19 @@ namespace KS2Drive.Tests.FS
 
                 Assert.AreEqual(FileSystemBase.STATUS_DISK_FULL, Status);
             }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static DavFsContext CreateContext(FlushMode Flush = FlushMode.FlushAtCleanup)
+        {
+            return DavFsContext.Create(s =>
+            {
+                s.AddFile("/dav/a.txt", "abcdef");
+                s.AddFolder("/dav/folder");
+            }, Flush);
         }
 
         #endregion

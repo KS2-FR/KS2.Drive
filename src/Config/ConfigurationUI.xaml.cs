@@ -120,6 +120,8 @@ namespace KS2Drive.Config
             }
         }
 
+        #region Private methods
+
         /// <summary>
         /// Validates the mandatory fields (URL, login, password), updates the Windows "Run" registry key
         /// for auto-start, copies the form values into the configuration, saves it, closes the window,
@@ -251,5 +253,7 @@ namespace KS2Drive.Config
                 }
             }
         }
+
+        #endregion
     }
 }

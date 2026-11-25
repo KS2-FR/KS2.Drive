@@ -11,27 +11,6 @@ namespace KS2Drive.Tests.UI
     [TestClass]
     public class ListBoxBehaviorTests
     {
-        private static IDictionary Associations()
-        {
-            FieldInfo Field = typeof(ListBoxBehavior).GetField("Associations", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.IsNotNull(Field, "ListBoxBehavior.Associations not found");
-            return (IDictionary)Field.GetValue(null);
-        }
-
-        private static void RaiseLoaded(ListBox L) => L.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-        private static void RaiseUnloaded(ListBox L) => L.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
-
-        /// <summary>
-        /// List box bound to <paramref name="Items"/>, with the behavior enabled after the items source is set, then loaded.
-        /// </summary>
-        private static ListBox LoadedListBox(ObservableCollection<string> Items)
-        {
-            var L = new ListBox { ItemsSource = Items };
-            ListBoxBehavior.SetScrollOnNewItem(L, true);
-            RaiseLoaded(L);
-            return L;
-        }
-
         [TestMethod]
         public void Property_IsRegisteredAsAttachedBool()
         {
@@ -320,5 +299,30 @@ namespace KS2Drive.Tests.UI
                 ListBoxBehavior.SetScrollOnNewItem(L2, false);
             });
         }
+
+        #region Private methods
+
+        private static IDictionary Associations()
+        {
+            FieldInfo Field = typeof(ListBoxBehavior).GetField("Associations", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(Field, "ListBoxBehavior.Associations not found");
+            return (IDictionary)Field.GetValue(null);
+        }
+
+        private static void RaiseLoaded(ListBox L) => L.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        private static void RaiseUnloaded(ListBox L) => L.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+
+        /// <summary>
+        /// List box bound to <paramref name="Items"/>, with the behavior enabled after the items source is set, then loaded.
+        /// </summary>
+        private static ListBox LoadedListBox(ObservableCollection<string> Items)
+        {
+            var L = new ListBox { ItemsSource = Items };
+            ListBoxBehavior.SetScrollOnNewItem(L, true);
+            RaiseLoaded(L);
+            return L;
+        }
+
+        #endregion
     }
 }

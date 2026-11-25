@@ -17,23 +17,6 @@ namespace KS2Drive.Tests.WebDav
     [TestClass]
     public class WebDavClientSetupTests
     {
-        private static WebDavClient NewClient(String ServerUrl = FakeWebDavServer.ServerUrl) => new WebDavClient(new HttpClient(), ServerUrl);
-
-        /// <summary>
-        /// Returns the handler of an HttpClient (private field of HttpMessageInvoker), or marks the test inconclusive.
-        /// </summary>
-        private static HttpMessageHandler HandlerOf(HttpClient Client)
-        {
-            const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
-            FieldInfo Field = typeof(HttpMessageInvoker).GetField("handler", Flags)
-                ?? typeof(HttpMessageInvoker).GetField("_handler", Flags)
-                ?? typeof(HttpMessageInvoker).GetFields(Flags).FirstOrDefault(x => typeof(HttpMessageHandler).IsAssignableFrom(x.FieldType));
-            if (Field == null) Assert.Inconclusive("The handler field of HttpMessageInvoker was not found by reflection");
-            var Handler = Field.GetValue(Client) as HttpMessageHandler;
-            if (Handler == null) Assert.Inconclusive("The handler field of HttpMessageInvoker is empty");
-            return Handler;
-        }
-
         #region Constructor
 
         [TestMethod]
@@ -242,6 +225,27 @@ namespace KS2Drive.Tests.WebDav
         public void GetUrl_KeepsServerPort()
         {
             Assert.AreEqual("https://docs.example.com:8443/dav/a%20b/", NewClient("https://docs.example.com:8443/x").GetUrl("/dav/a b", true).AbsoluteUri);
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private static WebDavClient NewClient(String ServerUrl = FakeWebDavServer.ServerUrl) => new WebDavClient(new HttpClient(), ServerUrl);
+
+        /// <summary>
+        /// Returns the handler of an HttpClient (private field of HttpMessageInvoker), or marks the test inconclusive.
+        /// </summary>
+        private static HttpMessageHandler HandlerOf(HttpClient Client)
+        {
+            const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo Field = typeof(HttpMessageInvoker).GetField("handler", Flags)
+                ?? typeof(HttpMessageInvoker).GetField("_handler", Flags)
+                ?? typeof(HttpMessageInvoker).GetFields(Flags).FirstOrDefault(x => typeof(HttpMessageHandler).IsAssignableFrom(x.FieldType));
+            if (Field == null) Assert.Inconclusive("The handler field of HttpMessageInvoker was not found by reflection");
+            var Handler = Field.GetValue(Client) as HttpMessageHandler;
+            if (Handler == null) Assert.Inconclusive("The handler field of HttpMessageInvoker is empty");
+            return Handler;
         }
 
         #endregion

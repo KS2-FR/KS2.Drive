@@ -20,35 +20,6 @@ namespace KS2Drive.Tests.FS
     {
         private static readonly TimeSpan NotBlocked = TimeSpan.FromSeconds(2);
 
-        private static Int32 GetSecurityByName(DavFsContext Ctx, String FileName)
-        {
-            Byte[] Descriptor = null;
-            return Ctx.Fs.GetSecurityByName(FileName, out UInt32 Attributes, ref Descriptor);
-        }
-
-        /// <summary>
-        /// Starts <paramref name="SlowOperation"/> (whose request to the server is held), then checks that a cached operation
-        /// completes while that request is still pending.
-        /// </summary>
-        private static void AssertCachedOperationIsNotBlocked(DavFsContext Ctx, Func<String, String, bool> Hold, Action SlowOperation, Func<Int32> CachedOperation)
-        {
-            Ctx.Server.HoldRequest = Hold;
-            var Slow = Task.Run(SlowOperation);
-            try
-            {
-                Assert.IsTrue(Ctx.Server.RequestHeld.Wait(TimeSpan.FromSeconds(10)), "The slow operation did not reach the server");
-
-                var Cached = Task.Run(CachedOperation);
-                Assert.IsTrue(Cached.Wait(NotBlocked), "A cached operation waited for a request of another operation (cache lock held during the request)");
-                Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Cached.Result);
-            }
-            finally
-            {
-                Ctx.Server.ReleaseHeldRequests.Set();
-                Assert.IsTrue(Slow.Wait(TimeSpan.FromSeconds(10)), "The slow operation did not complete once released");
-            }
-        }
-
         [TestMethod]
         public void Open_DoesNotHoldTheCacheLockDuringTheServerRequest()
         {
@@ -209,5 +180,38 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual(2, Ctx.Server.CountRequests("MOVE"));
             }
         }
+
+        #region Private methods
+
+        private static Int32 GetSecurityByName(DavFsContext Ctx, String FileName)
+        {
+            Byte[] Descriptor = null;
+            return Ctx.Fs.GetSecurityByName(FileName, out UInt32 Attributes, ref Descriptor);
+        }
+
+        /// <summary>
+        /// Starts <paramref name="SlowOperation"/> (whose request to the server is held), then checks that a cached operation
+        /// completes while that request is still pending.
+        /// </summary>
+        private static void AssertCachedOperationIsNotBlocked(DavFsContext Ctx, Func<String, String, bool> Hold, Action SlowOperation, Func<Int32> CachedOperation)
+        {
+            Ctx.Server.HoldRequest = Hold;
+            var Slow = Task.Run(SlowOperation);
+            try
+            {
+                Assert.IsTrue(Ctx.Server.RequestHeld.Wait(TimeSpan.FromSeconds(10)), "The slow operation did not reach the server");
+
+                var Cached = Task.Run(CachedOperation);
+                Assert.IsTrue(Cached.Wait(NotBlocked), "A cached operation waited for a request of another operation (cache lock held during the request)");
+                Assert.AreEqual(FileSystemBase.STATUS_SUCCESS, Cached.Result);
+            }
+            finally
+            {
+                Ctx.Server.ReleaseHeldRequests.Set();
+                Assert.IsTrue(Slow.Wait(TimeSpan.FromSeconds(10)), "The slow operation did not complete once released");
+            }
+        }
+
+        #endregion
     }
 }

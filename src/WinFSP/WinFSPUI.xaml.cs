@@ -45,6 +45,8 @@ namespace KS2Drive.WinFSP
             InstallWinFSP.Content = $"KS² Drive requires {RequiredWinFSP.VersionName} to run.\nThis dependency is not installed.\n\nClick 'Install' to install it now.\n\nNote : If a previous version of WinFSP is already installed on your system,\nplease uninstall it first";
         }
 
+        #region Private methods
+
         /// <summary>
         /// Closes the dialog without installing.
         /// </summary>
@@ -118,5 +120,7 @@ namespace KS2Drive.WinFSP
                 MessageBox.Show($"An error occurred while installing WinFSP : {ex.Message}");
             }
         }
+
+        #endregion
     }
 }

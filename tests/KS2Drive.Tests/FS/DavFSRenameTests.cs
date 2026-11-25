@@ -15,18 +15,6 @@ namespace KS2Drive.Tests.FS
     [TestClass]
     public class DavFSRenameTests
     {
-        private static DavFsContext CreateContext(WebDAVMode Mode = WebDAVMode.WebDAV, FlushMode Flush = FlushMode.FlushAtCleanup)
-        {
-            return DavFsContext.Create(s =>
-            {
-                s.AddFile("/dav/a.txt", "abc");
-                s.AddFile("/dav/b.txt", "bbbb");
-                s.AddFolder("/dav/folder");
-                s.AddFile("/dav/folder/c.txt", "ccc");
-                s.AddFolder("/dav/other");
-            }, Flush, Mode);
-        }
-
         [TestMethod]
         public void Rename_File_MovesItOnTheServerAndUpdatesTheNode()
         {
@@ -320,5 +308,21 @@ namespace KS2Drive.Tests.FS
                 Assert.AreEqual("abc", Ctx.Server.GetText("/dav/A.txt"), "The file content must survive a case-only rename");
             }
         }
+
+        #region Private methods
+
+        private static DavFsContext CreateContext(WebDAVMode Mode = WebDAVMode.WebDAV, FlushMode Flush = FlushMode.FlushAtCleanup)
+        {
+            return DavFsContext.Create(s =>
+            {
+                s.AddFile("/dav/a.txt", "abc");
+                s.AddFile("/dav/b.txt", "bbbb");
+                s.AddFolder("/dav/folder");
+                s.AddFile("/dav/folder/c.txt", "ccc");
+                s.AddFolder("/dav/other");
+            }, Flush, Mode);
+        }
+
+        #endregion
     }
 }

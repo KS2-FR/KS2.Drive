@@ -29,6 +29,8 @@ namespace KS2Drive.About
             InitializeComponent();
         }
 
+        #region Private methods
+
         /// <summary>
         /// Opens the clicked hyperlink in the default browser.
         /// </summary>
@@ -36,5 +38,7 @@ namespace KS2Drive.About
         {
             Process.Start(e.Uri.ToString());
         }
+
+        #endregion
     }
 }

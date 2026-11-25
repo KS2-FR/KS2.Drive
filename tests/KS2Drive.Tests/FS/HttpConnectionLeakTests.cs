@@ -25,6 +25,9 @@ namespace KS2Drive.Tests.FS
     {
         private static readonly TimeSpan NotBlocked = TimeSpan.FromSeconds(10);
 
+        private LocalHttpServer Server;
+        private WebDavClient Client;
+
         /// <summary>
         /// Minimal local HTTP server: answers each request with the status returned by <see cref="Status"/> and an HTML body.
         /// </summary>
@@ -46,6 +49,13 @@ namespace KS2Drive.Tests.FS
                 Listener.Start();
                 Task.Run(Loop);
             }
+
+            public void Dispose()
+            {
+                try { Listener.Stop(); Listener.Close(); } catch { }
+            }
+
+            #region Private methods
 
             private async Task Loop()
             {
@@ -73,14 +83,8 @@ namespace KS2Drive.Tests.FS
                 }
             }
 
-            public void Dispose()
-            {
-                try { Listener.Stop(); Listener.Close(); } catch { }
-            }
+            #endregion
         }
-
-        private LocalHttpServer Server;
-        private WebDavClient Client;
 
         [TestInitialize]
         public void Initialize()
@@ -96,31 +100,6 @@ namespace KS2Drive.Tests.FS
         public void Cleanup()
         {
             Server.Dispose();
-        }
-
-        private static void AssertCompletesQuickly(Func<Task> Request, String What)
-        {
-            var Running = Task.Run(Request);
-            try
-            {
-                Assert.IsTrue(Running.Wait(NotBlocked), $"{What} is blocked: HTTP connections are still held by previous responses");
-            }
-            catch (AggregateException)
-            {
-                //The request completed with an error: not blocked
-            }
-        }
-
-        private static void ExpectWebDavError(Func<Task> Request)
-        {
-            try
-            {
-                Request().GetAwaiter().GetResult();
-                Assert.Fail("A WebDavException was expected");
-            }
-            catch (WebDavException)
-            {
-            }
         }
 
         [TestMethod]
@@ -175,5 +154,34 @@ namespace KS2Drive.Tests.FS
             }, "20 upload/move/delete cycles");
             Assert.AreEqual(60, Server.RequestCount);
         }
+
+        #region Private methods
+
+        private static void AssertCompletesQuickly(Func<Task> Request, String What)
+        {
+            var Running = Task.Run(Request);
+            try
+            {
+                Assert.IsTrue(Running.Wait(NotBlocked), $"{What} is blocked: HTTP connections are still held by previous responses");
+            }
+            catch (AggregateException)
+            {
+                //The request completed with an error: not blocked
+            }
+        }
+
+        private static void ExpectWebDavError(Func<Task> Request)
+        {
+            try
+            {
+                Request().GetAwaiter().GetResult();
+                Assert.Fail("A WebDavException was expected");
+            }
+            catch (WebDavException)
+            {
+            }
+        }
+
+        #endregion
     }
 }

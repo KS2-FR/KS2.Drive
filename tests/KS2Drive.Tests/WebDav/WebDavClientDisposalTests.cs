@@ -18,29 +18,6 @@ namespace KS2Drive.Tests.WebDav
         private static readonly String FolderBody = DavResponses.MultiStatus(DavResponses.Folder("/dav/v1.2/"));
         private static readonly String FileBody = DavResponses.MultiStatus(DavResponses.File("/dav/a.txt"));
 
-        /// <summary>
-        /// Runs the operation (a WebDavException or XmlException is expected for error responses) and checks that the
-        /// expected number of responses was received and that all of them were disposed.
-        /// </summary>
-        private static async Task AssertResponsesDisposed(Func<HttpRequestMessage, HttpResponseMessage> Respond, Func<WebDavClient, Task> Operation, int ExpectedResponses)
-        {
-            var Handler = new RecordingHandler { Respond = Respond };
-            var Client = TestClients.For(Handler);
-            try
-            {
-                await Operation(Client);
-            }
-            catch (WebDavException)
-            {
-            }
-            catch (XmlException)
-            {
-            }
-
-            Assert.AreEqual(ExpectedResponses, Handler.ResponsesCreated, "Responses received");
-            Assert.AreEqual(Handler.ResponsesCreated, Handler.ResponsesDisposed, "Responses disposed");
-        }
-
         [TestMethod]
         public async Task PropFind_Success_DisposesResponse() => await AssertResponsesDisposed(r => DavResponses.Xml(FileBody), c => c.PropFind("/dav/a.txt", 0, false), 1);
 
@@ -116,5 +93,32 @@ namespace KS2Drive.Tests.WebDav
             Assert.AreEqual(Server.Requests.Count, Handler.ResponsesCreated, "Every request answered by the server went through the recorder");
             Assert.AreEqual(Handler.ResponsesCreated, Handler.ResponsesDisposed);
         }
+
+        #region Private methods
+
+        /// <summary>
+        /// Runs the operation (a WebDavException or XmlException is expected for error responses) and checks that the
+        /// expected number of responses was received and that all of them were disposed.
+        /// </summary>
+        private static async Task AssertResponsesDisposed(Func<HttpRequestMessage, HttpResponseMessage> Respond, Func<WebDavClient, Task> Operation, int ExpectedResponses)
+        {
+            var Handler = new RecordingHandler { Respond = Respond };
+            var Client = TestClients.For(Handler);
+            try
+            {
+                await Operation(Client);
+            }
+            catch (WebDavException)
+            {
+            }
+            catch (XmlException)
+            {
+            }
+
+            Assert.AreEqual(ExpectedResponses, Handler.ResponsesCreated, "Responses received");
+            Assert.AreEqual(Handler.ResponsesCreated, Handler.ResponsesDisposed, "Responses disposed");
+        }
+
+        #endregion
     }
 }

@@ -134,23 +134,6 @@ namespace KS2Drive.WebDav
             return await TryGetItem(Path, !LooksLikeFile).ConfigureAwait(false) ?? await TryGetItem(Path, LooksLikeFile).ConfigureAwait(false);
         }
 
-        private async Task<WebDavItem> TryGetItem(String Path, bool AsCollection)
-        {
-            try
-            {
-                return (await PropFind(Path, 0, AsCollection).ConfigureAwait(false)).FirstOrDefault();
-            }
-            catch (WebDavException ex) when (ex.StatusCode == 404)
-            {
-                return null;
-            }
-            catch (WebDavException ex) when (!AsCollection && ex.StatusCode >= 300 && ex.StatusCode < 400)
-            {
-                //A folder looked up without trailing slash: servers may redirect to the URL with a slash. The lookup as a folder follows
-                return null;
-            }
-        }
-
         /// <summary>
         /// Tells whether an element (file or folder) exists, with a single request: a PROPFIND without trailing slash finds a
         /// file, and for a folder servers either describe it or redirect to the URL with a slash (which also means it exists).
@@ -240,6 +223,25 @@ namespace KS2Drive.WebDav
             }
         }
 
+        #region Private methods
+
+        private async Task<WebDavItem> TryGetItem(String Path, bool AsCollection)
+        {
+            try
+            {
+                return (await PropFind(Path, 0, AsCollection).ConfigureAwait(false)).FirstOrDefault();
+            }
+            catch (WebDavException ex) when (ex.StatusCode == 404)
+            {
+                return null;
+            }
+            catch (WebDavException ex) when (!AsCollection && ex.StatusCode >= 300 && ex.StatusCode < 400)
+            {
+                //A folder looked up without trailing slash: servers may redirect to the URL with a slash. The lookup as a folder follows
+                return null;
+            }
+        }
+
         /// <summary>
         /// Sends a request. The caller must dispose the response.
         /// </summary>
@@ -261,5 +263,7 @@ namespace KS2Drive.WebDav
             int Status = (int)Response.StatusCode;
             if (!Expected.Contains(Status)) throw new WebDavException(Status, $"{Operation} {Response.RequestMessage?.RequestUri} failed: {Status} {Response.ReasonPhrase}");
         }
+
+        #endregion
     }
 }

@@ -44,11 +44,15 @@ namespace KS2Drive.Tests.WebDav
             OnCreate();
         }
 
+        #region Overrides
+
         protected override void Dispose(bool Disposing)
         {
             if (Disposing && Interlocked.Exchange(ref Disposed, 1) == 0) OnDispose();
             base.Dispose(Disposing);
         }
+
+        #endregion
     }
 
     /// <summary>
@@ -77,6 +81,8 @@ namespace KS2Drive.Tests.WebDav
         {
         }
 
+        #region Overrides
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage Request, CancellationToken CancellationToken)
         {
             var Recorded = new RecordedRequest { Method = Request.Method.Method, Url = Request.RequestUri };
@@ -102,6 +108,8 @@ namespace KS2Drive.Tests.WebDav
             foreach (var Header in Inner.Headers) Tracked.Headers.TryAddWithoutValidation(Header.Key, Header.Value);
             return Tracked;
         }
+
+        #endregion
     }
 
     /// <summary>

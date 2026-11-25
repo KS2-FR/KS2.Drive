@@ -86,6 +86,8 @@ namespace KS2Drive
             //LayoutRenderer.Register<KS2Drive.Log.IndentationLayoutRenderer>("IndentationLayout");
         }
 
+        #region Private methods
+
         /// <summary>
         /// Releases the single-instance mutex when the application exits.
         /// </summary>
@@ -93,5 +95,7 @@ namespace KS2Drive
         {
             UnicityMutex?.Dispose();
         }
+
+        #endregion
     }
 }
