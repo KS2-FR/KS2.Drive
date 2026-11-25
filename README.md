@@ -1,5 +1,5 @@
 # KS2.Drive
-This software allows you to mount a webDAV / AOS server as if it was a local HDD.<br/>
+This software allows you to mount a webDAV server as if it was a local HDD.<br/>
 
 It is similar to what webdrive© or netdrive© do.
 
@@ -15,9 +15,6 @@ Usage :
   ->	Enter your credentials<br/>
 -	Hit "SAVE"
 -	Right-click on the icon loaded in the notification area and select "MOUNT"
-
-Note :
-AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfresco.com/5.0/concepts/aos-intro.html)
 
 <br/>
 <br/>
