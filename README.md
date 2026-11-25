@@ -24,3 +24,5 @@ AOS is a kind of webDav protocol implemented in Alfresco ECM (http://docs.alfres
 
 Based on WinFSP by Bill Zissimopoulos (https://github.com/billziss-gh/winfsp)<br/>
 The WebDAV client (src/WebDav) is a small implementation of RFC 4918 written for KS2 Drive. Earlier versions were based on the WebdavClient library by Sagui Itay (https://github.com/saguiitay/WebDAVClient)
+
+This software is provided "as is", without warranty of any kind. Use at your own risk. The authors shall not be held liable for any data loss or damage arising from its use.
