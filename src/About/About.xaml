@@ -10,8 +10,8 @@
     <Grid>
         <RichTextBox x:Name="richTextBox" Margin="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" IsReadOnly="True" IsDocumentEnabled="True">
             <FlowDocument>
-                <Paragraph FontSize="30" Margin="0">KS² Drive - 0.8.6.1</Paragraph>
-                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a webDAV / AOS server as a local drive.</Paragraph>
+                <Paragraph FontSize="30" Margin="0">KS² Drive - 0.9.0.0</Paragraph>
+                <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="20" Foreground="Gray">This software allows you to mount a webDAV server as a local drive.</Paragraph>
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="14" Foreground="Gray">The software is intented to be used in conjunction with Alfresco ECM (and tested as such) but should work with any webDAV server.</Paragraph>
 
                 <Paragraph FontSize="24" Margin="0,30,0,0">Usage</Paragraph>
@@ -26,15 +26,9 @@
                         <Paragraph TextAlignment="Left" FontSize="14">Click on the KS2 Drive icon on your desktop</Paragraph>
                     </ListItem>
                     <ListItem>
-                        <Paragraph TextAlignment="Left" FontSize="14">Configure the server</Paragraph>
+                        <Paragraph TextAlignment="Left" FontSize="14">Configure the server URL</Paragraph>
                     </ListItem>
-                    <ListItem Margin="20,0,0,0">
-                        <Paragraph TextAlignment="Left" FontSize="14">Enter the Webdav/AOS URL of the server</Paragraph>
-                    </ListItem>
-                    <ListItem Margin="20,0,0,0">
-                        <Paragraph TextAlignment="Left" FontSize="14">Select the protocol (Webdav or AOS)</Paragraph>
-                    </ListItem>
-                    <ListItem Margin="20,0,0,0">
+                    <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Enter your credentials</Paragraph>
                     </ListItem>
                     <ListItem>
