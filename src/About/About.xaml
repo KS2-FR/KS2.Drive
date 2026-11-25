@@ -37,6 +37,7 @@
                     <ListItem>
                         <Paragraph TextAlignment="Left" FontSize="14">Right-click on the icon loaded in the notification area and select "MOUNT"</Paragraph>
                     </ListItem>
+                    
                 </List>
 
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12" Foreground="Gray" Margin="0,60,0,0">Based on WinFSP by Bill Zissimopoulos :
@@ -46,6 +47,7 @@
                 <Paragraph FontStyle="Italic" TextAlignment="Left" FontSize="12">More information on KS² : 
                     <Hyperlink NavigateUri="http://www.ks2.fr" IsEnabled="True" RequestNavigate="Hyperlink_RequestNavigate">http://www.ks2.fr</Hyperlink>
                 </Paragraph>
+                <Paragraph>This software is provided "as is", without warranty of any kind. Use at your own risk. The authors shall not be held liable for any data loss or damage arising from its use.</Paragraph>
             </FlowDocument>
         </RichTextBox>
     </Grid>
